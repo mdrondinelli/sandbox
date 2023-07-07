@@ -24,7 +24,7 @@ public:
     swap(temp);
   }
 
-  std::uint32_t handle() const noexcept { return _handle; }
+  std::uint32_t get() const noexcept { return _handle; }
 
 private:
   void swap(Gl_unique_vertex_array &other) noexcept {

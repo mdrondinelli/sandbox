@@ -84,7 +84,7 @@ void Gl_renderer::render(Render *render) {
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER,
                     gl_render->destination()->framebuffer());
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  
+  glUseProgram(_shader_program.get());
 }
 } // namespace rendering
 } // namespace marlon

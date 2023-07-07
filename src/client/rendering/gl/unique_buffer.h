@@ -25,7 +25,7 @@ public:
     return *this;
   }
 
-  std::uint32_t handle() const noexcept { return _handle; }
+  std::uint32_t get() const noexcept { return _handle; }
 
 private:
   void swap(Gl_unique_buffer &other) noexcept {

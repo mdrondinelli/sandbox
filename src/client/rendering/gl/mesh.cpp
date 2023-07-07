@@ -21,16 +21,16 @@ Gl_mesh::Gl_mesh(Mesh_create_info const &create_info)
     }
     throw;
   }();
-  glNamedBufferStorage(_index_buffer.handle(),
+  glNamedBufferStorage(_index_buffer.get(),
                        index_size * create_info.index_count,
                        create_info.index_data, 0);
-  glVertexArrayElementBuffer(_vertex_array.handle(), _index_buffer.handle());
-  glNamedBufferStorage(_vertex_buffer.handle(),
+  glVertexArrayElementBuffer(_vertex_array.get(), _index_buffer.get());
+  glNamedBufferStorage(_vertex_buffer.get(),
                        create_info.vertex_format.stride *
                            create_info.vertex_count,
                        create_info.vertex_data, 0);
   glVertexArrayVertexBuffer(
-      _vertex_array.handle(), 0, _vertex_buffer.handle(), 0,
+      _vertex_array.get(), 0, _vertex_buffer.get(), 0,
       static_cast<GLsizei>(create_info.vertex_format.stride));
   const auto [position_size, position_type] = [&]() {
     switch (create_info.vertex_format.position_fetch_info.format) {
@@ -40,9 +40,9 @@ Gl_mesh::Gl_mesh(Mesh_create_info const &create_info)
     throw;
   }();
   glVertexArrayAttribFormat(
-      _vertex_array.handle(), 0, position_size, position_type, GL_FALSE,
+      _vertex_array.get(), 0, position_size, position_type, GL_FALSE,
       create_info.vertex_format.position_fetch_info.offset);
-  glVertexArrayAttribBinding(_vertex_array.handle(), 0, 0);
+  glVertexArrayAttribBinding(_vertex_array.get(), 0, 0);
 }
 } // namespace rendering
 } // namespace marlon

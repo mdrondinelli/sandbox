@@ -9,6 +9,7 @@
 #include "render.h"
 #include "scene.h"
 #include "surface.h"
+#include "unique_shader_program.h"
 
 namespace marlon {
 namespace rendering {
@@ -48,6 +49,7 @@ public:
 
 private:
   std::unique_ptr<Gl_default_render_destination> _default_render_destination;
+  Gl_unique_shader_program _shader_program;
 };
 } // namespace rendering
 } // namespace marlon

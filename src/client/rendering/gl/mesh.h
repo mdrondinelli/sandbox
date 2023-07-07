@@ -27,7 +27,7 @@ public:
     return _index_format;
   }
 
-  std::uint32_t vertex_array() const noexcept { return _vertex_array.handle(); }
+  std::uint32_t vertex_array() const noexcept { return _vertex_array.get(); }
 };
 } // namespace rendering
 } // namespace marlon
