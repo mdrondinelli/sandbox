@@ -10,8 +10,8 @@ struct Material_create_info;
 class Mesh;
 struct Mesh_create_info;
 class Render_destination;
-class Render_group;
-struct Render_group_create_info;
+class Render;
+struct Render_create_info;
 class Scene;
 struct Scene_create_info;
 class Surface;
@@ -44,10 +44,11 @@ public:
 
   virtual void destroy_render_destination(Render_destination *destination) = 0;
 
-  virtual Render_group *
-  create_render_group(Render_group_create_info const &create_info) = 0;
+  virtual Render *create_render(Render_create_info const &create_info) = 0;
 
-  virtual void destroy_render_group(Render_group *group) = 0;
+  virtual void destroy_render(Render *render) = 0;
+
+  virtual void render(Render *render) = 0;
 
   // TODO: interface for compositing or figure out how multi view rendering will
   // work compositing could be used for first person view models

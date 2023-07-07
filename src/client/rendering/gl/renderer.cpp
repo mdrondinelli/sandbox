@@ -1,6 +1,6 @@
 #include "renderer.h"
 
-#include "default_render_destination.h"
+#include <glad/glad.h>
 
 namespace marlon {
 namespace rendering {
@@ -62,7 +62,8 @@ Gl_scene *Gl_renderer::create_scene(Scene_create_info const &) {
 
 void Gl_renderer::destroy_scene(Scene *scene) { delete scene; }
 
-Render_destination *Gl_renderer::create_default_render_destination() noexcept {
+Gl_default_render_destination *
+Gl_renderer::create_default_render_destination() noexcept {
   return _default_render_destination.get();
 }
 
@@ -70,6 +71,20 @@ void Gl_renderer::destroy_render_destination(Render_destination *destination) {
   if (destination != _default_render_destination.get()) {
     delete destination;
   }
+}
+
+Gl_render *Gl_renderer::create_render(Render_create_info const &create_info) {
+  return new Gl_render{create_info};
+}
+
+void Gl_renderer::destroy_render(Render *render) { delete render; }
+
+void Gl_renderer::render(Render *render) {
+  auto const gl_render = static_cast<Gl_render *>(render);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER,
+                    gl_render->destination()->framebuffer());
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  
 }
 } // namespace rendering
 } // namespace marlon

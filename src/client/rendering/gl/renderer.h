@@ -4,7 +4,9 @@
 #include <memory>
 
 #include "../renderer.h"
+#include "default_render_destination.h"
 #include "mesh.h"
+#include "render.h"
 #include "scene.h"
 #include "surface.h"
 
@@ -29,17 +31,23 @@ public:
   Gl_surface *create_surface(Surface_create_info const &create_info) final;
 
   void destroy_surface(Surface *surface) final;
-  
+
   Gl_scene *create_scene(Scene_create_info const &create_info) final;
 
   void destroy_scene(Scene *scene) final;
-  
-  Render_destination *create_default_render_destination() noexcept;
-  
+
+  Gl_default_render_destination *create_default_render_destination() noexcept;
+
   void destroy_render_destination(Render_destination *destination) final;
 
+  Gl_render *create_render(Render_create_info const &create_info) final;
+
+  void destroy_render(Render *render) final;
+
+  void render(Render *render) final;
+
 private:
-  std::unique_ptr<Render_destination> _default_render_destination;
+  std::unique_ptr<Gl_default_render_destination> _default_render_destination;
 };
 } // namespace rendering
 } // namespace marlon

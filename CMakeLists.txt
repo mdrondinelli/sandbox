@@ -15,7 +15,7 @@ set(
   "src/client/rendering/gl/default_render_destination.cpp"
   "src/client/rendering/gl/material.cpp"
   "src/client/rendering/gl/mesh.cpp"
-  "src/client/rendering/gl/render_group.cpp"
+  "src/client/rendering/gl/render.cpp"
   "src/client/rendering/gl/renderer.cpp"
   "src/client/rendering/gl/scene.cpp"
   "src/client/rendering/gl/scene_node.cpp"
