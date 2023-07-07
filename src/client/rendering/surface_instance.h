@@ -11,7 +11,14 @@ struct Surface_instance_create_info {
   Scene_node *node;
 };
 
-class Surface_instance {};
+class Surface_instance {
+public:
+  virtual ~Surface_instance() = default;
+
+  virtual Surface *surface() const noexcept = 0;
+
+  virtual Scene_node *node() const noexcept = 0;
+};
 } // namespace rendering
 } // namespace marlon
 
