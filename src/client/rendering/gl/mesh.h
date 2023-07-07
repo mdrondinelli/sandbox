@@ -4,17 +4,17 @@
 #include <cstdint>
 
 #include "../mesh.h"
-#include "buffer.h"
-#include "vertex_array.h"
+#include "unique_buffer.h"
+#include "unique_vertex_array.h"
 
 namespace marlon {
 namespace rendering {
 class Gl_mesh : public Mesh {
   std::uint32_t _index_count;
   Mesh_index_format _index_format;
-  Gl_buffer _index_buffer;
-  Gl_buffer _vertex_buffer;
-  Gl_vertex_array _vertex_array;
+  Gl_unique_buffer _index_buffer;
+  Gl_unique_buffer _vertex_buffer;
+  Gl_unique_vertex_array _vertex_array;
 
 public:
   explicit Gl_mesh(Mesh_create_info const &create_info);

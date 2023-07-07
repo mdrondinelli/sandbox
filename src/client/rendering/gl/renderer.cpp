@@ -1,5 +1,7 @@
 #include "renderer.h"
 
+#include "default_render_destination.h"
+
 namespace marlon {
 namespace rendering {
 namespace {
@@ -13,7 +15,7 @@ void main() {
 }
 )";
 
-constexpr auto vert_src = R"(#version 460 core
+constexpr auto frag_src = R"(#version 460 core
 layout (location = 0) out vec4 fragColor;
 
 uniform vec3 albedo;
@@ -25,7 +27,8 @@ void main() {
 } // namespace
 
 Gl_renderer::Gl_renderer()
-    : _default_render_destination{std::make_unique<Render_destination>()} {}
+    : _default_render_destination{
+          std::make_unique<Gl_default_render_destination>()} {}
 
 Gl_camera *Gl_renderer::create_camera(Camera_create_info const &create_info) {
   return new Gl_camera{create_info};

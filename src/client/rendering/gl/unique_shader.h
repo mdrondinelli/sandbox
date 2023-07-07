@@ -1,11 +1,9 @@
-#ifndef MARLON_RENDERING_GL_SHADER_H
-#define MARLON_RENDERING_GL_SHADER_H
+#ifndef MARLON_RENDERING_GL_UNIQUE_SHADER_H
+#define MARLON_RENDERING_GL_UNIQUE_SHADER_H
 
 #include <cstdint>
 
 #include <utility>
-
-#include "default_handle_init.h"
 
 namespace marlon {
 namespace rendering {
@@ -13,7 +11,7 @@ class Gl_shader {
 public:
   Gl_shader() noexcept : _handle{0} {}
 
-  explicit Gl_shader(std::uint32_t type);
+  explicit Gl_shader(std::uint32_t handle) noexcept : _handle{handle} {}
 
   ~Gl_shader();
 
@@ -33,6 +31,8 @@ private:
 
   std::uint32_t _handle;
 };
+
+Gl_shader make_gl_unique_shader(std::uint32_t type);
 } // namespace rendering
 } // namespace marlon
 

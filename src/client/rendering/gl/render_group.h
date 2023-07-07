@@ -17,7 +17,7 @@ struct Gl_render_info {
 class Gl_render_group : public Render_group {
 public:
   explicit Gl_render_group(
-      Render_group_create_info const &create_info) noexcept;
+      Render_group_create_info const &create_info);
 
   void render() final;
 

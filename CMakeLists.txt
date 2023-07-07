@@ -10,7 +10,6 @@ set(
   "src/client/glad/glad.cpp" 
   "src/client/glfw/instance.cpp"
   "src/client/glfw/window.cpp"
-  "src/client/rendering/gl/buffer.cpp"
   "src/client/rendering/gl/camera.cpp"
   "src/client/rendering/gl/camera_instance.cpp"
   "src/client/rendering/gl/default_render_destination.cpp"
@@ -20,9 +19,10 @@ set(
   "src/client/rendering/gl/renderer.cpp"
   "src/client/rendering/gl/scene.cpp"
   "src/client/rendering/gl/scene_node.cpp"
-  "src/client/rendering/gl/shader.cpp"
   "src/client/rendering/gl/surface.cpp"
-  "src/client/rendering/gl/vertex_array.cpp"
+  "src/client/rendering/gl/unique_buffer.cpp"
+  "src/client/rendering/gl/unique_shader.cpp"
+  "src/client/rendering/gl/unique_vertex_array.cpp"
   "src/shared/math/quat.cpp"
   "src/shared/math/vec.cpp")
 add_executable(
