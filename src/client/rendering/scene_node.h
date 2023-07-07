@@ -26,17 +26,18 @@ public:
 
   virtual math::Quatf orientation() const noexcept = 0;
 
-  virtual Scene_node &orientation(math::Quatf const &new_orientation) noexcept;
+  virtual Scene_node &
+  orientation(math::Quatf const &new_orientation) noexcept = 0;
 
-  virtual Scene_node &pre_rotate(math::Quatf const &rotation) noexcept;
+  virtual Scene_node &pre_rotate(math::Quatf const &rotation) noexcept = 0;
 
-  virtual Scene_node &post_rotate(math::Quatf const &rotation) noexcept;
+  virtual Scene_node &post_rotate(math::Quatf const &rotation) noexcept = 0;
 
-  virtual float scale_factor() const noexcept;
+  virtual float scale_factor() const noexcept = 0;
 
-  virtual Scene_node &scale_factor(float new_scale_factor) noexcept;
+  virtual Scene_node &scale_factor(float new_scale_factor) noexcept = 0;
 
-  virtual Scene_node &scale(float amount) noexcept;
+  virtual Scene_node &scale(float amount) noexcept = 0;
 };
 } // namespace rendering
 } // namespace marlon

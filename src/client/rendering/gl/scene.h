@@ -2,8 +2,9 @@
 #define MARLON_RENDERING_GL_SCENE_H
 
 #include "../scene.h"
-#include "scene_node.h"
 #include "camera_instance.h"
+#include "scene_node.h"
+#include "surface_instance.h"
 
 namespace marlon {
 namespace rendering {
@@ -19,7 +20,7 @@ public:
 
   void destroy_camera_instance(Camera_instance *instance) override;
 
-  Surface_instance *create_surface_instance(
+  Gl_surface_instance *create_surface_instance(
       Surface_instance_create_info const &create_info) override;
 
   void destroy_surface_instance(Surface_instance *instance) override;

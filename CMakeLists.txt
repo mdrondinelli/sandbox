@@ -20,6 +20,7 @@ set(
   "src/client/rendering/gl/scene.cpp"
   "src/client/rendering/gl/scene_node.cpp"
   "src/client/rendering/gl/surface.cpp"
+  "src/client/rendering/gl/surface_instance.cpp"
   "src/client/rendering/gl/unique_buffer.cpp"
   "src/client/rendering/gl/unique_shader.cpp"
   "src/client/rendering/gl/unique_vertex_array.cpp"
