@@ -4,6 +4,16 @@
 
 namespace marlon {
 namespace math {
+static_assert(sizeof(Vec2i) == 8);
+static_assert(sizeof(Vec2f) == 8);
+static_assert(sizeof(Vec2d) == 16);
+static_assert(sizeof(Vec3i) == 12);
+static_assert(sizeof(Vec3f) == 12);
+static_assert(sizeof(Vec3d) == 24);
+static_assert(sizeof(Vec4i) == 16);
+static_assert(sizeof(Vec4f) == 16);
+static_assert(sizeof(Vec4d) == 32);
+
 TEST_CASE("Vectors can be constructed.") {
   const Vec2i i{1, 0};
   REQUIRE(i.x == 1);
