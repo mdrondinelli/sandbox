@@ -26,6 +26,7 @@ set(
   "src/client/rendering/gl/unique_shader.cpp"
   "src/client/rendering/gl/unique_shader_program.cpp"
   "src/client/rendering/gl/unique_vertex_array.cpp"
+  "src/shared/math/mat.cpp"
   "src/shared/math/quat.cpp"
   "src/shared/math/vec.cpp")
 add_executable(
