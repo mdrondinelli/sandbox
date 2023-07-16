@@ -143,19 +143,10 @@ void Gl_scene_diff::Impl::apply(float factor) {
   for (auto const &pair : _continuous_scene_node_translations) {
     pair.first->_impl.blend_translation(pair.second, factor);
   }
-  for (auto const &pair : _discontinuous_scene_node_translations) {
-    pair.first->_impl.blend_translation(pair.second, factor);
-  }
   for (auto const &pair : _continuous_scene_node_rotations) {
     pair.first->_impl.blend_rotation(pair.second, factor);
   }
-  for (auto const &pair : _discontinuous_scene_node_rotations) {
-    pair.first->_impl.blend_rotation(pair.second, factor);
-  }
   for (auto const &pair : _continuous_scene_node_scales) {
-    pair.first->_impl.blend_scale(pair.second, factor);
-  }
-  for (auto const &pair : _discontinuous_scene_node_scales) {
     pair.first->_impl.blend_scale(pair.second, factor);
   }
 }
