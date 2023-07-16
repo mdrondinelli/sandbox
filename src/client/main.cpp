@@ -77,9 +77,15 @@ int main() {
   auto const left_diff = render_engine->create_scene_diff({.scene = scene});
   render_engine->record_scene_node_translation_continuous(
       left_diff, surface_node, {-0.5f, 0.0f, 0.0f});
+  render_engine->record_scene_node_rotation_continuous(
+      left_diff, surface_node,
+      math::Quatf::axis_angle({0.0f, 0.0f, 1.0f}, math::deg_to_rad(-90.0f)));
   auto const right_diff = render_engine->create_scene_diff({.scene = scene});
   render_engine->record_scene_node_translation_continuous(
       right_diff, surface_node, {0.5f, 0.0f, 0.0f});
+  render_engine->record_scene_node_rotation_continuous(
+      right_diff, surface_node,
+      math::Quatf::axis_angle({0.0f, 0.0f, 1.0f}, math::deg_to_rad(90.0f)));
   auto const diffs = std::vector{left_diff, right_diff};
   auto const time_between_updates = 1.0;
   auto diff_index = 0;

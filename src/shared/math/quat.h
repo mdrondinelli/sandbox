@@ -4,6 +4,8 @@
 #include <cassert>
 #include <cmath>
 
+#include <numbers>
+
 #include "vec.h"
 
 namespace marlon {
@@ -104,6 +106,14 @@ template <typename T> constexpr auto length(Quat<T> const &q) noexcept {
 
 template <typename T> constexpr auto normalize(Quat<T> const &q) noexcept {
   return q / length(q);
+}
+
+template <typename T> constexpr auto deg_to_rad(T deg) noexcept {
+  return deg * (std::numbers::pi_v<T> / T(180));
+}
+
+template <typename T> constexpr auto rad_to_deg(T rad) noexcept {
+  return rad * (T(180) / std::numbers::pi_v<T>);
 }
 } // namespace math
 } // namespace marlon
