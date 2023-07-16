@@ -10,17 +10,17 @@ namespace marlon {
 namespace rendering {
 namespace {
 constexpr auto vert_src = R"(#version 460 core
-layout (location = 0) in vec3 position;
+layout(location = 0) in vec3 position;
 
-// uniform mat4 model_view_projection;
+layout(location = 0) uniform mat4 model_view_projection;
 
 void main() {
-  gl_Position = vec4(position, 1.0);
+  gl_Position = model_view_projection * vec4(position, 1.0);
 }
 )";
 
 constexpr auto frag_src = R"(#version 460 core
-layout (location = 0) out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
 
 void main() {
   fragColor = vec4(1.0f, 1.0f, 1.0f, 1.0);
@@ -240,7 +240,8 @@ void Gl_render_engine::destroy_render_stream(Render_stream *stream) {
 }
 
 void Gl_render_engine::render(Render_stream *stream) {
-  static_cast<Gl_render_stream *>(stream)->_impl.render(_shader_program.get());
+  static_cast<Gl_render_stream *>(stream)->_impl.render(_shader_program.get(),
+                                                        0);
 }
 } // namespace rendering
 } // namespace marlon

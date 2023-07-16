@@ -10,12 +10,14 @@ namespace marlon {
 namespace rendering {
 class Gl_render_stream : public Render_stream {
   friend class Gl_render_engine;
+
 public:
   class Impl {
   public:
     explicit Impl(Render_stream_create_info const &create_info) noexcept;
 
-    void render(std::uint32_t shader_program);
+    void render(std::uint32_t shader_program,
+                std::int32_t model_view_matrix_uniform_location);
 
   private:
     Gl_scene *_source_scene;

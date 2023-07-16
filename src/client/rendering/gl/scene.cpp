@@ -1,5 +1,7 @@
 #include "scene.h"
 
+#include <glad/glad.h>
+
 namespace marlon {
 namespace rendering {
 Gl_scene::Impl::Impl(Scene_create_info const &) noexcept {}
@@ -60,8 +62,20 @@ bool Gl_scene::Impl::release_surface_instance(
   return _surface_instances.erase(surface_instance) != 0;
 }
 
-void Gl_scene::Impl::draw_surface_instances() {
+void Gl_scene::Impl::draw_surface_instances(
+    std::uint32_t shader_program,
+    std::int32_t model_view_projection_matrix_location) {
   for (auto const surface_instance : _surface_instances) {
+    auto const model_matrix = surface_instance->_impl.get_scene_node()
+                                  ->_impl.calculate_model_matrix();
+    auto const model_view_projection_matrix =
+        math::Mat4x4f{model_matrix[0],
+                      model_matrix[1],
+                      model_matrix[2],
+                      {0.0f, 0.0f, 0.0f, 1.0f}};
+    glProgramUniformMatrix4fv(shader_program,
+                              model_view_projection_matrix_location, 1, GL_TRUE,
+                              &model_view_projection_matrix[0][0]);
     auto const &mesh_impl =
         surface_instance->_impl.get_surface()->_impl.get_mesh()->_impl;
     mesh_impl.bind_vertex_array();

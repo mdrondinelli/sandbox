@@ -41,7 +41,9 @@ public:
 
     bool release_surface_instance(Gl_surface_instance *surface_instance);
 
-    void draw_surface_instances();
+    void
+    draw_surface_instances(std::uint32_t shader_program,
+                           std::int32_t model_view_projection_matrix_location);
 
   private:
     std::unordered_set<Gl_scene_node *> _scene_nodes;

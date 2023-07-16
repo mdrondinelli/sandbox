@@ -9,39 +9,37 @@
 #include "glfw/window.h"
 #include "rendering/gl/render_engine.h"
 
-static_assert(sizeof(marlon::math::Vec3f) == 12);
+using namespace marlon;
 
 int main() {
-  marlon::glfw::Instance glfw;
+  glfw::Instance glfw;
   // glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  const auto window = marlon::glfw::make_unique_window(800, 600, "title");
+  const auto window = glfw::make_unique_window(800, 600, "title");
   glfwMakeContextCurrent(window.get());
-  const auto loadproc = [](const char *procname) -> void * {
-    return glfwGetProcAddress(procname);
-  };
-  if (!gladLoadGLLoader(loadproc)) {
+  if (!gladLoadGLLoader([](char const *procname) {
+        return static_cast<void *>(glfwGetProcAddress(procname));
+      })) {
     std::cerr << "Failed to initialize OpenGL" << std::endl;
     return -1;
   }
   glfwSwapInterval(1);
-  auto const render_engine = new marlon::rendering::Gl_render_engine{};
+  auto const render_engine = std::make_unique<rendering::Gl_render_engine>();
   auto const material =
       render_engine->create_material({.albedo = {1.0f, 1.0f, 1.0f}});
   auto const mesh_indices = std::vector<std::uint32_t>{0, 1, 2};
   auto const mesh_vertices = std::vector<marlon::math::Vec3f>{
       {-0.5f, -0.5f, 0.0f}, {0.5f, -0.5f, 0.0f}, {0.0f, 0.5f, 0.0f}};
   auto const mesh = render_engine->create_mesh(
-      {.index_format = marlon::rendering::Mesh_index_format::uint32,
+      {.index_format = rendering::Mesh_index_format::uint32,
        .index_count = 3,
        .index_data = mesh_indices.data(),
        .vertex_format =
            {.position_fetch_info =
-                {.format =
-                     marlon::rendering::Mesh_vertex_position_format::float3,
+                {.format = rendering::Mesh_vertex_position_format::float3,
                  .offset = 0},
             .stride = 12},
        .vertex_count = 3,
@@ -51,8 +49,8 @@ int main() {
   auto const scene = render_engine->create_scene({});
   auto const scene_diff = render_engine->create_scene_diff({.scene = scene});
   auto const surface_node = render_engine->record_scene_node_creation(
-      scene_diff, {.translation = marlon::math::Vec3f::zero(),
-                   .rotation = marlon::math::Quatf::identity(),
+      scene_diff, {.translation = {0.1f, 0.0f, 0.0f},
+                   .rotation = math::Quatf::identity(),
                    .scale = 1.0f});
   render_engine->record_surface_instance_creation(
       scene_diff, {.surface = surface, .scene_node = surface_node});
@@ -62,8 +60,8 @@ int main() {
                    .aspect_ratio = 16.0f / 9.0f,
                    .vertical_fov = 1.5f});
   auto const camera_node = render_engine->record_scene_node_creation(
-      scene_diff, {.translation = marlon::math::Vec3f::zero(),
-                   .rotation = marlon::math::Quatf::identity(),
+      scene_diff, {.translation = math::Vec3f::zero(),
+                   .rotation = math::Quatf::identity(),
                    .scale = 1.0f});
   auto const camera_instance = render_engine->record_camera_instance_creation(
       scene_diff, {.camera = camera, .scene_node = camera_node});
@@ -83,6 +81,5 @@ int main() {
   render_engine->destroy_material(material);
   render_engine->destroy_mesh(mesh);
   render_engine->destroy_scene(scene);
-  delete render_engine;
   return 0;
 }
