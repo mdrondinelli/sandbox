@@ -75,10 +75,6 @@ int main() {
        .destination = render_engine->get_default_render_destination()});
   while (!glfwWindowShouldClose(window.get())) {
     glfwPollEvents();
-    // auto const scene_diff = render_engine->create_scene_diff({.scene =
-    // scene});
-
-    // render_engine->destroy_scene_diff(scene_diff);
     render_engine->render(render_stream);
     glfwSwapBuffers(window.get());
   }
