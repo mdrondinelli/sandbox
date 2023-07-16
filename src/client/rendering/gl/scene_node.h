@@ -38,21 +38,21 @@ public:
     math::Mat3x4f calculate_model_matrix() const noexcept {
       return {{1.0f - 2.0f * _rotation.v.y * _rotation.v.y -
                    2.0f * _rotation.v.z * _rotation.v.z,
-               2.0f * _rotation.v.x * _rotation.v.y +
+               2.0f * _rotation.v.x * _rotation.v.y -
                    2.0f * _rotation.w * _rotation.v.z,
-               2.0f * _rotation.v.x * _rotation.v.z -
-                   2.0f * _rotation.w * _rotation.v.y,
-               _translation.x},
-              {2.0f * _rotation.v.x * _rotation.v.y -
+               2.0f * _rotation.v.x * _rotation.v.z +
+                   2.0f * _rotation.w * _rotation.v.y},
+              {2.0f * _rotation.v.x * _rotation.v.y +
                    2.0f * _rotation.w * _rotation.v.z,
                1.0f - 2.0f * _rotation.v.x * _rotation.v.x -
                    2.0f * _rotation.v.z * _rotation.v.z,
-               2.0f * _rotation.v.y * _rotation.v.z +
+               2.0f * _rotation.v.y * _rotation.v.z -
                    2.0f * _rotation.w * _rotation.v.x,
                _translation.y},
-              {2.0f * _rotation.v.x * _rotation.v.z +
+              {2.0f * _rotation.v.x * _rotation.v.z -
                    2.0f * _rotation.w * _rotation.v.y,
-               2.0f * _rotation.v.y * _rotation.v.z -
+               _translation.x,
+               2.0f * _rotation.v.y * _rotation.v.z +
                    2.0f * _rotation.w * _rotation.v.x,
                1.0f - 2.0f * _rotation.v.x * _rotation.v.x -
                    2.0f * _rotation.v.y * _rotation.v.y,
