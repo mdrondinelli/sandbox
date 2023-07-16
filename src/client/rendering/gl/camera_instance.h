@@ -9,16 +9,20 @@ namespace marlon {
 namespace rendering {
 class Gl_camera_instance : public Camera_instance {
 public:
+  class Impl {
+  public:
+    explicit Impl(Camera_instance_create_info const &create_info) noexcept;
+
+  private:
+    Gl_camera *_camera;
+    Gl_scene_node *_scene_node;
+  };
+
   explicit Gl_camera_instance(
       Camera_instance_create_info const &create_info) noexcept;
 
-  Gl_camera *camera() const noexcept override;
-
-  Gl_scene_node *node() const noexcept override;
-
 private:
-  Gl_camera *_camera;
-  Gl_scene_node *_node;
+  Impl _impl;
 };
 } // namespace rendering
 } // namespace marlon

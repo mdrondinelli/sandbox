@@ -9,7 +9,9 @@ namespace marlon {
 namespace rendering {
 class Gl_render_destination : public Render_destination {
 public:
-  virtual std::uint32_t framebuffer() const noexcept = 0;
+  virtual ~Gl_render_destination() = default;
+
+  virtual std::uint32_t get_framebuffer() const noexcept = 0;
 };
 } // namespace rendering
 } // namespace marlon

@@ -32,10 +32,7 @@ struct Mesh_create_info {
   void const *vertex_data;
 };
 
-class Mesh {
-public:
-  virtual ~Mesh() = default;
-};
+class Mesh {};
 } // namespace rendering
 } // namespace marlon
 

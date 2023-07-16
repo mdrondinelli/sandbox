@@ -10,24 +10,29 @@
 namespace marlon {
 namespace rendering {
 class Gl_mesh : public Mesh {
-  std::uint32_t _index_count;
-  Mesh_index_format _index_format;
-  Gl_unique_buffer _index_buffer;
-  Gl_unique_buffer _vertex_buffer;
-  Gl_unique_vertex_array _vertex_array;
+  friend class Gl_scene;
 
 public:
+  class Impl {
+  public:
+    explicit Impl(Mesh_create_info const &create_info);
+
+    void bind_vertex_array() const noexcept;
+
+    void draw() const noexcept;
+
+  private:
+    std::uint32_t _index_count;
+    Mesh_index_format _index_format;
+    Gl_unique_buffer _index_buffer;
+    Gl_unique_buffer _vertex_buffer;
+    Gl_unique_vertex_array _vertex_array;
+  };
+
   explicit Gl_mesh(Mesh_create_info const &create_info);
 
-  std::uint32_t index_count() const noexcept {
-    return _index_count;
-  }
-
-  Mesh_index_format index_format() const noexcept {
-    return _index_format;
-  }
-
-  std::uint32_t vertex_array() const noexcept { return _vertex_array.get(); }
+private:
+  Impl _impl;
 };
 } // namespace rendering
 } // namespace marlon

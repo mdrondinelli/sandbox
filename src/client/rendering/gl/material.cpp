@@ -2,9 +2,10 @@
 
 namespace marlon {
 namespace rendering {
-Gl_material::Gl_material(Material_create_info const &create_info) noexcept
+Gl_material::Impl::Impl(Material_create_info const &create_info) noexcept
     : _albedo{create_info.albedo} {}
 
-Rgb_spectrum Gl_material::albedo() const noexcept { return _albedo; }
+Gl_material::Gl_material(Material_create_info const &create_info) noexcept
+    : _impl{create_info} {}
 } // namespace rendering
 } // namespace marlon

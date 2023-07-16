@@ -3,10 +3,7 @@
 
 namespace marlon {
 namespace rendering {
-class Render_destination {
-public:
-  virtual ~Render_destination() = default;
-};
+class Render_destination {};
 } // namespace rendering
 } // namespace marlon
 

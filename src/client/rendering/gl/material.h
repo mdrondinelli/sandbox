@@ -7,12 +7,18 @@ namespace marlon {
 namespace rendering {
 class Gl_material : public Material {
 public:
+  class Impl {
+  public:
+    explicit Impl(Material_create_info const &create_info) noexcept;
+
+  private:
+    Rgb_spectrum _albedo;
+  };
+
   explicit Gl_material(Material_create_info const &create_info) noexcept;
 
-  Rgb_spectrum albedo() const noexcept override;
-
 private:
-  Rgb_spectrum _albedo;
+  Impl _impl;
 };
 } // namespace rendering
 } // namespace marlon

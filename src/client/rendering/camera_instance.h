@@ -8,17 +8,10 @@ class Scene_node;
 
 struct Camera_instance_create_info {
   Camera *camera;
-  Scene_node *node;
+  Scene_node *scene_node;
 };
 
-class Camera_instance {
-public:
-  virtual ~Camera_instance() = default;
-
-  virtual Camera *camera() const noexcept = 0;
-
-  virtual Scene_node *node() const noexcept = 0;
-};
+class Camera_instance {};
 } // namespace rendering
 } // namespace marlon
 

@@ -8,17 +8,31 @@
 namespace marlon {
 namespace rendering {
 class Gl_surface_instance : public Surface_instance {
+  friend class Gl_scene;
+
 public:
+  class Impl {
+  public:
+    explicit Impl(Surface_instance_create_info const &create_info) noexcept;
+  
+    Gl_surface *get_surface() const noexcept {
+      return _surface;
+    }
+    
+    Gl_scene_node *get_scene_node() const noexcept {
+      return _scene_node;
+    }
+
+  private:
+    Gl_surface *_surface;
+    Gl_scene_node *_scene_node;
+  };
+
   explicit Gl_surface_instance(
       Surface_instance_create_info const &create_info) noexcept;
 
-  Gl_surface *surface() const noexcept final;
-
-  Gl_scene_node *node() const noexcept final;
-
 private:
-  Gl_surface *_surface;
-  Gl_scene_node *_node;
+  Impl _impl;
 };
 } // namespace rendering
 } // namespace marlon

@@ -9,12 +9,7 @@ struct Material_create_info {
   Rgb_spectrum albedo;
 };
 
-class Material {
-public:
-  virtual ~Material() = default;
-
-  virtual Rgb_spectrum albedo() const noexcept = 0;
-};
+class Material {};
 } // namespace rendering
 } // namespace marlon
 

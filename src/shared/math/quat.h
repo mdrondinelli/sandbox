@@ -40,6 +40,22 @@ template <typename T> constexpr auto operator-(Quat<T> const &q) noexcept {
   return Quat<T>{-q.w, -q.v};
 }
 
+template <typename T> constexpr auto operator*(T s, Quat<T> const &q) noexcept {
+  return Quat<T>{s * q.w, s * q.v};
+}
+
+template <typename T> constexpr auto operator*(Quat<T> const &q, T s) noexcept {
+  return Quat<T>{q.w * s, q.v * s};
+}
+
+template <typename T> constexpr auto operator/(Quat<T> const &q, T s) noexcept {
+  if constexpr (std::is_floating_point_v<T>) {
+    return q * (1 / s);
+  } else {
+    return Quat<T>{q.w / s, q.v / s};
+  }
+}
+
 template <typename T>
 constexpr auto operator*(Quat<T> const &q1, Quat<T> const &q2) noexcept {
   return Quat<T>{q1.w * q2.w - dot(q1.v, q2.v),
@@ -47,8 +63,47 @@ constexpr auto operator*(Quat<T> const &q1, Quat<T> const &q2) noexcept {
 }
 
 template <typename T>
+constexpr auto operator+(Quat<T> const &q1, Quat<T> const &q2) noexcept {
+  return Quat<T>{q1.w + q2.w, q1.v + q2.v};
+}
+template <typename T>
+constexpr auto operator-(Quat<T> const &q1, Quat<T> const &q2) noexcept {
+  return Quat<T>{q1.w - q2.w, q1.v - q2.v};
+}
+
+template <typename T>
 constexpr auto &operator*=(Quat<T> &q1, Quat<T> const &q2) noexcept {
   return q1 = (q1 * q2);
+}
+
+template <typename T> constexpr auto &operator*=(Quat<T> &q, T s) noexcept {
+  return q = q * s;
+}
+
+template <typename T> constexpr auto &operator/=(Quat<T> &q, T s) noexcept {
+  return q = q / s;
+}
+
+template <typename T>
+constexpr auto &operator+=(Quat<T> &q1, Quat<T> const &q2) noexcept {
+  return q1 = (q1 + q2);
+}
+
+template <typename T>
+constexpr auto &operator-=(Quat<T> &q1, Quat<T> const &q2) noexcept {
+  return q1 = (q1 - q2);
+}
+
+template <typename T> constexpr auto length_squared(Quat<T> const &q) noexcept {
+  return q.w * q.w + dot(q.v, q.v);
+}
+
+template <typename T> constexpr auto length(Quat<T> const &q) noexcept {
+  return std::sqrt(length_squared(q));
+}
+
+template <typename T> constexpr auto normalize(Quat<T> const &q) noexcept {
+  return q / length(q);
 }
 } // namespace math
 } // namespace marlon

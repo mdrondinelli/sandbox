@@ -7,18 +7,11 @@ class Material;
 class Mesh;
 
 struct Surface_create_info {
-  Mesh *mesh;
   Material *material;
+  Mesh *mesh;
 };
 
-class Surface {
-public:
-  virtual ~Surface() = default;
-
-  virtual Mesh *mesh() const noexcept = 0;
-
-  virtual Material *material() const noexcept = 0;
-};
+class Surface {};
 } // namespace rendering
 } // namespace marlon
 

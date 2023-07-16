@@ -15,9 +15,10 @@ set(
   "src/client/rendering/gl/default_render_destination.cpp"
   "src/client/rendering/gl/material.cpp"
   "src/client/rendering/gl/mesh.cpp"
-  "src/client/rendering/gl/render.cpp"
-  "src/client/rendering/gl/renderer.cpp"
+  "src/client/rendering/gl/render_engine.cpp"
+  "src/client/rendering/gl/render_stream.cpp"
   "src/client/rendering/gl/scene.cpp"
+  "src/client/rendering/gl/scene_diff.cpp"
   "src/client/rendering/gl/scene_node.cpp"
   "src/client/rendering/gl/surface.cpp"
   "src/client/rendering/gl/surface_instance.cpp"
@@ -30,7 +31,7 @@ set(
 add_executable(
   client ${CLIENT_SOURCES} "src/client/main.cpp")
 add_executable(client_tests ${CLIENT_SOURCES})
-target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE=1)
+target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)
 target_include_directories(client PRIVATE include)
 target_include_directories(client_tests PRIVATE include)
 target_link_libraries(client glfw)
