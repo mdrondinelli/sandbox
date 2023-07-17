@@ -35,7 +35,7 @@ public:
 
   void run() {
     auto const material =
-        _graphics->create_material({.albedo = {1.0f, 1.0f, 1.0f}});
+        _graphics->create_material({.albedo = {1.0f, 0.0f, 0.0f}});
     std::vector<std::uint32_t> const mesh_indices{0, 1, 2, 3, 2, 1};
     std::vector<marlon::math::Vec3f> const mesh_vertices{{-0.5f, -0.5f, 0.0f},
                                                          {0.5f, -0.5f, 0.0f},

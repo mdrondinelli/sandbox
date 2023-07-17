@@ -12,18 +12,20 @@ namespace {
 constexpr auto vert_src = R"(#version 460 core
 layout(location = 0) in vec3 position;
 
-layout(location = 0) uniform mat4 model_view_projection;
+layout(location = 0) uniform mat4 model_view_clip_matrix;
 
 void main() {
-  gl_Position = model_view_projection * vec4(position, 1.0);
+  gl_Position = model_view_clip_matrix * vec4(position, 1.0);
 }
 )";
 
 constexpr auto frag_src = R"(#version 460 core
 layout(location = 0) out vec4 fragColor;
 
+layout(location = 1) uniform vec3 albedo;
+
 void main() {
-  fragColor = vec4(1.0f, 1.0f, 1.0f, 1.0);
+  fragColor = vec4(albedo, 1.0);
 }
 )";
 } // namespace
@@ -248,7 +250,7 @@ void Gl_render_engine::render(Scene *source_scene,
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glUseProgram(_shader_program.get());
-  gl_source_scene->_impl.draw_surface_instances(_shader_program.get(), 0,
+  gl_source_scene->_impl.draw_surface_instances(_shader_program.get(), 0, 1,
                                                 clip_matrix * view_matrix);
 }
 } // namespace rendering

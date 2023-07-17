@@ -6,10 +6,16 @@
 namespace marlon {
 namespace rendering {
 class Gl_material : public Material {
+  friend class Gl_scene;
+
 public:
   class Impl {
   public:
     explicit Impl(Material_create_info const &create_info) noexcept;
+
+    Rgb_spectrum const &get_albedo() const noexcept {
+      return _albedo;
+    }
 
   private:
     Rgb_spectrum _albedo;

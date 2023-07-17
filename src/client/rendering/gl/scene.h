@@ -43,6 +43,7 @@ public:
 
     void draw_surface_instances(std::uint32_t shader_program,
                                 std::int32_t model_view_clip_matrix_location,
+                                std::int32_t albedo_location,
                                 math::Mat4x4f const &view_clip_matrix);
 
   private:
