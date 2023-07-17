@@ -70,10 +70,6 @@ int main() {
       initial_diff, {.camera = camera, .scene_node = camera_node});
   render_engine->apply_scene_diff(initial_diff);
   render_engine->destroy_scene_diff(initial_diff);
-  auto const render_stream = render_engine->create_render_stream(
-      {.source_scene = scene,
-       .source_camera_instance = camera_instance,
-       .destination = render_engine->get_default_render_destination()});
   auto const left_diff = render_engine->create_scene_diff({.scene = scene});
   render_engine->record_scene_node_translation_continuous(
       left_diff, surface_node, {-0.5f, 0.0f, 0.0f});
@@ -110,12 +106,12 @@ int main() {
         diffs[diff_index],
         static_cast<float>(1.0 - time_until_update /
                                      (time_until_update + time_passed)));
-    render_engine->render(render_stream);
+    render_engine->render(scene, camera_instance,
+                          render_engine->get_default_render_target());
     glfwSwapBuffers(window.get());
   }
   render_engine->destroy_scene_diff(right_diff);
   render_engine->destroy_scene_diff(left_diff);
-  render_engine->destroy_render_stream(render_stream);
   render_engine->destroy_surface(surface);
   render_engine->destroy_material(material);
   render_engine->destroy_mesh(mesh);

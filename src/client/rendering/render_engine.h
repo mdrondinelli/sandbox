@@ -14,7 +14,7 @@ class Material;
 struct Material_create_info;
 class Mesh;
 struct Mesh_create_info;
-class Render_destination;
+class Render_target;
 class Render_stream;
 struct Render_stream_create_info;
 class Scene;
@@ -116,16 +116,18 @@ public:
   record_surface_instance_destruction(Scene_diff *scene_diff,
                                       Surface_instance *surface_instance) = 0;
 
-  // Render_destination creation is implementation-specific
+  // Render_target creation is implementation-specific
 
-  virtual void destroy_render_destination(Render_destination *destination) = 0;
+  virtual void destroy_render_target(Render_target *target) = 0;
 
-  virtual Render_stream *
-  create_render_stream(Render_stream_create_info const &create_info) = 0;
+  virtual void render(Scene *source_scene,
+                      Camera_instance *source_camera_instance,
+                      Render_target *target) = 0;
 
-  virtual void destroy_render_stream(Render_stream *render_stream) = 0;
+  // virtual Render_stream *
+  // create_render_stream(Render_stream_create_info const &create_info) = 0;
 
-  virtual void render(Render_stream *stream) = 0;
+  // virtual void destroy_render_stream(Render_stream *render_stream) = 0;
 
   // TODO: interface for compositing or figure out how multi view rendering will
   // work compositing could be used for first person view models

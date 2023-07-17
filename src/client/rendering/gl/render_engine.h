@@ -6,9 +6,8 @@
 #include "../render_engine.h"
 #include "camera.h"
 #include "camera_instance.h"
-#include "default_render_destination.h"
+#include "default_render_target.h"
 #include "mesh.h"
-#include "render_stream.h"
 #include "scene.h"
 #include "scene_diff.h"
 #include "surface.h"
@@ -96,23 +95,19 @@ public:
       Scene_diff *scene_diff,
       Surface_instance_create_info const &create_info) final;
 
-  void record_surface_instance_destruction(
-      Scene_diff *scene_diff,
-      Surface_instance *surface_instance) final;
+  void
+  record_surface_instance_destruction(Scene_diff *scene_diff,
+                                      Surface_instance *surface_instance) final;
 
-  Gl_default_render_destination *get_default_render_destination() noexcept;
+  Gl_default_render_target *get_default_render_target() noexcept;
 
-  void destroy_render_destination(Render_destination *destination) final;
+  void destroy_render_target(Render_target *target) final;
 
-  Gl_render_stream *
-  create_render_stream(Render_stream_create_info const &create_info) final;
-
-  void destroy_render_stream(Render_stream *stream) final;
-
-  void render(Render_stream *stream) final;
+  void render(Scene *source_scene, Camera_instance *source_camera_instance,
+              Render_target *target) final;
 
 private:
-  std::unique_ptr<Gl_default_render_destination> _default_render_destination;
+  std::unique_ptr<Gl_default_render_target> _default_render_target;
   Gl_unique_shader_program _shader_program;
 };
 } // namespace rendering

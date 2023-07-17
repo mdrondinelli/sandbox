@@ -3,13 +3,13 @@
 
 #include <cstdint>
 
-#include "../render_destination.h"
+#include "../render_target.h"
 
 namespace marlon {
 namespace rendering {
-class Gl_render_destination : public Render_destination {
+class Gl_render_target : public Render_target {
 public:
-  virtual ~Gl_render_destination() = default;
+  virtual ~Gl_render_target() = default;
 
   virtual std::uint32_t get_framebuffer() const noexcept = 0;
 };

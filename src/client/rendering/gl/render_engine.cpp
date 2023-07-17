@@ -29,8 +29,7 @@ void main() {
 } // namespace
 
 Gl_render_engine::Gl_render_engine()
-    : _default_render_destination{std::make_unique<
-          Gl_default_render_destination>()},
+    : _default_render_target{std::make_unique<Gl_default_render_target>()},
       _shader_program{make_gl_unique_shader_program()} {
   GLint status;
   auto const vertex_shader{make_gl_unique_shader(GL_VERTEX_SHADER)};
@@ -220,28 +219,26 @@ void Gl_render_engine::record_surface_instance_destruction(
           static_cast<Gl_surface_instance *>(surface_instance));
 }
 
-Gl_default_render_destination *
-Gl_render_engine::get_default_render_destination() noexcept {
-  return _default_render_destination.get();
+Gl_default_render_target *
+Gl_render_engine::get_default_render_target() noexcept {
+  return _default_render_target.get();
 }
 
-void Gl_render_engine::destroy_render_destination(
-    Render_destination *destination) {
-  delete static_cast<Gl_render_destination *>(destination);
+void Gl_render_engine::destroy_render_target(Render_target *) {
+  // delete static_cast<Gl_render_target *>(target);
 }
 
-Gl_render_stream *Gl_render_engine::create_render_stream(
-    Render_stream_create_info const &create_info) {
-  return new Gl_render_stream{create_info};
-}
-
-void Gl_render_engine::destroy_render_stream(Render_stream *stream) {
-  delete stream;
-}
-
-void Gl_render_engine::render(Render_stream *stream) {
-  static_cast<Gl_render_stream *>(stream)->_impl.render(_shader_program.get(),
-                                                        0);
+void Gl_render_engine::render(Scene *source_scene, Camera_instance *,
+                              Render_target *target) {
+  auto const gl_source_scene = static_cast<Gl_scene *>(source_scene);
+  // auto const gl_source_camera_instance =
+  //     static_cast<Gl_camera_instance *>(source_camera_instance);
+  auto const gl_target = static_cast<Gl_render_target *>(target);
+  glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
+  glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glUseProgram(_shader_program.get());
+  gl_source_scene->_impl.draw_surface_instances(_shader_program.get(), 0);
 }
 } // namespace rendering
 } // namespace marlon

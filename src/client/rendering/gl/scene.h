@@ -13,7 +13,7 @@
 namespace marlon {
 namespace rendering {
 class Gl_scene : public Scene {
-  friend class Gl_render_stream;
+  friend class Gl_render_engine;
   friend class Gl_scene_diff;
 
 public:
