@@ -81,7 +81,7 @@ Gl_mesh *Gl_render_engine::create_mesh(Mesh_create_info const &create_info) {
   return new Gl_mesh{create_info};
 }
 
-void Gl_render_engine::destroy_mesh(Mesh *mesh) {
+void Gl_render_engine::destroy_mesh(Mesh *mesh) noexcept {
   delete static_cast<Gl_mesh *>(mesh);
 }
 
@@ -90,7 +90,7 @@ Gl_render_engine::create_material(Material_create_info const &create_info) {
   return new Gl_material{create_info};
 }
 
-void Gl_render_engine::destroy_material(Material *material) {
+void Gl_render_engine::destroy_material(Material *material) noexcept {
   delete static_cast<Gl_material *>(material);
 }
 
@@ -99,15 +99,15 @@ Gl_render_engine::create_surface(Surface_create_info const &create_info) {
   return new Gl_surface{create_info};
 }
 
-void Gl_render_engine::destroy_surface(Surface *surface) {
+void Gl_render_engine::destroy_surface(Surface *surface) noexcept {
   delete static_cast<Gl_surface *>(surface);
 }
 
 Gl_scene *Gl_render_engine::create_scene(Scene_create_info const &create_info) {
   return new Gl_scene{create_info};
-}
+} 
 
-void Gl_render_engine::destroy_scene(Scene *scene) {
+void Gl_render_engine::destroy_scene(Scene *scene) noexcept {
   delete static_cast<Gl_scene *>(scene);
 }
 
@@ -226,7 +226,7 @@ Gl_render_engine::get_default_render_target() noexcept {
   return _default_render_target.get();
 }
 
-void Gl_render_engine::destroy_render_target(Render_target *) {
+void Gl_render_engine::destroy_render_target(Render_target *) noexcept {
   // delete static_cast<Gl_render_target *>(target);
 }
 

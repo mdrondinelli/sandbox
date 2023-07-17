@@ -22,19 +22,19 @@ public:
 
   Gl_mesh *create_mesh(Mesh_create_info const &create_info) final;
 
-  void destroy_mesh(Mesh *mesh) final;
+  void destroy_mesh(Mesh *mesh) noexcept final;
 
   Gl_material *create_material(Material_create_info const &create_info) final;
 
-  void destroy_material(Material *material) final;
+  void destroy_material(Material *material) noexcept final;
 
   Gl_surface *create_surface(Surface_create_info const &create_info) final;
 
-  void destroy_surface(Surface *surface) final;
+  void destroy_surface(Surface *surface) noexcept final;
 
   Gl_scene *create_scene(Scene_create_info const &create_info) final;
 
-  void destroy_scene(Scene *scene) final;
+  void destroy_scene(Scene *scene) noexcept final;
 
   Gl_scene_diff *
   create_scene_diff(Scene_diff_create_info const &create_info) final;
@@ -101,7 +101,7 @@ public:
 
   Gl_default_render_target *get_default_render_target() noexcept;
 
-  void destroy_render_target(Render_target *target) final;
+  void destroy_render_target(Render_target *target) noexcept final;
 
   void render(Scene *source_scene, Camera_instance *source_camera_instance,
               Render_target *target) final;

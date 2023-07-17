@@ -39,15 +39,19 @@ public:
   virtual Material *
   create_material(Material_create_info const &create_info) = 0;
 
-  virtual void destroy_material(Material *material) = 0;
+  virtual void destroy_material(Material *material) noexcept = 0;
+
+  virtual Mesh *create_mesh(Mesh_create_info const &create_info) = 0;
+
+  virtual void destroy_mesh(Mesh *mesh) noexcept = 0;
 
   virtual Surface *create_surface(Surface_create_info const &create_info) = 0;
 
-  virtual void destroy_surface(Surface *surface) = 0;
+  virtual void destroy_surface(Surface *surface) noexcept = 0;
 
   virtual Scene *create_scene(Scene_create_info const &create_info) = 0;
 
-  virtual void destroy_scene(Scene *scene) = 0;
+  virtual void destroy_scene(Scene *scene) noexcept = 0;
 
   virtual Scene_diff *
   create_scene_diff(Scene_diff_create_info const &create_info) = 0;
@@ -118,16 +122,11 @@ public:
 
   // Render_target creation is implementation-specific
 
-  virtual void destroy_render_target(Render_target *target) = 0;
+  virtual void destroy_render_target(Render_target *target) noexcept = 0;
 
   virtual void render(Scene *source_scene,
                       Camera_instance *source_camera_instance,
                       Render_target *target) = 0;
-
-  // virtual Render_stream *
-  // create_render_stream(Render_stream_create_info const &create_info) = 0;
-
-  // virtual void destroy_render_stream(Render_stream *render_stream) = 0;
 
   // TODO: interface for compositing or figure out how multi view rendering will
   // work compositing could be used for first person view models
