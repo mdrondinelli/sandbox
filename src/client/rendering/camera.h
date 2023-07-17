@@ -6,8 +6,8 @@ namespace rendering {
 struct Camera_create_info {
   float near_plane_distance;
   float far_plane_distance;
-  float aspect_ratio;
-  float vertical_fov;
+  float zoom_x;
+  float zoom_y;
 };
 
 class Camera {};

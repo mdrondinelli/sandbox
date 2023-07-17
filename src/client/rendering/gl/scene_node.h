@@ -7,6 +7,7 @@
 namespace marlon {
 namespace rendering {
 struct Gl_scene_node : public Scene_node {
+  friend class Gl_render_engine;
   friend class Gl_scene;
   friend class Gl_scene_diff;
 
@@ -57,6 +58,36 @@ public:
                _scale * (1.0f - 2.0f * _rotation.v.x * _rotation.v.x -
                          2.0f * _rotation.v.y * _rotation.v.y),
                _translation.z}};
+    }
+
+    math::Mat3x4f calculate_model_matrix_inv() const noexcept {
+      auto const scale_inv = 1.0f / _scale;
+      auto const upper_left_inv = math::Mat3x3f{
+          {scale_inv * (1.0f - 2.0f * _rotation.v.y * _rotation.v.y -
+                        2.0f * _rotation.v.z * _rotation.v.z),
+           scale_inv * (2.0f * _rotation.v.x * _rotation.v.y +
+                        2.0f * _rotation.w * _rotation.v.z),
+           scale_inv * (2.0f * _rotation.v.x * _rotation.v.z -
+                        2.0f * _rotation.w * _rotation.v.y)},
+          {scale_inv * (2.0f * _rotation.v.x * _rotation.v.y -
+                        2.0f * _rotation.w * _rotation.v.z),
+           scale_inv * (1.0f - 2.0f * _rotation.v.x * _rotation.v.x -
+                        2.0f * _rotation.v.z * _rotation.v.z),
+           scale_inv * (2.0f * _rotation.v.y * _rotation.v.z +
+                        2.0f * _rotation.w * _rotation.v.x)},
+          {scale_inv * (2.0f * _rotation.v.x * _rotation.v.z +
+                        2.0f * _rotation.w * _rotation.v.y),
+           scale_inv * (2.0f * _rotation.v.y * _rotation.v.z -
+                        2.0f * _rotation.w * _rotation.v.x),
+           scale_inv * (1.0f - 2.0f * _rotation.v.x * _rotation.v.x -
+                        2.0f * _rotation.v.y * _rotation.v.y)}};
+      return math::Mat3x4f{
+          {upper_left_inv[0][0], upper_left_inv[0][1], upper_left_inv[0][2],
+           -dot(upper_left_inv[0], _translation)},
+          {upper_left_inv[1][0], upper_left_inv[1][1], upper_left_inv[1][2],
+           -dot(upper_left_inv[1], _translation)},
+          {upper_left_inv[2][0], upper_left_inv[2][1], upper_left_inv[2][2],
+           -dot(upper_left_inv[2], _translation)}};
     }
 
   private:

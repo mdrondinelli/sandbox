@@ -9,6 +9,10 @@ template <typename T, int N, int M> class Mat;
 
 template <typename T, int M> class Mat<T, 2, M> {
 public:
+  static auto zero() {
+    return Mat<T, 2, M>{Vec<T, M>::zero(), Vec<T, M>::zero()};
+  }
+
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1) noexcept
       : rows{row0, row1} {}
 
@@ -26,6 +30,11 @@ private:
 
 template <typename T, int M> class Mat<T, 3, M> {
 public:
+  static auto zero() {
+    return Mat<T, 3, M>{Vec<T, M>::zero(), Vec<T, M>::zero(),
+                        Vec<T, M>::zero()};
+  }
+
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
                 Vec<T, M> const &row2) noexcept
       : rows{row0, row1, row2} {}
@@ -45,6 +54,11 @@ private:
 
 template <typename T, int M> class Mat<T, 4, M> {
 public:
+  static auto zero() {
+    return Mat<T, 4, M>{Vec<T, M>::zero(), Vec<T, M>::zero(), Vec<T, M>::zero(),
+                        Vec<T, M>::zero()};
+  }
+
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
                 Vec<T, M> const &row2, Vec<T, M> const &row3) noexcept
       : rows{row0, row1, row2, row3} {}
@@ -99,6 +113,20 @@ constexpr bool operator==(Mat<T, N, M> const &a,
     }
   }
   return true;
+}
+
+template <typename T, int N1, int N2, int N3>
+constexpr auto operator*(Mat<T, N1, N2> const &a,
+                         Mat<T, N2, N3> const &b) noexcept {
+  auto ab = Mat<T, N1, N3>::zero();
+  for (auto i = 0; i < N1; ++i) {
+    for (auto j = 0; j < N3; ++j) {
+      for (auto k = 0; k < N2; ++k) {
+        ab[i][j] += a[i][k] * b[k][j];
+      }
+    }
+  }
+  return ab;
 }
 } // namespace math
 } // namespace marlon

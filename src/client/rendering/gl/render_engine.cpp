@@ -228,17 +228,28 @@ void Gl_render_engine::destroy_render_target(Render_target *) {
   // delete static_cast<Gl_render_target *>(target);
 }
 
-void Gl_render_engine::render(Scene *source_scene, Camera_instance *,
+void Gl_render_engine::render(Scene *source_scene,
+                              Camera_instance *source_camera_instance,
                               Render_target *target) {
   auto const gl_source_scene = static_cast<Gl_scene *>(source_scene);
-  // auto const gl_source_camera_instance =
-  //     static_cast<Gl_camera_instance *>(source_camera_instance);
+  auto const gl_source_camera_instance =
+      static_cast<Gl_camera_instance *>(source_camera_instance);
   auto const gl_target = static_cast<Gl_render_target *>(target);
+  auto const view_matrix_3x4 =
+      gl_source_camera_instance->_impl.get_scene_node()
+          ->_impl.calculate_model_matrix_inv();
+  auto const view_matrix = math::Mat4x4f{view_matrix_3x4[0],
+                                         view_matrix_3x4[1],
+                                         view_matrix_3x4[2],
+                                         {0.0f, 0.0f, 0.0f, 1.0f}};
+  auto const clip_matrix = gl_source_camera_instance->_impl.get_camera()
+                               ->_impl.calculate_clip_matrix();
   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
-  glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glUseProgram(_shader_program.get());
-  gl_source_scene->_impl.draw_surface_instances(_shader_program.get(), 0);
+  gl_source_scene->_impl.draw_surface_instances(_shader_program.get(), 0,
+                                                clip_matrix * view_matrix);
 }
 } // namespace rendering
 } // namespace marlon
