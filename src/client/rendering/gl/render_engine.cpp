@@ -53,8 +53,7 @@ Gl_render_engine::Gl_render_engine()
     std::vector<char> log;
     log.resize(log_size);
     glGetShaderInfoLog(vertex_shader.get(), log_size, nullptr, log.data());
-    std::cerr << log.data() << std::endl;
-    throw;
+    throw std::runtime_error{log.data()};
   }
   auto const fragment_shader{make_gl_unique_shader(GL_FRAGMENT_SHADER)};
   glShaderSource(fragment_shader.get(), 1, &frag_src, nullptr);
@@ -66,8 +65,7 @@ Gl_render_engine::Gl_render_engine()
     std::vector<char> log;
     log.resize(log_size);
     glGetShaderInfoLog(fragment_shader.get(), log_size, nullptr, log.data());
-    std::cerr << log.data() << std::endl;
-    throw;
+    throw std::runtime_error{log.data()};
   }
   glAttachShader(_shader_program.get(), vertex_shader.get());
   glAttachShader(_shader_program.get(), fragment_shader.get());
@@ -81,8 +79,7 @@ Gl_render_engine::Gl_render_engine()
     std::vector<char> log;
     log.resize(log_size);
     glGetProgramInfoLog(_shader_program.get(), log_size, nullptr, log.data());
-    std::cerr << log.data() << std::endl;
-    throw;
+    throw std::runtime_error{log.data()};
   }
 }
 
