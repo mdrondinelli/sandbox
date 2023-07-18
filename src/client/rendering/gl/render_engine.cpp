@@ -10,22 +10,29 @@ namespace marlon {
 namespace rendering {
 namespace {
 constexpr auto vert_src = R"(#version 460 core
-layout(location = 0) in vec3 position;
+layout(location = 0) in vec3 model_space_position;
 
-layout(location = 0) uniform mat4 model_view_clip_matrix;
+out vec3 view_space_position;
+
+layout(location = 0) uniform mat4 model_view_matrix;
+layout(location = 1) uniform mat4 model_view_clip_matrix;
 
 void main() {
-  gl_Position = model_view_clip_matrix * vec4(position, 1.0);
+  view_space_position = (model_view_matrix * vec4(model_space_position, 1.0)).xyz;
+  gl_Position = model_view_clip_matrix * vec4(model_space_position, 1.0);
 }
 )";
 
 constexpr auto frag_src = R"(#version 460 core
+in vec3 view_space_position;
+
 layout(location = 0) out vec4 fragColor;
 
-layout(location = 1) uniform vec3 albedo;
+layout(location = 2) uniform vec3 albedo;
 
 void main() {
-  fragColor = vec4(albedo, 1.0);
+  float attenuation_factor = 1.0 / dot(view_space_position, view_space_position);
+  fragColor = vec4(attenuation_factor * albedo, 1.0);
 }
 )";
 } // namespace
@@ -105,7 +112,7 @@ void Gl_render_engine::destroy_surface(Surface *surface) noexcept {
 
 Gl_scene *Gl_render_engine::create_scene(Scene_create_info const &create_info) {
   return new Gl_scene{create_info};
-} 
+}
 
 void Gl_render_engine::destroy_scene(Scene *scene) noexcept {
   delete static_cast<Gl_scene *>(scene);
@@ -246,12 +253,13 @@ void Gl_render_engine::render(Scene *source_scene,
                                          {0.0f, 0.0f, 0.0f, 1.0f}};
   auto const clip_matrix = gl_source_camera_instance->_impl.get_camera()
                                ->_impl.calculate_clip_matrix();
+  glEnable(GL_FRAMEBUFFER_SRGB);
   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glUseProgram(_shader_program.get());
-  gl_source_scene->_impl.draw_surface_instances(_shader_program.get(), 0, 1,
-                                                clip_matrix * view_matrix);
+  gl_source_scene->_impl.draw_surface_instances(_shader_program.get(), 0, 1, 2,
+                                                view_matrix, clip_matrix * view_matrix);
 }
 } // namespace rendering
 } // namespace marlon

@@ -63,8 +63,9 @@ bool Gl_scene::Impl::release_surface_instance(
 }
 
 void Gl_scene::Impl::draw_surface_instances(
-    std::uint32_t shader_program, std::int32_t model_view_clip_matrix_location,
-    std::int32_t albedo_location, math::Mat4x4f const &view_clip_matrix) {
+    std::uint32_t shader_program, std::int32_t model_view_matrix_location,
+    std::int32_t model_view_clip_matrix_location, std::int32_t albedo_location,
+    math::Mat4x4f const &view_matrix, math::Mat4x4f const &view_clip_matrix) {
   for (auto const surface_instance : _surface_instances) {
     auto const model_matrix_3x4 = surface_instance->_impl.get_scene_node()
                                       ->_impl.calculate_model_matrix();
@@ -72,7 +73,10 @@ void Gl_scene::Impl::draw_surface_instances(
                                                 model_matrix_3x4[1],
                                                 model_matrix_3x4[2],
                                                 {0.0f, 0.0f, 0.0f, 1.0f}};
+    auto const model_view_matrix = view_matrix * model_matrix_4x4;
     auto const model_view_clip_matrix = view_clip_matrix * model_matrix_4x4;
+    glProgramUniformMatrix4fv(shader_program, model_view_matrix_location,
+                              1, GL_TRUE, &model_view_matrix[0][0]);
     glProgramUniformMatrix4fv(shader_program, model_view_clip_matrix_location,
                               1, GL_TRUE, &model_view_clip_matrix[0][0]);
     auto const albedo = surface_instance->_impl.get_surface()
