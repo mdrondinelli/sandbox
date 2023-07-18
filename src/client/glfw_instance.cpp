@@ -1,4 +1,4 @@
-#include "Instance.h"
+#include "glfw_instance.h"
 
 #include <stdexcept>
 #include <utility>
@@ -7,12 +7,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 namespace marlon {
-namespace glfw {
+namespace client {
 namespace {
 int instance_count{0};
 }
 
-Instance::Instance() {
+Glfw_instance::Glfw_instance() {
   if (instance_count != 0) {
     throw std::runtime_error{
         "attempted to construct more than once simultaneous glfw instance"};
@@ -26,7 +26,7 @@ Instance::Instance() {
   ++instance_count;
 }
 
-Instance::~Instance() {
+Glfw_instance::~Glfw_instance() {
   if (_owns) {
     glfwTerminate();
     _owns = false;
@@ -34,30 +34,30 @@ Instance::~Instance() {
   }
 }
 
-Instance::Instance(Instance &&other) noexcept
+Glfw_instance::Glfw_instance(Glfw_instance &&other) noexcept
     : _owns{std::exchange(other._owns, false)} {}
 
-Instance &Instance::operator=(Instance &&other) noexcept {
+Glfw_instance &Glfw_instance::operator=(Glfw_instance &&other) noexcept {
   auto temp{std::move(other)};
   swap(temp);
   return *this;
 }
 
-bool Instance::owns() const noexcept { return _owns; }
+bool Glfw_instance::owns() const noexcept { return _owns; }
 
-void Instance::swap(Instance &other) noexcept { std::swap(_owns, other._owns); }
+void Glfw_instance::swap(Glfw_instance &other) noexcept { std::swap(_owns, other._owns); }
 
 TEST_CASE("glfw::Instance") {
   REQUIRE(instance_count == 0);
   {
-    Instance instance;
+    Glfw_instance instance;
     REQUIRE(instance_count == 1);
     REQUIRE(instance.owns());
-    Instance other_instance{std::move(instance)};
+    Glfw_instance other_instance{std::move(instance)};
     REQUIRE(instance_count == 1);
     REQUIRE(!instance.owns());
     REQUIRE(other_instance.owns());
-    REQUIRE_THROWS(Instance{});
+    REQUIRE_THROWS(Glfw_instance{});
   }
   REQUIRE(instance_count == 0);
 }

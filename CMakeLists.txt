@@ -31,8 +31,8 @@ add_library(
   "src/graphics/glad/glad.cpp" )
 set(
   CLIENT_SOURCES
-  "src/client/glfw/instance.cpp"
-  "src/client/glfw/window.cpp")
+  "src/client/glfw_instance.cpp"
+  "src/client/glfw_window.cpp")
 add_executable(
   client ${CLIENT_SOURCES} "src/client/main.cpp")
 add_executable(client_tests ${CLIENT_SOURCES})

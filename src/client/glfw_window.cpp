@@ -1,19 +1,19 @@
-#include "window.h"
+#include "glfw_window.h"
 
 #include <stdexcept>
 
 #include <GLFW/glfw3.h>
 #include <catch2/catch_test_macros.hpp>
 
-#include "instance.h"
+#include "glfw_instance.h"
 
 namespace marlon {
-namespace glfw {
-void Window_deleter::operator()(GLFWwindow *ptr) const {
+namespace client {
+void Glfw_window_deleter::operator()(GLFWwindow *ptr) const {
   glfwDestroyWindow(ptr);
 }
 
-Unique_window_ptr make_unique_window(int width, int height, const char *title,
+Unique_glfw_window_ptr make_unique_window(int width, int height, const char *title,
                                      GLFWmonitor *monitor, GLFWwindow *share) {
   const auto window = glfwCreateWindow(width, height, title, monitor, share);
   if (window == nullptr) {
@@ -21,12 +21,12 @@ Unique_window_ptr make_unique_window(int width, int height, const char *title,
     glfwGetError(&error_description);
     throw std::runtime_error{error_description};
   }
-  return Unique_window_ptr{window};
+  return Unique_glfw_window_ptr{window};
 }
 
-TEST_CASE("glfw::Unique_window_ptr") {
+TEST_CASE("glfw::Unique_glfw_window_ptr") {
   REQUIRE_THROWS(make_unique_window(800, 600, "title"));
-  const Instance instance;
+  const Glfw_instance instance;
   const auto window = make_unique_window(800, 600, "title");
   {
     auto a = make_unique_window(100, 100, "a");

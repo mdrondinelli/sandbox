@@ -5,8 +5,8 @@
 
 #include <GLFW/glfw3.h>
 
-#include "glfw/instance.h"
-#include "glfw/window.h"
+#include "glfw_instance.h"
+#include "glfw_window.h"
 #include "../graphics/gl/graphics.h"
 
 using namespace marlon;
@@ -19,7 +19,7 @@ public:
           glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
           glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
           glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-          return glfw::make_unique_window(1024, 768, "title");
+          return client::make_unique_window(1024, 768, "title");
         }()},
         _graphics{[this]() {
           glfwMakeContextCurrent(_window.get());
@@ -117,8 +117,8 @@ public:
   }
 
 private:
-  glfw::Instance _glfw;
-  glfw::Unique_window_ptr _window;
+  client::Glfw_instance _glfw;
+  client::Unique_glfw_window_ptr _window;
   std::unique_ptr<rendering::Gl_graphics> _graphics;
 };
 
