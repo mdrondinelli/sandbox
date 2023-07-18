@@ -2,7 +2,7 @@
 #define MARLON_RENDERING_SCENE_H
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Scene_diff;
 struct Scene_diff_create_info;
 

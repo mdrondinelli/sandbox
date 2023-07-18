@@ -1,7 +1,7 @@
 #include "camera.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_camera::Impl::Impl(Camera_create_info const &create_info) noexcept
     : _near_plane_distance{create_info.near_plane_distance},
       _far_plane_distance{create_info.far_plane_distance},

@@ -5,7 +5,7 @@
 #include "../scene_node.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 struct Gl_scene_node : public Scene_node {
   friend class Gl_graphics;
   friend class Gl_scene;

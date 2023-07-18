@@ -2,7 +2,7 @@
 #define MARLON_RENDERING_CAMERA_H
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 struct Camera_create_info {
   float near_plane_distance;
   float far_plane_distance;

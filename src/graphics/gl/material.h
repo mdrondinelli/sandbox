@@ -4,7 +4,7 @@
 #include "../material.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_material : public Material {
   friend class Gl_scene;
 

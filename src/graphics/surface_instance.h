@@ -2,7 +2,7 @@
 #define MARLON_RENDERING_SURFACE_INSTANCE_H
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Scene_node;
 class Surface;
 

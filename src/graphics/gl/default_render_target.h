@@ -4,7 +4,7 @@
 #include "render_target.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_default_render_target : public Gl_render_target {
 public:
   std::uint32_t get_framebuffer() const noexcept final;

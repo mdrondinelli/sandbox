@@ -1,7 +1,7 @@
 #include "scene_node.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_scene_node::Impl::Impl(Scene_node_create_info const &create_info) noexcept
     : _translation{create_info.translation}, _rotation{create_info.rotation},
       _scale{create_info.scale} {}

@@ -9,7 +9,7 @@
 #include "surface_instance.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_scene_diff : public Scene_diff {
   friend class Gl_graphics;
 

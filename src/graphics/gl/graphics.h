@@ -15,7 +15,7 @@
 #include "unique_shader_program.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_graphics : public Graphics {
 public:
   Gl_graphics();

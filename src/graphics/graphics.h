@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_RENDER_ENGINE_H
-#define MARLON_RENDERING_RENDER_ENGINE_H
+#ifndef MARLON_GRAPHICS_GRAPHICS_H
+#define MARLON_GRAPHICS_GRAPHICS_H
 
 #include <memory>
 
@@ -7,7 +7,7 @@
 #include "../math/vec.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Camera;
 struct Camera_create_info;
 class Camera_instance;

@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_unique_shader::~Gl_unique_shader() {
   glDeleteShader(_handle);
 }

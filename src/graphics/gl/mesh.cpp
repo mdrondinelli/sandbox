@@ -5,7 +5,7 @@
 #include <glad/glad.h>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_mesh::Impl::Impl(Mesh_create_info const &create_info)
     : _index_count{create_info.index_count},
       _index_format{create_info.index_format},

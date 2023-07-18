@@ -5,7 +5,7 @@
 #include "../camera.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_camera : public Camera {
   friend class Gl_graphics;
 

@@ -2,7 +2,7 @@
 #define MARLONR_RGB_SPECTRUM
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Rgb_spectrum {
 public:
   float r;

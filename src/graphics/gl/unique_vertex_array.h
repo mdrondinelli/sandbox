@@ -6,7 +6,7 @@
 #include <utility>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_unique_vertex_array {
 public:
   constexpr Gl_unique_vertex_array() noexcept : _handle{0} {}

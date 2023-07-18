@@ -1,7 +1,7 @@
 #include "surface_instance.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_surface_instance::Impl::Impl(
     Surface_instance_create_info const &create_info) noexcept
     : _surface{static_cast<Gl_surface *>(create_info.surface)},

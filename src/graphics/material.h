@@ -4,7 +4,7 @@
 #include "rgb_spectrum.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 struct Material_create_info {
   Rgb_spectrum albedo;
 };

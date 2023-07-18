@@ -2,7 +2,7 @@
 #define MARLONR_RENDERING_SURFACE_H
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Material;
 class Mesh;
 

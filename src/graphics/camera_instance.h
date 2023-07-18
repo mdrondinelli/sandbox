@@ -2,7 +2,7 @@
 #define MARLON_RENDERING_CAMERA_INSTANCE_H
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Camera;
 class Scene_node;
 

@@ -6,7 +6,7 @@
 #include <optional>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 enum class Mesh_index_format { uint16, uint32 };
 
 enum class Mesh_vertex_position_format { float3 };

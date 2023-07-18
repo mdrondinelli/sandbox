@@ -1,7 +1,7 @@
 #include "camera_instance.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_camera_instance::Impl::Impl(
     Camera_instance_create_info const &create_info) noexcept
     : _camera{static_cast<Gl_camera *>(create_info.camera)},

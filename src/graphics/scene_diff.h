@@ -5,7 +5,7 @@
 #include "../../math/vec.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Scene;
 
 struct Scene_diff_create_info {

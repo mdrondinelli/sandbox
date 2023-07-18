@@ -1,7 +1,7 @@
 #include "scene_diff.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_scene_diff::Impl::Impl(Scene_diff_create_info const &create_info) noexcept
     : _scene{static_cast<Gl_scene *>(create_info.scene)} {}
 

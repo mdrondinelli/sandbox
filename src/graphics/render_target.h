@@ -2,7 +2,7 @@
 #define MARLON_RENDERING_RENDER_TARGET_H
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Render_target {};
 } // namespace rendering
 } // namespace marlon

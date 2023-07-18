@@ -5,7 +5,7 @@
 #include "../../math/vec.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 struct Scene_node_create_info {
   math::Vec3f translation;
   math::Quatf rotation;
