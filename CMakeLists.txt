@@ -5,14 +5,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(/W4 /WX)
 find_package(glfw3 3.3.8 REQUIRED)
 find_package(Catch2 3 REQUIRED)
-set(
-  CLIENT_SOURCES
-  "src/client/glad/glad.cpp" 
-  "src/client/glfw/instance.cpp"
-  "src/client/glfw/window.cpp"
-  "src/shared/math/mat.cpp"
-  "src/shared/math/quat.cpp"
-  "src/shared/math/vec.cpp")
 add_library(
   graphics
   "src/graphics/gl/camera.cpp"
@@ -30,6 +22,14 @@ add_library(
   "src/graphics/gl/unique_shader.cpp"
   "src/graphics/gl/unique_shader_program.cpp"
   "src/graphics/gl/unique_vertex_array.cpp")
+set(
+  CLIENT_SOURCES
+  "src/client/glad/glad.cpp" 
+  "src/client/glfw/instance.cpp"
+  "src/client/glfw/window.cpp"
+  "src/shared/math/mat.cpp"
+  "src/shared/math/quat.cpp"
+  "src/shared/math/vec.cpp")
 add_executable(
   client ${CLIENT_SOURCES} "src/client/main.cpp")
 add_executable(client_tests ${CLIENT_SOURCES})
