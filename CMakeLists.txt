@@ -27,10 +27,10 @@ add_library(
   "src/graphics/gl/unique_buffer.cpp"
   "src/graphics/gl/unique_shader.cpp"
   "src/graphics/gl/unique_shader_program.cpp"
-  "src/graphics/gl/unique_vertex_array.cpp")
+  "src/graphics/gl/unique_vertex_array.cpp"
+  "src/graphics/glad/glad.cpp" )
 set(
   CLIENT_SOURCES
-  "src/client/glad/glad.cpp" 
   "src/client/glfw/instance.cpp"
   "src/client/glfw/window.cpp")
 add_executable(
