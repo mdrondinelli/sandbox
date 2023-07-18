@@ -1,1 +1,0 @@
-// lifetime guard instead of marlon::rendering::unique_ptr

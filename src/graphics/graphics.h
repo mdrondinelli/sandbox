@@ -3,8 +3,8 @@
 
 #include <memory>
 
-#include "../../shared/math/quat.h"
-#include "../../shared/math/vec.h"
+#include "../../math/quat.h"
+#include "../../math/vec.h"
 
 namespace marlon {
 namespace rendering {

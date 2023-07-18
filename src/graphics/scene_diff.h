@@ -1,8 +1,8 @@
 #ifndef MARLON_RENDERING_SCENE_KEYFRAME_H
 #define MARLON_RENDERING_SCENE_KEYFRAME_H
 
-#include "../../shared/math/quat.h"
-#include "../../shared/math/vec.h"
+#include "../../math/quat.h"
+#include "../../math/vec.h"
 
 namespace marlon {
 namespace rendering {

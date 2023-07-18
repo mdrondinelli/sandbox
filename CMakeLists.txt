@@ -5,6 +5,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(/W4 /WX)
 find_package(glfw3 3.3.8 REQUIRED)
 find_package(Catch2 3 REQUIRED)
+add_executable(
+  math_tests
+  "src/math/mat.cpp"
+  "src/math/quat.cpp"
+  "src/math/vec.cpp")
+target_link_libraries(math_tests Catch2::Catch2WithMain)
 add_library(
   graphics
   "src/graphics/gl/camera.cpp"
@@ -26,10 +32,7 @@ set(
   CLIENT_SOURCES
   "src/client/glad/glad.cpp" 
   "src/client/glfw/instance.cpp"
-  "src/client/glfw/window.cpp"
-  "src/shared/math/mat.cpp"
-  "src/shared/math/quat.cpp"
-  "src/shared/math/vec.cpp")
+  "src/client/glfw/window.cpp")
 add_executable(
   client ${CLIENT_SOURCES} "src/client/main.cpp")
 add_executable(client_tests ${CLIENT_SOURCES})

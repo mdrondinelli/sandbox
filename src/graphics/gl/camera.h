@@ -1,7 +1,7 @@
 #ifndef MARLON_RENDERING_GL_CAMERA_H
 #define MARLON_RENDERING_GL_CAMERA_H
 
-#include "../../shared/math/mat.h"
+#include "../../math/mat.h"
 #include "../camera.h"
 
 namespace marlon {
