@@ -1,6 +1,6 @@
 #include "render_engine.h"
 
-#include <iostream>
+#include <stdexcept>
 
 #include <glad/glad.h>
 
