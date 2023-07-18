@@ -11,7 +11,7 @@
 namespace marlon {
 namespace rendering {
 class Gl_scene_diff : public Scene_diff {
-  friend class Gl_render_engine;
+  friend class Gl_graphics;
 
 public:
   class Impl {

@@ -7,7 +7,7 @@
 namespace marlon {
 namespace rendering {
 struct Gl_scene_node : public Scene_node {
-  friend class Gl_render_engine;
+  friend class Gl_graphics;
   friend class Gl_scene;
   friend class Gl_scene_diff;
 

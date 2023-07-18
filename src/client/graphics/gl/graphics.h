@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "../render_engine.h"
+#include "../graphics.h"
 #include "camera.h"
 #include "camera_instance.h"
 #include "default_render_target.h"
@@ -16,9 +16,9 @@
 
 namespace marlon {
 namespace rendering {
-class Gl_render_engine : public Render_engine {
+class Gl_graphics : public Graphics {
 public:
-  Gl_render_engine();
+  Gl_graphics();
 
   Gl_mesh *create_mesh(Mesh_create_info const &create_info) final;
 

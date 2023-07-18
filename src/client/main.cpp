@@ -7,7 +7,7 @@
 
 #include "glfw/instance.h"
 #include "glfw/window.h"
-#include "rendering/gl/render_engine.h"
+#include "graphics/gl/graphics.h"
 
 using namespace marlon;
 
@@ -28,7 +28,7 @@ public:
               })) {
             throw std::runtime_error{"Failed to initialize OpenGL"};
           }
-          return std::make_unique<rendering::Gl_render_engine>();
+          return std::make_unique<rendering::Gl_graphics>();
         }()} {
     glfwSwapInterval(1);
   }
@@ -119,7 +119,7 @@ public:
 private:
   glfw::Instance _glfw;
   glfw::Unique_window_ptr _window;
-  std::unique_ptr<rendering::Gl_render_engine> _graphics;
+  std::unique_ptr<rendering::Gl_graphics> _graphics;
 };
 
 int main() {

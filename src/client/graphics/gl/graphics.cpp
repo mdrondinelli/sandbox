@@ -1,4 +1,4 @@
-#include "render_engine.h"
+#include "graphics.h"
 
 #include <stdexcept>
 
@@ -39,7 +39,7 @@ void main() {
 )";
 } // namespace
 
-Gl_render_engine::Gl_render_engine()
+Gl_graphics::Gl_graphics()
     : _default_render_target{std::make_unique<Gl_default_render_target>()},
       _shader_program{make_gl_unique_shader_program()} {
   GLint status;
@@ -83,144 +83,144 @@ Gl_render_engine::Gl_render_engine()
   }
 }
 
-Gl_mesh *Gl_render_engine::create_mesh(Mesh_create_info const &create_info) {
+Gl_mesh *Gl_graphics::create_mesh(Mesh_create_info const &create_info) {
   return new Gl_mesh{create_info};
 }
 
-void Gl_render_engine::destroy_mesh(Mesh *mesh) noexcept {
+void Gl_graphics::destroy_mesh(Mesh *mesh) noexcept {
   delete static_cast<Gl_mesh *>(mesh);
 }
 
 Gl_material *
-Gl_render_engine::create_material(Material_create_info const &create_info) {
+Gl_graphics::create_material(Material_create_info const &create_info) {
   return new Gl_material{create_info};
 }
 
-void Gl_render_engine::destroy_material(Material *material) noexcept {
+void Gl_graphics::destroy_material(Material *material) noexcept {
   delete static_cast<Gl_material *>(material);
 }
 
 Gl_surface *
-Gl_render_engine::create_surface(Surface_create_info const &create_info) {
+Gl_graphics::create_surface(Surface_create_info const &create_info) {
   return new Gl_surface{create_info};
 }
 
-void Gl_render_engine::destroy_surface(Surface *surface) noexcept {
+void Gl_graphics::destroy_surface(Surface *surface) noexcept {
   delete static_cast<Gl_surface *>(surface);
 }
 
-Gl_scene *Gl_render_engine::create_scene(Scene_create_info const &create_info) {
+Gl_scene *Gl_graphics::create_scene(Scene_create_info const &create_info) {
   return new Gl_scene{create_info};
 }
 
-void Gl_render_engine::destroy_scene(Scene *scene) noexcept {
+void Gl_graphics::destroy_scene(Scene *scene) noexcept {
   delete static_cast<Gl_scene *>(scene);
 }
 
 Gl_scene_diff *
-Gl_render_engine::create_scene_diff(Scene_diff_create_info const &create_info) {
+Gl_graphics::create_scene_diff(Scene_diff_create_info const &create_info) {
   return new Gl_scene_diff{create_info};
 }
 
-void Gl_render_engine::destroy_scene_diff(Scene_diff *scene_diff) noexcept {
+void Gl_graphics::destroy_scene_diff(Scene_diff *scene_diff) noexcept {
   delete static_cast<Gl_scene_diff *>(scene_diff);
 }
 
-void Gl_render_engine::apply_scene_diff(Scene_diff *scene_diff) {
+void Gl_graphics::apply_scene_diff(Scene_diff *scene_diff) {
   static_cast<Gl_scene_diff *>(scene_diff)->_impl.apply();
 }
 
-void Gl_render_engine::apply_scene_diff(Scene_diff *scene_diff, float factor) {
+void Gl_graphics::apply_scene_diff(Scene_diff *scene_diff, float factor) {
   static_cast<Gl_scene_diff *>(scene_diff)->_impl.apply(factor);
 }
 
-Gl_scene_node *Gl_render_engine::record_scene_node_creation(
+Gl_scene_node *Gl_graphics::record_scene_node_creation(
     Scene_diff *scene_diff, Scene_node_create_info const &create_info) {
   return static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_scene_node_creation(create_info);
 }
 
-void Gl_render_engine::record_scene_node_destruction(Scene_diff *scene_diff,
+void Gl_graphics::record_scene_node_destruction(Scene_diff *scene_diff,
                                                      Scene_node *scene_node) {
   return static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_scene_node_destruction(
           static_cast<Gl_scene_node *>(scene_node));
 }
 
-void Gl_render_engine::record_scene_node_translation_continuous(
+void Gl_graphics::record_scene_node_translation_continuous(
     Scene_diff *scene_diff, Scene_node *scene_node, math::Vec3f const &value) {
   static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_scene_node_translation_continuous(
           static_cast<Gl_scene_node *>(scene_node), value);
 }
 
-void Gl_render_engine::record_scene_node_translation_discontinuous(
+void Gl_graphics::record_scene_node_translation_discontinuous(
     Scene_diff *scene_diff, Scene_node *scene_node, math::Vec3f const &value) {
   static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_scene_node_translation_discontinuous(
           static_cast<Gl_scene_node *>(scene_node), value);
 }
 
-void Gl_render_engine::record_scene_node_rotation_continuous(
+void Gl_graphics::record_scene_node_rotation_continuous(
     Scene_diff *scene_diff, Scene_node *scene_node, math::Quatf const &value) {
   static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_scene_node_rotation_continuous(
           static_cast<Gl_scene_node *>(scene_node), value);
 }
 
-void Gl_render_engine::record_scene_node_rotation_discontinuous(
+void Gl_graphics::record_scene_node_rotation_discontinuous(
     Scene_diff *scene_diff, Scene_node *scene_node, math::Quatf const &value) {
   static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_scene_node_rotation_discontinuous(
           static_cast<Gl_scene_node *>(scene_node), value);
 }
 
-void Gl_render_engine::record_scene_node_scale_continuous(
+void Gl_graphics::record_scene_node_scale_continuous(
     Scene_diff *scene_diff, Scene_node *scene_node, float value) {
   static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_scene_node_scale_continuous(
           static_cast<Gl_scene_node *>(scene_node), value);
 }
 
-void Gl_render_engine::record_scene_node_scale_discontinuous(
+void Gl_graphics::record_scene_node_scale_discontinuous(
     Scene_diff *scene_diff, Scene_node *scene_node, float value) {
   static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_scene_node_scale_discontinuous(
           static_cast<Gl_scene_node *>(scene_node), value);
 }
 
-Gl_camera *Gl_render_engine::record_camera_creation(
+Gl_camera *Gl_graphics::record_camera_creation(
     Scene_diff *scene_diff, Camera_create_info const &create_info) {
   return static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_camera_creation(create_info);
 }
 
-void Gl_render_engine::record_camera_destruction(Scene_diff *scene_diff,
+void Gl_graphics::record_camera_destruction(Scene_diff *scene_diff,
                                                  Camera *camera) {
   return static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_camera_destruction(static_cast<Gl_camera *>(camera));
 }
 
-Gl_camera_instance *Gl_render_engine::record_camera_instance_creation(
+Gl_camera_instance *Gl_graphics::record_camera_instance_creation(
     Scene_diff *scene_diff, Camera_instance_create_info const &create_info) {
   return static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_camera_instance_creation(create_info);
 }
 
-void Gl_render_engine::record_camera_instance_destruction(
+void Gl_graphics::record_camera_instance_destruction(
     Scene_diff *scene_diff, Camera_instance *camera_instance) {
   return static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_camera_instance_destruction(
           static_cast<Gl_camera_instance *>(camera_instance));
 }
 
-Gl_surface_instance *Gl_render_engine::record_surface_instance_creation(
+Gl_surface_instance *Gl_graphics::record_surface_instance_creation(
     Scene_diff *scene_diff, Surface_instance_create_info const &create_info) {
   return static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_surface_instance_creation(create_info);
 }
 
-void Gl_render_engine::record_surface_instance_destruction(
+void Gl_graphics::record_surface_instance_destruction(
     Scene_diff *scene_diff, Surface_instance *surface_instance) {
   return static_cast<Gl_scene_diff *>(scene_diff)
       ->_impl.record_surface_instance_destruction(
@@ -228,15 +228,15 @@ void Gl_render_engine::record_surface_instance_destruction(
 }
 
 Gl_default_render_target *
-Gl_render_engine::get_default_render_target() noexcept {
+Gl_graphics::get_default_render_target() noexcept {
   return _default_render_target.get();
 }
 
-void Gl_render_engine::destroy_render_target(Render_target *) noexcept {
+void Gl_graphics::destroy_render_target(Render_target *) noexcept {
   // delete static_cast<Gl_render_target *>(target);
 }
 
-void Gl_render_engine::render(Scene *source_scene,
+void Gl_graphics::render(Scene *source_scene,
                               Camera_instance *source_camera_instance,
                               Render_target *target) {
   auto const gl_source_scene = static_cast<Gl_scene *>(source_scene);

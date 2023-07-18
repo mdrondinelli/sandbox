@@ -30,56 +30,56 @@ struct Surface_create_info;
 class Surface_instance;
 struct Surface_instance_create_info;
 
-class Render_engine;
+class Graphics;
 
 class Material_deleter {
 public:
-  Material_deleter(Render_engine *owner) noexcept : _owner{owner} {}
+  Material_deleter(Graphics *owner) noexcept : _owner{owner} {}
 
   void operator()(Material *material) const noexcept;
 
 private:
-  Render_engine *_owner;
+  Graphics *_owner;
 };
 
 class Mesh_deleter {
 public:
-  Mesh_deleter(Render_engine *owner) noexcept : _owner{owner} {}
+  Mesh_deleter(Graphics *owner) noexcept : _owner{owner} {}
 
   void operator()(Mesh *mesh) const noexcept;
 
 private:
-  Render_engine *_owner;
+  Graphics *_owner;
 };
 
 class Surface_deleter {
 public:
-  Surface_deleter(Render_engine *owner) noexcept : _owner{owner} {}
+  Surface_deleter(Graphics *owner) noexcept : _owner{owner} {}
 
   void operator()(Surface *surface) const noexcept;
 
 private:
-  Render_engine *_owner;
+  Graphics *_owner;
 };
 
 class Scene_deleter {
 public:
-  Scene_deleter(Render_engine *owner) noexcept : _owner{owner} {}
+  Scene_deleter(Graphics *owner) noexcept : _owner{owner} {}
 
   void operator()(Scene *scene) const noexcept;
 
 private:
-  Render_engine *_owner;
+  Graphics *_owner;
 };
 
 class Scene_diff_deleter {
 public:
-  Scene_diff_deleter(Render_engine *owner) noexcept : _owner{owner} {}
+  Scene_diff_deleter(Graphics *owner) noexcept : _owner{owner} {}
 
   void operator()(Scene_diff *scene_diff) const noexcept;
 
 private:
-  Render_engine *_owner;
+  Graphics *_owner;
 };
 
 using Unique_material_ptr = std::unique_ptr<Material, Material_deleter>;
@@ -88,9 +88,9 @@ using Unique_surface_ptr = std::unique_ptr<Surface, Surface_deleter>;
 using Unique_scene_ptr = std::unique_ptr<Scene, Scene_deleter>;
 using Unique_scene_diff_ptr = std::unique_ptr<Scene_diff, Scene_diff_deleter>;
 
-class Render_engine {
+class Graphics {
 public:
-  virtual ~Render_engine() = default;
+  virtual ~Graphics() = default;
 
   virtual Material *
   create_material(Material_create_info const &create_info) = 0;

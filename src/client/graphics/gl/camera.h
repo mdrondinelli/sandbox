@@ -7,7 +7,7 @@
 namespace marlon {
 namespace rendering {
 class Gl_camera : public Camera {
-  friend class Gl_render_engine;
+  friend class Gl_graphics;
 
 public:
   class Impl {
