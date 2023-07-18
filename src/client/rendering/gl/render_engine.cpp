@@ -32,7 +32,9 @@ layout(location = 2) uniform vec3 albedo;
 
 void main() {
   float attenuation_factor = 1.0 / dot(view_space_position, view_space_position);
-  fragColor = vec4(attenuation_factor * albedo, 1.0);
+  vec3 unbounded_color = attenuation_factor * albedo;
+  vec3 bounded_color = unbounded_color / (unbounded_color + vec3(1.0));
+  fragColor = vec4(bounded_color, 1.0);
 }
 )";
 } // namespace
