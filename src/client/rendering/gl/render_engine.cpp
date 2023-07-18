@@ -257,8 +257,8 @@ void Gl_render_engine::render(Scene *source_scene,
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glUseProgram(_shader_program.get());
-  gl_source_scene->_impl.draw_surface_instances(_shader_program.get(), 0, 1, 2,
-                                                view_matrix, clip_matrix * view_matrix);
+  gl_source_scene->_impl.draw_surface_instances(
+      _shader_program.get(), 0, 1, 2, view_matrix, clip_matrix * view_matrix);
 }
 } // namespace rendering
 } // namespace marlon
