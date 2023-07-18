@@ -7,7 +7,7 @@
 
 #include "glfw/instance.h"
 #include "glfw/window.h"
-#include "graphics/gl/graphics.h"
+#include "../graphics/gl/graphics.h"
 
 using namespace marlon;
 

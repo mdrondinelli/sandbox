@@ -10,29 +10,32 @@ set(
   "src/client/glad/glad.cpp" 
   "src/client/glfw/instance.cpp"
   "src/client/glfw/window.cpp"
-  "src/client/graphics/gl/camera.cpp"
-  "src/client/graphics/gl/camera_instance.cpp"
-  "src/client/graphics/gl/default_render_target.cpp"
-  "src/client/graphics/gl/graphics.cpp"
-  "src/client/graphics/gl/material.cpp"
-  "src/client/graphics/gl/mesh.cpp"
-  "src/client/graphics/gl/scene.cpp"
-  "src/client/graphics/gl/scene_diff.cpp"
-  "src/client/graphics/gl/scene_node.cpp"
-  "src/client/graphics/gl/surface.cpp"
-  "src/client/graphics/gl/surface_instance.cpp"
-  "src/client/graphics/gl/unique_buffer.cpp"
-  "src/client/graphics/gl/unique_shader.cpp"
-  "src/client/graphics/gl/unique_shader_program.cpp"
-  "src/client/graphics/gl/unique_vertex_array.cpp"
   "src/shared/math/mat.cpp"
   "src/shared/math/quat.cpp"
   "src/shared/math/vec.cpp")
+add_library(
+  graphics
+  "src/graphics/gl/camera.cpp"
+  "src/graphics/gl/camera_instance.cpp"
+  "src/graphics/gl/default_render_target.cpp"
+  "src/graphics/gl/graphics.cpp"
+  "src/graphics/gl/material.cpp"
+  "src/graphics/gl/mesh.cpp"
+  "src/graphics/gl/scene.cpp"
+  "src/graphics/gl/scene_diff.cpp"
+  "src/graphics/gl/scene_node.cpp"
+  "src/graphics/gl/surface.cpp"
+  "src/graphics/gl/surface_instance.cpp"
+  "src/graphics/gl/unique_buffer.cpp"
+  "src/graphics/gl/unique_shader.cpp"
+  "src/graphics/gl/unique_shader_program.cpp"
+  "src/graphics/gl/unique_vertex_array.cpp")
 add_executable(
   client ${CLIENT_SOURCES} "src/client/main.cpp")
 add_executable(client_tests ${CLIENT_SOURCES})
 target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)
+target_include_directories(graphics PRIVATE include)
 target_include_directories(client PRIVATE include)
 target_include_directories(client_tests PRIVATE include)
-target_link_libraries(client glfw)
+target_link_libraries(client glfw graphics)
 target_link_libraries(client_tests glfw Catch2::Catch2WithMain)
