@@ -12,9 +12,9 @@ struct Glfw_window_deleter {
   void operator()(GLFWwindow *ptr) const;
 };
 
-using Glfw_unique_window = std::unique_ptr<GLFWwindow, Glfw_window_deleter>;
+using Glfw_unique_window_ptr = std::unique_ptr<GLFWwindow, Glfw_window_deleter>;
 
-Glfw_unique_window make_glfw_unique_window(int width, int height,
+Glfw_unique_window_ptr make_glfw_unique_window(int width, int height,
                                            const char *title,
                                            GLFWmonitor *monitor = nullptr,
                                            GLFWwindow *share = nullptr);

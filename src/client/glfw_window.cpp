@@ -13,7 +13,7 @@ void Glfw_window_deleter::operator()(GLFWwindow *ptr) const {
   glfwDestroyWindow(ptr);
 }
 
-Glfw_unique_window make_glfw_unique_window(int width, int height,
+Glfw_unique_window_ptr make_glfw_unique_window(int width, int height,
                                            const char *title,
                                            GLFWmonitor *monitor,
                                            GLFWwindow *share) {
@@ -23,10 +23,10 @@ Glfw_unique_window make_glfw_unique_window(int width, int height,
     glfwGetError(&error_description);
     throw std::runtime_error{error_description};
   }
-  return Glfw_unique_window{window};
+  return Glfw_unique_window_ptr{window};
 }
 
-TEST_CASE("glfw::Glfw_unique_window") {
+TEST_CASE("glfw::Glfw_unique_window_ptr") {
   REQUIRE_THROWS(make_glfw_unique_window(800, 600, "title"));
   const Glfw_shared_instance instance;
   const auto window = make_glfw_unique_window(800, 600, "title");
