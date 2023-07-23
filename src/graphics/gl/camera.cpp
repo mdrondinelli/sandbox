@@ -10,5 +10,5 @@ Gl_camera::Impl::Impl(Camera_create_info const &create_info) noexcept
 
 Gl_camera::Gl_camera(Camera_create_info const &create_info) noexcept
     : _impl{create_info} {}
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon

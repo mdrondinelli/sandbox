@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_GL_SURFACE_H
-#define MARLON_RENDERING_GL_SURFACE_H
+#ifndef MARLON_GRAPHICS_GL_SURFACE_H
+#define MARLON_GRAPHICS_GL_SURFACE_H
 
 #include "../surface.h"
 #include "material.h"

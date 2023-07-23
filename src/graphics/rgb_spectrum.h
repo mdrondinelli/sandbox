@@ -1,5 +1,5 @@
-#ifndef MARLONR_RGB_SPECTRUM
-#define MARLONR_RGB_SPECTRUM
+#ifndef MARLONR_GRAPHICS_RGB_SPECTRUM_H
+#define MARLONR_GRAPHICS_RGB_SPECTRUM_H
 
 namespace marlon {
 namespace graphics {
@@ -12,7 +12,7 @@ public:
   constexpr Rgb_spectrum(float r, float g, float b) noexcept
       : r{r}, g{g}, b{b} {}
 };
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

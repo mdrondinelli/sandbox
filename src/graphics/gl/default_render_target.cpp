@@ -5,5 +5,5 @@ namespace graphics {
 std::uint32_t Gl_default_render_target::get_framebuffer() const noexcept {
   return 0;
 }
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon

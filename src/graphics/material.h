@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_MATERIAL_H
-#define MARLON_RENDERING_MATERIAL_H
+#ifndef MARLON_GRAPHICS_MATERIAL_H
+#define MARLON_GRAPHICS_MATERIAL_H
 
 #include "rgb_spectrum.h"
 
@@ -10,7 +10,7 @@ struct Material_create_info {
 };
 
 class Material {};
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

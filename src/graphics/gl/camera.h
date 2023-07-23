@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_GL_CAMERA_H
-#define MARLON_RENDERING_GL_CAMERA_H
+#ifndef MARLON_GRAPHICS_GL_CAMERA_H
+#define MARLON_GRAPHICS_GL_CAMERA_H
 
 #include "../../math/mat.h"
 #include "../camera.h"
@@ -37,7 +37,7 @@ public:
 private:
   Impl _impl;
 };
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

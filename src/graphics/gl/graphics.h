@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_GL_RENDER_ENGINE_H
-#define MARLON_RENDERING_GL_RENDER_ENGINE_H
+#ifndef MARLON_GRAPHICS_GL_RENDER_ENGINE_H
+#define MARLON_GRAPHICS_GL_RENDER_ENGINE_H
 
 #include <memory>
 
@@ -110,7 +110,7 @@ private:
   std::unique_ptr<Gl_default_render_target> _default_render_target;
   Gl_unique_shader_program _shader_program;
 };
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

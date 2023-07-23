@@ -231,7 +231,7 @@ inline void
 Scene_diff_deleter::operator()(Scene_diff *scene_diff) const noexcept {
   _owner->destroy_scene_diff(scene_diff);
 }
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

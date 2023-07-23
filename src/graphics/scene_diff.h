@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_SCENE_KEYFRAME_H
-#define MARLON_RENDERING_SCENE_KEYFRAME_H
+#ifndef MARLON_GRAPHICS_SCENE_DIFF_H
+#define MARLON_GRAPHICS_SCENE_DIFF_H
 
 #include "../../math/quat.h"
 #include "../../math/vec.h"

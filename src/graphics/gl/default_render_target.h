@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_GL_DEFAULT_RENDER_TARGET_H
-#define MARLON_RENDERING_GL_DEFAULT_RENDER_TARGET_H
+#ifndef MARLON_GRAPHICS_GL_DEFAULT_RENDER_TARGET_H
+#define MARLON_GRAPHICS_GL_DEFAULT_RENDER_TARGET_H
 
 #include "render_target.h"
 
@@ -9,7 +9,7 @@ class Gl_default_render_target : public Gl_render_target {
 public:
   std::uint32_t get_framebuffer() const noexcept final;
 };
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

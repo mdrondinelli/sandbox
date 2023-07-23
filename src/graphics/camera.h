@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_CAMERA_H
-#define MARLON_RENDERING_CAMERA_H
+#ifndef MARLON_GRAPHICS_CAMERA_H
+#define MARLON_GRAPHICS_CAMERA_H
 
 namespace marlon {
 namespace graphics {
@@ -11,7 +11,7 @@ struct Camera_create_info {
 };
 
 class Camera {};
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

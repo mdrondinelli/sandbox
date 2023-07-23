@@ -1,5 +1,5 @@
-#ifndef MARLONR_RENDERING_SURFACE_H
-#define MARLONR_RENDERING_SURFACE_H
+#ifndef MARLONR_GRAPHICS_SURFACE_H
+#define MARLONR_GRAPHICS_SURFACE_H
 
 namespace marlon {
 namespace graphics {
@@ -12,7 +12,7 @@ struct Surface_create_info {
 };
 
 class Surface {};
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

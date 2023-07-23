@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_MESH_H
-#define MARLON_RENDERING_MESH_H
+#ifndef MARLON_GRAPHICS_MESH_H
+#define MARLON_GRAPHICS_MESH_H
 
 #include <cstdint>
 
@@ -33,7 +33,7 @@ struct Mesh_create_info {
 };
 
 class Mesh {};
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

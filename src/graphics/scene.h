@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_SCENE_H
-#define MARLON_RENDERING_SCENE_H
+#ifndef MARLON_GRAPHICS_SCENE_H
+#define MARLON_GRAPHICS_SCENE_H
 
 namespace marlon {
 namespace graphics {
@@ -9,7 +9,7 @@ struct Scene_diff_create_info;
 struct Scene_create_info {};
 
 class Scene {};
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif
