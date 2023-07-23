@@ -6,7 +6,7 @@
 #include "scene_node.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_camera_instance : public Camera_instance {
   friend class Gl_graphics;
 
@@ -34,7 +34,7 @@ public:
 private:
   Impl _impl;
 };
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

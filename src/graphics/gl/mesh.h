@@ -8,7 +8,7 @@
 #include "unique_vertex_array.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_mesh : public Mesh {
   friend class Gl_scene;
 

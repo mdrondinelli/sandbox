@@ -15,7 +15,7 @@
 #include "unique_shader_program.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_graphics : public Graphics {
 public:
   Gl_graphics();
@@ -110,7 +110,7 @@ private:
   std::unique_ptr<Gl_default_render_target> _default_render_target;
   Gl_unique_shader_program _shader_program;
 };
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

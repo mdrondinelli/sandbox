@@ -6,7 +6,7 @@
 #include <utility>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_shader {
 public:
   Gl_shader() noexcept : _handle{0} {}

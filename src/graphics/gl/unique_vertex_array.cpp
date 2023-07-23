@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_unique_vertex_array::~Gl_unique_vertex_array() { glDeleteVertexArrays(1, &_handle); }
 
 Gl_unique_vertex_array make_gl_unique_vertex_array() {

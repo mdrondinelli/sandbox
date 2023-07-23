@@ -3,11 +3,11 @@
 
 #include <memory>
 
-#include "../../math/quat.h"
-#include "../../math/vec.h"
+#include "../math/quat.h"
+#include "../math/vec.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Camera;
 struct Camera_create_info;
 class Camera_instance;

@@ -28,7 +28,7 @@ public:
               })) {
             throw std::runtime_error{"Failed to initialize OpenGL"};
           }
-          return std::make_unique<rendering::Gl_graphics>();
+          return std::make_unique<graphics::Gl_graphics>();
         }()} {
     glfwSwapInterval(1);
   }
@@ -42,12 +42,12 @@ public:
                                                          {-0.5f, 0.5f, 0.0f},
                                                          {0.5f, 0.5f, 0.0f}};
     auto const mesh = _graphics->create_mesh_unique(
-        {.index_format = rendering::Mesh_index_format::uint32,
+        {.index_format = graphics::Mesh_index_format::uint32,
          .index_count = 6,
          .index_data = mesh_indices.data(),
          .vertex_format =
              {.position_fetch_info =
-                  {.format = rendering::Mesh_vertex_position_format::float3,
+                  {.format = graphics::Mesh_vertex_position_format::float3,
                    .offset = 0},
               .stride = 12},
          .vertex_count = 4,
@@ -119,7 +119,7 @@ public:
 private:
   client::Glfw_instance _glfw;
   client::Unique_glfw_window_ptr _window;
-  std::unique_ptr<rendering::Gl_graphics> _graphics;
+  std::unique_ptr<graphics::Gl_graphics> _graphics;
 };
 
 int main() {

@@ -6,7 +6,7 @@
 #include <utility>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_unique_buffer {
 public:
   constexpr Gl_unique_buffer() noexcept : _handle{0} {}

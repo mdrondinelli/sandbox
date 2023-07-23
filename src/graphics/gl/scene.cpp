@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_scene::Impl::Impl(Scene_create_info const &) noexcept {}
 
 Gl_scene::Impl::~Impl() {

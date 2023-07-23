@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 Gl_unique_buffer::~Gl_unique_buffer() { glDeleteBuffers(1, &_handle); }
 
 Gl_unique_buffer make_gl_unique_buffer() {

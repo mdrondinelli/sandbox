@@ -6,7 +6,7 @@
 #include "../render_target.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_render_target : public Render_target {
 public:
   virtual ~Gl_render_target() = default;

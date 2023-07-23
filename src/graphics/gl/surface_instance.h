@@ -6,7 +6,7 @@
 #include "surface.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Gl_surface_instance : public Surface_instance {
   friend class Gl_scene;
 
