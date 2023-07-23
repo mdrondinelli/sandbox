@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_GL_SCENE_DIFF_H
-#define MARLON_RENDERING_GL_SCENE_DIFF_H
+#ifndef MARLON_GRAPHICS_GL_SCENE_DIFF_H
+#define MARLON_GRAPHICS_GL_SCENE_DIFF_H
 
 #include <memory>
 
@@ -81,7 +81,8 @@ public:
     std::vector<Gl_camera *> _destroyed_cameras;
     std::vector<std::unique_ptr<Gl_camera_instance>> _created_camera_instances;
     std::vector<Gl_camera_instance *> _destroyed_camera_instances;
-    std::vector<std::unique_ptr<Gl_surface_instance>> _created_surface_instances;
+    std::vector<std::unique_ptr<Gl_surface_instance>>
+        _created_surface_instances;
     std::vector<Gl_surface_instance *> _destroyed_surface_instances;
   };
 
@@ -90,7 +91,7 @@ public:
 private:
   Impl _impl;
 };
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

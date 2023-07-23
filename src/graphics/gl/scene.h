@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_GL_SCENE_H
-#define MARLON_RENDERING_GL_SCENE_H
+#ifndef MARLON_GRAPHICS_GL_SCENE_H
+#define MARLON_GRAPHICS_GL_SCENE_H
 
 #include <memory>
 #include <unordered_set>

@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_RENDER_ENGINE_H
-#define MARLON_RENDERING_RENDER_ENGINE_H
+#ifndef MARLON_GRAPHICS_GRAPHICS_H
+#define MARLON_GRAPHICS_GRAPHICS_H
 
 #include <memory>
 
@@ -231,7 +231,7 @@ inline void
 Scene_diff_deleter::operator()(Scene_diff *scene_diff) const noexcept {
   _owner->destroy_scene_diff(scene_diff);
 }
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

@@ -1,8 +1,8 @@
-#ifndef MARLON_RENDERING_SURFACE_INSTANCE_H
-#define MARLON_RENDERING_SURFACE_INSTANCE_H
+#ifndef MARLON_GRAPHICS_SURFACE_INSTANCE_H
+#define MARLON_GRAPHICS_SURFACE_INSTANCE_H
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 class Scene_node;
 class Surface;
 
@@ -12,7 +12,7 @@ struct Surface_instance_create_info {
 };
 
 class Surface_instance {};
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

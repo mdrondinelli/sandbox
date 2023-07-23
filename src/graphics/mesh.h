@@ -1,12 +1,12 @@
-#ifndef MARLON_RENDERING_MESH_H
-#define MARLON_RENDERING_MESH_H
+#ifndef MARLON_GRAPHICS_MESH_H
+#define MARLON_GRAPHICS_MESH_H
 
 #include <cstdint>
 
 #include <optional>
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 enum class Mesh_index_format { uint16, uint32 };
 
 enum class Mesh_vertex_position_format { float3 };
@@ -33,7 +33,7 @@ struct Mesh_create_info {
 };
 
 class Mesh {};
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

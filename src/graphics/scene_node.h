@@ -1,11 +1,11 @@
-#ifndef MARLON_RENDERING_SCENE_NODE_H
-#define MARLON_RENDERING_SCENE_NODE_H
+#ifndef MARLON_GRAPHICS_SCENE_NODE_H
+#define MARLON_GRAPHICS_SCENE_NODE_H
 
 #include "../../math/quat.h"
 #include "../../math/vec.h"
 
 namespace marlon {
-namespace rendering {
+namespace graphics {
 struct Scene_node_create_info {
   math::Vec3f translation;
   math::Quatf rotation;
@@ -13,7 +13,7 @@ struct Scene_node_create_info {
 };
 
 class Scene_node {};
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

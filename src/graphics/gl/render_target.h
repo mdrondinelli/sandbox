@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_GL_RENDER_DESTINATION_H
-#define MARLON_RENDERING_GL_RENDER_DESTINATION_H
+#ifndef MARLON_GRAPHICS_GL_RENDER_DESTINATION_H
+#define MARLON_GRAPHICS_GL_RENDER_DESTINATION_H
 
 #include <cstdint>
 
@@ -13,7 +13,7 @@ public:
 
   virtual std::uint32_t get_framebuffer() const noexcept = 0;
 };
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

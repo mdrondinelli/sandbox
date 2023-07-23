@@ -1,5 +1,5 @@
-#ifndef MARLON_RENDERING_GL_SCENE_NODE_H
-#define MARLON_RENDERING_GL_SCENE_NODE_H
+#ifndef MARLON_GRAPHICS_GL_SCENE_NODE_H
+#define MARLON_GRAPHICS_GL_SCENE_NODE_H
 
 #include "../../math/mat.h"
 #include "../scene_node.h"
