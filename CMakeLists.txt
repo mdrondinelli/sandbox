@@ -29,6 +29,9 @@ add_library(
   "src/graphics/gl/unique_shader_program.cpp"
   "src/graphics/gl/unique_vertex_array.cpp"
   "src/graphics/glad/glad.cpp" )
+add_library(
+  physics
+  "src/physics/space.cpp")
 set(
   CLIENT_SOURCES
   "src/client/glfw_instance.cpp"
