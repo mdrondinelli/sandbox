@@ -7,9 +7,9 @@
 namespace marlon {
 namespace graphics {
 struct Scene_node_create_info {
-  math::Vec3f translation;
-  math::Quatf rotation;
-  float scale;
+  math::Vec3f translation{math::Vec3f::zero()};
+  math::Quatf rotation{math::Quatf::identity()};
+  float scale{1.0f};
 };
 
 class Scene_node {};
