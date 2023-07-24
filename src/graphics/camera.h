@@ -4,10 +4,10 @@
 namespace marlon {
 namespace graphics {
 struct Camera_create_info {
-  float near_plane_distance;
-  float far_plane_distance;
-  float zoom_x;
-  float zoom_y;
+  float near_plane_distance{0.001f};
+  float far_plane_distance{1000.0f};
+  float zoom_x{1.0f};
+  float zoom_y{1.0f};
 };
 
 class Camera {};
