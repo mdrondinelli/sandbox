@@ -252,6 +252,7 @@ void Gl_graphics::render(Scene *source_scene,
                                          {0.0f, 0.0f, 0.0f, 1.0f}};
   auto const clip_matrix = gl_source_camera_instance->_impl.get_camera()
                                ->_impl.calculate_clip_matrix();
+  glEnable(GL_DEPTH_TEST);
   glEnable(GL_FRAMEBUFFER_SRGB);
   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
