@@ -6,7 +6,7 @@
 namespace marlon {
 namespace graphics {
 struct Material_create_info {
-  Rgb_spectrum albedo;
+  Rgb_spectrum albedo{0.0f, 0.0f, 0.0f};
 };
 
 class Material {};
