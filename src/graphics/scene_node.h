@@ -1,8 +1,8 @@
 #ifndef MARLON_GRAPHICS_SCENE_NODE_H
 #define MARLON_GRAPHICS_SCENE_NODE_H
 
-#include "../../math/quat.h"
-#include "../../math/vec.h"
+#include "../math/quat.h"
+#include "../math/vec.h"
 
 namespace marlon {
 namespace graphics {
