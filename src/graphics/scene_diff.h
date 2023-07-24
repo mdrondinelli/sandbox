@@ -6,7 +6,7 @@ namespace graphics {
 class Scene;
 
 struct Scene_diff_create_info {
-  Scene *scene;
+  Scene *scene{nullptr};
 };
 
 class Scene_diff {};
