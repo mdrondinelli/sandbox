@@ -30,11 +30,21 @@ layout(location = 0) out vec4 fragColor;
 
 layout(location = 2) uniform vec3 albedo;
 
+float luminance(vec3 v) {
+  return dot(v, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 tonemap(vec3 v) {
+  float l = luminance(v);
+  vec3 tv = v / (v + vec3(1.0));
+  return mix(v / (l + vec3(1.0)), tv, tv);
+}
+
 void main() {
   float attenuation_factor = 1.0 / dot(view_space_position, view_space_position);
   float exposure_factor = 4.0;
   vec3 unbounded_color = exposure_factor * attenuation_factor * albedo;
-  vec3 bounded_color = unbounded_color / (unbounded_color + vec3(1.0));
+  vec3 bounded_color = tonemap(unbounded_color);
   fragColor = vec4(bounded_color, 1.0);
 }
 )";
