@@ -1,5 +1,7 @@
 #include "test_entity.h"
 
+#include <array>
+
 namespace marlon {
 namespace client {
 Test_entity_manager::Test_entity_manager(
@@ -47,6 +49,16 @@ Test_entity_manager::~Test_entity_manager() {
 
 namespace {
 template <typename Random_number_engine>
+math::Vec3f sample_disk(Random_number_engine &random_number_engine) {
+  std::uniform_real_distribution<float> distribution{0.0f, 1.0f};
+  auto const u = distribution(random_number_engine);
+  auto const v = distribution(random_number_engine);
+  auto const angle = 2.0f * std::numbers::pi_v<float> * u;
+  auto const radius = std::sqrt(v);
+  return math::Vec3f{radius * std::cos(angle), 0.0f, -radius * std::sin(angle)};
+}
+
+template <typename Random_number_engine>
 math::Vec3f sample_ball(Random_number_engine &random_number_engine) {
   std::uniform_real_distribution<float> distribution{-1.0f, 1.0f};
   math::Vec3f retval{0.0f, 0.0f, 0.0f};
@@ -61,21 +73,22 @@ math::Vec3f sample_ball(Random_number_engine &random_number_engine) {
 
 Entity_reference
 Test_entity_manager::create_entity(Entity_create_info const &) {
-  std::uniform_real_distribution<float> scale_distribution{0.05f, 0.1f};
-//   std::uniform_real_distribution<float> horizontal_angle_distribution{
-//       0.0f, 2.0f * std::numbers::pi_v<float>};
-//   std::uniform_real_distribution<float> vertical_angle_distribution{
-//       math::deg_to_rad(-90.0f), math::deg_to_rad(0.0f)};
-//   std::exponential_distribution<float> speed_distribution{2.0f};
+  std::uniform_int_distribution index_distribution{0, 3};
+  std::uniform_real_distribution<float> scale_distribution{0.03f, 0.1f};
+  auto const centers = std::array<math::Vec3f, 3>{
+      math::Vec3f{-5.0f, 0.5f, 0.0f}, math::Vec3f{0.0f, 0.5f, 0.0f},
+      math::Vec3f{5.0f, 0.5f, 0.0f}};
+  auto const radii = std::array<float, 3>{0.25f, 0.5f, 0.25f};
+  auto const velocities = std::array<math::Vec3f, 3>{
+      math::Vec3f{0.0f, 6.0f, 0.0f}, math::Vec3f{0.0f, 12.0f, 0.0f},
+      math::Vec3f{0.0f, 6.0f, 0.0f}};
+  auto const index = [](int n) {
+    return n == 3 ? 1 : n;
+  }(index_distribution(_random_number_engine));
   auto const position =
-      sample_ball(_random_number_engine) * 0.5f + math::Vec3f{0.0f, 4.5f, 0.0f};
-  auto const velocity = sample_ball(_random_number_engine);
+      radii[index] * sample_ball(_random_number_engine) + centers[index];
+  auto const velocity = velocities[index];
   auto const scale = scale_distribution(_random_number_engine);
-//   auto const horizontal_angle =
-//       horizontal_angle_distribution(_random_number_engine);
-//   auto const vertical_angle =
-//       vertical_angle_distribution(_random_number_engine);
-//   auto const speed = 1.0f * speed_distribution(_random_number_engine);
   Entity_reference const reference{_next_entity_reference_value};
   auto &value = _entities[reference];
   value.manager = this;
@@ -86,7 +99,8 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
       *_scene_diff, {.surface = _surface, .scene_node = value.scene_node});
   value.particle = _space->create_particle({.position = position,
                                             .velocity = velocity,
-                                            .mass = 0.5f,
+                                            .mass = scale * scale * scale,
+                                            .radius = scale,
                                             .motion_callback = &value});
   ++_next_entity_reference_value;
   return reference;
@@ -108,7 +122,6 @@ void Test_entity_manager::Test_entity::on_particle_motion(
       *manager->_scene_diff, scene_node, event.position);
   if (event.position.y < 0.0f) {
     manager->_entity_destruction_queue->push(manager, reference);
-    manager->_entity_construction_queue->push(manager, {});
   }
 }
 } // namespace client

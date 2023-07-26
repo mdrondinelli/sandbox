@@ -61,16 +61,12 @@ void tick(physics::Space *space,
           client::Entity_construction_queue *entity_construction_queue,
           client::Entity_destruction_queue *entity_destruction_queue,
           client::Test_entity_manager *test_entity_manager, float delta_time) {
-  static int tick_number = 0;
-  if (tick_number++ < 400) {
-    for (int i = 0; i < 10; ++i) {
-      test_entity_manager->create_entity({});
-    }
-  }
+  for (int i = 0; i < 16; ++i)
+    test_entity_manager->create_entity({});
   entity_construction_queue->consume();
   space->simulate({.acceleration = {0.0, -9.8f, 0.0f},
                    .delta_time = delta_time,
-                   .substep_count = 1});
+                   .substep_count = 2});
   entity_destruction_queue->consume();
 }
 
@@ -82,7 +78,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
                    client::Entity_construction_queue *entity_construction_queue,
                    client::Entity_destruction_queue *entity_destruction_queue,
                    client::Test_entity_manager *test_entity_manager) {
-  auto const tick_rate = 16.0;
+  auto const tick_rate = 32.0;
   auto const tick_duration = 1.0 / tick_rate;
   auto previous_time = glfwGetTime();
   auto accumulator = 0.0;
@@ -154,7 +150,7 @@ int main() {
                           .zoom_y = 1.0f,
                       });
   auto const camera_scene_node = graphics->record_scene_node_creation(
-      scene_diff_raw, {.translation = {0.0f, 1.5f, 8.0f}});
+      scene_diff_raw, {.translation = {0.0f, 1.5f, 10.0f}});
   auto const camera_instance = graphics->record_camera_instance_creation(
       scene_diff_raw, {.camera = camera, .scene_node = camera_scene_node});
   auto const ground_scene_node = graphics->record_scene_node_creation(

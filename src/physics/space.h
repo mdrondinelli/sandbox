@@ -27,11 +27,17 @@ public:
 
 private:
   struct Particle {
-    math::Vec3f position;
+    math::Vec3f previous_position;
+    math::Vec3f current_position;
     math::Vec3f velocity;
-    float mass;
+    float inverse_mass;
+    float radius;
     Particle_motion_callback *motion_callback;
   };
+
+  std::vector<std::pair<Particle *, Particle *>> find_particle_collisions();
+  void solve_particle_collisions(
+      std::span<std::pair<Particle *, Particle *> const> particle_collisions);
 
   std::uint64_t _next_particle_reference_value{};
   std::unordered_map<Particle_reference, Particle> _particles;

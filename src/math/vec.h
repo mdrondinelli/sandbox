@@ -233,6 +233,11 @@ constexpr auto length(Vec<T, N> const &v) noexcept {
 }
 
 template <typename T, int N>
+constexpr auto normalize(Vec<T, N> const &v) noexcept {
+  return v / length(v);
+}
+
+template <typename T, int N>
 constexpr auto dot(Vec<T, N> const &a, Vec<T, N> const &b) noexcept {
   auto retval = T(0);
   for (int i = 0; i < N; ++i) {

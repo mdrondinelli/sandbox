@@ -18,9 +18,12 @@ struct Particle_reference {
 };
 
 struct Particle_create_info {
+  std::uint64_t collision_flags{0};
+  std::uint64_t collision_mask{std::numeric_limits<std::uint64_t>::max()};
   math::Vec3f position{math::Vec3f::zero()};
   math::Vec3f velocity{math::Vec3f::zero()};
   float mass{1.0f};
+  float radius{0.0f};
   Particle_motion_callback *motion_callback{nullptr};
 };
 
