@@ -4,44 +4,29 @@
 
 namespace marlon {
 namespace physics {
-namespace {
-struct Particle {
-  math::Vec3f position;
-  math::Vec3f velocity;
-  float mass;
-};
-} // namespace
+Particle_reference
+Space::create_particle(Particle_create_info const &create_info) {
+  Particle_reference const reference{_next_particle_reference_value};
+  Particle const particle{create_info.position, create_info.velocity,
+                          create_info.mass, create_info.motion_callback};
+  _particles.emplace(reference, particle);
+  ++_next_particle_reference_value;
+  return reference;
+}
 
-struct Space_state::Impl {
-  std::uint64_t next_particle_reference_value{};
-  std::unordered_map<Particle_reference, Particle> particles;
-};
+void Space::destroy_particle(Particle_reference particle) {
+  _particles.erase(particle);
+}
 
-Space_state::Space_state() : _impl{std::make_unique<Impl>()} {}
-
-Space_state::~Space_state() {}
-
-Space_state Space_state::step(Space_state_step_info const &step_info) {
-  Space_state retval;
-  retval._impl->particles = _impl->particles;
-  for (auto const reference : step_info.destroyed_particles) {
-    retval._impl->particles.erase(reference);
+void Space::simulate(Space_simulate_info const &simulate_info) {
+  for (auto &[reference, value] : _particles) {
+    value.velocity += simulate_info.acceleration * simulate_info.delta_time;
+    value.position += value.velocity * simulate_info.delta_time;
+    if (value.motion_callback != nullptr) {
+      value.motion_callback->on_particle_motion(
+          {reference, value.position, value.velocity});
+    }
   }
-  for (auto &[reference, particle] : retval._impl->particles) {
-    particle.position += particle.velocity * step_info.delta_time;
-    step_info.particle_motion_callback(
-        {reference, particle.position, particle.velocity});
-  }
-  for (auto const &create_info : step_info.created_particles) {
-    Particle_reference const reference{
-        retval._impl->next_particle_reference_value};
-    Particle const particle{create_info.position, create_info.velocity,
-                            create_info.mass};
-    retval._impl->particles.emplace(reference, particle);
-    ++retval._impl->next_particle_reference_value;
-    *create_info.out_reference = reference;
-  }
-  return retval;
 }
 } // namespace physics
 } // namespace marlon

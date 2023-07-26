@@ -5,6 +5,17 @@
 
 #include "../math/quat.h"
 #include "../math/vec.h"
+#include "camera.h"
+#include "camera_instance.h"
+#include "material.h"
+#include "mesh.h"
+#include "render_target.h"
+#include "rgb_spectrum.h"
+#include "scene.h"
+#include "scene_diff.h"
+#include "scene_node.h"
+#include "surface.h"
+#include "surface_instance.h"
 
 namespace marlon {
 namespace graphics {

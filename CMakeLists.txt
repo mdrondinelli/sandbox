@@ -28,14 +28,17 @@ add_library(
   "src/graphics/gl/unique_shader.cpp"
   "src/graphics/gl/unique_shader_program.cpp"
   "src/graphics/gl/unique_vertex_array.cpp"
-  "src/graphics/glad/glad.cpp" )
+  "src/graphics/glad/glad.cpp")
 add_library(
   physics
+  "src/physics/particle.cpp"
   "src/physics/space.cpp")
 set(
   CLIENT_SOURCES
+  "src/client/entity.cpp"
   "src/client/glfw_instance.cpp"
-  "src/client/glfw_window.cpp")
+  "src/client/glfw_window.cpp"
+  "src/client/test_entity.cpp")
 add_executable(
   client ${CLIENT_SOURCES} "src/client/main.cpp")
 add_executable(client_tests ${CLIENT_SOURCES})

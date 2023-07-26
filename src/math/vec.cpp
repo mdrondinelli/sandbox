@@ -77,5 +77,10 @@ TEST_CASE("Vectors can be divided by scalars.") {
   v /= s;
   REQUIRE(v == u_over_s);
 }
+
+TEST_CASE("The length of a vector can be taken") {
+  const Vec2i u{3, 4};
+  REQUIRE(length(u) == 5);
+}
 } // namespace math
 } // namespace marlon

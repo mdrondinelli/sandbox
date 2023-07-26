@@ -62,28 +62,39 @@ public:
     void apply(float factor);
 
   private:
+    void apply_continuous();
+    void apply_discontinuous();
+    void apply_created_cameras();
+    void apply_created_scene_nodes();
+    void apply_created_camera_instances();
+    void apply_created_surface_instances();
+    void apply_destroyed_surface_instances();
+    void apply_destroyed_camera_instances();
+    void apply_destroyed_scene_nodes();
+    void apply_destroyed_cameras();
+
     Gl_scene *_scene;
-    std::vector<std::unique_ptr<Gl_scene_node>> _created_scene_nodes;
-    std::vector<Gl_scene_node *> _destroyed_scene_nodes;
     std::vector<std::pair<Gl_scene_node *, math::Vec3f>>
         _continuous_scene_node_translations;
+    std::vector<std::pair<Gl_scene_node *, math::Quatf>>
+        _continuous_scene_node_rotations;
+    std::vector<std::pair<Gl_scene_node *, float>>
+        _continuous_scene_node_scales;
     std::vector<std::pair<Gl_scene_node *, math::Vec3f>>
         _discontinuous_scene_node_translations;
     std::vector<std::pair<Gl_scene_node *, math::Quatf>>
-        _continuous_scene_node_rotations;
-    std::vector<std::pair<Gl_scene_node *, math::Quatf>>
         _discontinuous_scene_node_rotations;
-    std::vector<std::pair<Gl_scene_node *, float>>
-        _continuous_scene_node_scales;
     std::vector<std::pair<Gl_scene_node *, float>>
         _discontinuous_scene_node_scales;
     std::vector<std::unique_ptr<Gl_camera>> _created_cameras;
-    std::vector<Gl_camera *> _destroyed_cameras;
+    std::vector<std::unique_ptr<Gl_scene_node>> _created_scene_nodes;
     std::vector<std::unique_ptr<Gl_camera_instance>> _created_camera_instances;
-    std::vector<Gl_camera_instance *> _destroyed_camera_instances;
     std::vector<std::unique_ptr<Gl_surface_instance>>
         _created_surface_instances;
+    std::vector<Gl_camera_instance *> _destroyed_camera_instances;
     std::vector<Gl_surface_instance *> _destroyed_surface_instances;
+    std::vector<Gl_camera *> _destroyed_cameras;
+    std::vector<Gl_scene_node *> _destroyed_scene_nodes;
   };
 
   explicit Gl_scene_diff(Scene_diff_create_info const &create_info) noexcept;

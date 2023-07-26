@@ -2,6 +2,7 @@
 #define MARLON_MATH_VEC_H
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 
 #include <type_traits>
@@ -215,6 +216,20 @@ constexpr auto &operator*=(Vec<T, N> &v, T s) noexcept {
 template <typename T, int N>
 constexpr auto &operator/=(Vec<T, N> &v, T s) noexcept {
   return v = (v / s);
+}
+
+template <typename T, int N>
+constexpr auto length2(Vec<T, N> const &v) noexcept {
+  auto retval = T(0);
+  for (int i = 0; i < N; ++i) {
+    retval += v[i] * v[i];
+  }
+  return retval;
+}
+
+template <typename T, int N>
+constexpr auto length(Vec<T, N> const &v) noexcept {
+  return std::sqrt(length2(v));
 }
 
 template <typename T, int N>

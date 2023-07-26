@@ -1,48 +1,40 @@
 #ifndef MARLON_PHYSICS_SPACE_H
-#define MARLON_PHYSICS_STATE_H
+#define MARLON_PHYSICS_SPACE_H
 
-#include <functional>
 #include <memory>
 #include <span>
 
+#include "../math/vec.h"
 #include "particle.h"
 
 namespace marlon {
 namespace physics {
-struct Space_state_step_info {
-  std::function<void(Particle_motion_event const &)> particle_motion_callback;
-  std::span<Particle_create_info const> created_particles;
-  std::span<Particle_reference const> destroyed_particles;
+struct Space_simulate_info {
+  math::Vec3f acceleration;
   float delta_time;
   int substep_count;
 };
 
-class Space_state {
+class Space {
 public:
-  Space_state();
+  Particle_reference create_particle(Particle_create_info const &create_info);
 
-  ~Space_state();
+  void destroy_particle(Particle_reference particle);
 
-  Space_state(Space_state &&other) noexcept : _impl{std::move(other._impl)} {}
+  void simulate(Space_simulate_info const &simulate_info);
 
-  Space_state &operator=(Space_state &&other) noexcept {
-    auto temp{std::move(other)};
-    swap(temp);
-    return *this;
-  }
-
-  // semantics:
-  // destroyed particles removed
-  // simulation step + callbacks
-  // created particles added
-  Space_state step(Space_state_step_info const &step_info);
+  // void step(Space_step_info const &step_info);
 
 private:
-  struct Impl;
+  struct Particle {
+    math::Vec3f position;
+    math::Vec3f velocity;
+    float mass;
+    Particle_motion_callback *motion_callback;
+  };
 
-  void swap(Space_state &other) { _impl.swap(other._impl); }
-
-  std::unique_ptr<Impl> _impl;
+  std::uint64_t _next_particle_reference_value{};
+  std::unordered_map<Particle_reference, Particle> _particles;
 };
 } // namespace physics
 } // namespace marlon
