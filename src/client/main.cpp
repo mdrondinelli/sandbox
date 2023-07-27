@@ -57,6 +57,76 @@ create_cube_mesh_unique(graphics::Graphics *graphics) {
        .vertex_data = vertices.data()});
 }
 
+graphics::Unique_mesh_ptr
+create_icosahedron_mesh_unique(graphics::Graphics *graphics,
+                               int subdivisions = 0) {
+  auto const phi = std::numbers::phi_v<float>;
+  std::vector<math::Vec3f> vertices{
+      math::normalize(math::Vec3f{phi, 1.0f, 0.0f}),
+      math::normalize(math::Vec3f{phi, -1.0f, 0.0f}),
+      math::normalize(math::Vec3f{-phi, -1.0f, 0.0f}),
+      math::normalize(math::Vec3f{-phi, 1.0f, 0.0f}),
+      math::normalize(math::Vec3f{1.0f, 0.0f, phi}),
+      math::normalize(math::Vec3f{-1.0f, 0.0f, phi}),
+      math::normalize(math::Vec3f{-1.0f, 0.0f, -phi}),
+      math::normalize(math::Vec3f{1.0f, 0.0f, -phi}),
+      math::normalize(math::Vec3f{0.0f, phi, 1.0f}),
+      math::normalize(math::Vec3f{0.0f, phi, -1.0f}),
+      math::normalize(math::Vec3f{0.0f, -phi, -1.0f}),
+      math::normalize(math::Vec3f{0.0f, -phi, 1.0f})};
+  std::vector<std::uint32_t> indices{
+      0, 9, 8,  0, 8,  4,  0,  4, 1, 0, 1, 7,  0, 7,  9,  3, 8,  9,  3, 9,
+      6, 3, 6,  2, 3,  2,  5,  3, 5, 8, 4, 8,  5, 11, 1,  4, 11, 4,  5, 11,
+      5, 2, 11, 2, 10, 11, 10, 1, 6, 9, 7, 10, 7, 1,  10, 6, 7,  10, 2, 6};
+  for (int i = 0; i < subdivisions; ++i) {
+    auto const indices_copy = indices;
+    indices.clear();
+    for (int j = 0; j != indices_copy.size(); j += 3) {
+      auto const index_0 = indices_copy[j + 0];
+      auto const index_1 = indices_copy[j + 1];
+      auto const index_2 = indices_copy[j + 2];
+      auto const &vertex_0 = vertices[index_0];
+      auto const &vertex_1 = vertices[index_1];
+      auto const &vertex_2 = vertices[index_2];
+      auto const new_vertex_0 = math::normalize(0.5f * (vertex_0 + vertex_1));
+      auto const new_vertex_1 = math::normalize(0.5f * (vertex_1 + vertex_2));
+      auto const new_vertex_2 = math::normalize(0.5f * (vertex_2 + vertex_0));
+      auto const new_vertex_0_index =
+          static_cast<std::uint32_t>(vertices.size());
+      auto const new_vertex_1_index =
+          static_cast<std::uint32_t>(vertices.size() + 1);
+      auto const new_vertex_2_index =
+          static_cast<std::uint32_t>(vertices.size() + 2);
+      vertices.emplace_back(new_vertex_0);
+      vertices.emplace_back(new_vertex_1);
+      vertices.emplace_back(new_vertex_2);
+      indices.emplace_back(index_0);
+      indices.emplace_back(new_vertex_0_index);
+      indices.emplace_back(new_vertex_2_index);
+      indices.emplace_back(index_1);
+      indices.emplace_back(new_vertex_1_index);
+      indices.emplace_back(new_vertex_0_index);
+      indices.emplace_back(index_2);
+      indices.emplace_back(new_vertex_2_index);
+      indices.emplace_back(new_vertex_1_index);
+      indices.emplace_back(new_vertex_0_index);
+      indices.emplace_back(new_vertex_1_index);
+      indices.emplace_back(new_vertex_2_index);
+    }
+  }
+  return graphics->create_mesh_unique(
+      {.index_format = graphics::Mesh_index_format::uint32,
+       .index_count = static_cast<std::uint32_t>(indices.size()),
+       .index_data = indices.data(),
+       .vertex_format = {.position_fetch_info =
+                             {.format =
+                                  graphics::Mesh_vertex_position_format::float3,
+                              .offset = 0u},
+                         .stride = 12u},
+       .vertex_count = static_cast<std::uint32_t>(vertices.size()),
+       .vertex_data = vertices.data()});
+}
+
 void tick(physics::Space *space,
           client::Entity_construction_queue *entity_construction_queue,
           client::Entity_destruction_queue *entity_destruction_queue,
@@ -132,11 +202,19 @@ int main() {
   auto const window = create_window_unique();
   auto const graphics = create_graphics_unique(window.get());
   glfwSwapInterval(0);
+  auto const particle_material =
+      graphics->create_material_unique({.albedo = {0.0f, 0.375f, 1.0f}});
   auto const ground_material =
       graphics->create_material_unique({.albedo = {0.00f, 0.005f, 0.02f}});
-  auto const ground_mesh = create_cube_mesh_unique(graphics.get());
+  auto const cube_mesh = create_cube_mesh_unique(graphics.get());
+  auto const icosahedron_mesh = create_icosahedron_mesh_unique(graphics.get());
+  auto const sphere_mesh = create_icosahedron_mesh_unique(graphics.get(), 2);
+  auto const particle_surface = graphics->create_surface_unique(
+      {.material = particle_material.get(), .mesh = icosahedron_mesh.get()});
   auto const ground_surface = graphics->create_surface_unique(
-      {.material = ground_material.get(), .mesh = ground_mesh.get()});
+      {.material = ground_material.get(), .mesh = cube_mesh.get()});
+  auto const ball_surface = graphics->create_surface_unique(
+      {.material = particle_material.get(), .mesh = sphere_mesh.get()});
   auto const scene = graphics->create_scene_unique({});
   auto const scene_diff =
       graphics->create_scene_diff_unique({.scene = scene.get()});
@@ -157,6 +235,11 @@ int main() {
   graphics->record_surface_instance_creation(
       scene_diff_raw,
       {.surface = ground_surface.get(), .scene_node = ground_scene_node});
+  auto const ball_scene_node = graphics->record_scene_node_creation(
+      scene_diff_raw, {.translation = {0.0f, 1.5f, 0.0f}, .scale = 0.5f});
+  graphics->record_surface_instance_creation(
+      scene_diff_raw,
+      {.surface = ball_surface.get(), .scene_node = ball_scene_node});
   physics::Space space;
   physics::Half_space ground_shape{math::Vec3f{0.0f, 1.0f, 0.0f}};
   space.create_static_rigid_body({.collision_flags = 1,
@@ -164,11 +247,20 @@ int main() {
                                   .position = math::Vec3f::zero(),
                                   .orientation = math::Quatf::identity(),
                                   .shape = &ground_shape});
+  physics::Ball ball_shape{0.5f};
+  space.create_static_rigid_body({.collision_flags = 1,
+                                  .collision_mask = 1,
+                                  .position = {0.0f, 1.5f, 0.0f},
+                                  .orientation = math::Quatf::identity(),
+                                  .shape = &ball_shape});
   client::Entity_construction_queue entity_construction_queue;
   client::Entity_destruction_queue entity_destruction_queue;
-  client::Test_entity_manager test_entity_manager{
-      graphics.get(), &scene_diff_raw, &space, &entity_construction_queue,
-      &entity_destruction_queue};
+  client::Test_entity_manager test_entity_manager{graphics.get(),
+                                                  &scene_diff_raw,
+                                                  particle_surface.get(),
+                                                  &space,
+                                                  &entity_construction_queue,
+                                                  &entity_destruction_queue};
   graphics->apply_scene_diff(scene_diff_raw);
   auto const render_target = graphics->get_default_render_target();
   run_game_loop(window.get(), graphics.get(), render_target, scene.get(),

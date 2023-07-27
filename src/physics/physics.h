@@ -1,6 +1,7 @@
 #ifndef MARLON_PHYSICS_PHYSICS_H
 #define MARLON_PHYSICS_PHYSICS_H
 
+#include "ball.h"
 #include "half_space.h"
 #include "particle.h"
 #include "shape.h"

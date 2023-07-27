@@ -1,13 +1,13 @@
-#ifndef MARLON_PHYSICS_HALF_SPACE_H
-#define MARLON_PHYSICS_HALF_SPACE_H
+#ifndef MARLON_PHYSICS_BALL_H
+#define MARLON_PHYSICS_BALL_H
 
 #include "shape.h"
 
 namespace marlon {
 namespace physics {
-class Half_space : public Shape {
+class Ball : public Shape {
 public:
-  explicit Half_space(math::Vec3f const &normal) noexcept;
+  explicit Ball(float radius) noexcept;
 
   std::optional<Contact> collide_particle(math::Vec3f const &shape_position,
                                           math::Quatf const &shape_orientation,
@@ -15,7 +15,7 @@ public:
                                           float particle_radius) const noexcept final;
 
 private:
-  math::Vec3f _normal;
+  float _radius;
 };
 } // namespace physics
 } // namespace marlon

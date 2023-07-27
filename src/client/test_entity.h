@@ -14,7 +14,7 @@ class Test_entity_manager : public Entity_manager {
 public:
   explicit Test_entity_manager(
       graphics::Graphics *graphics, graphics::Scene_diff *const *scene_diff,
-      physics::Space *space,
+      graphics::Surface *surface, physics::Space *space,
       Entity_construction_queue *entity_construction_queue,
       Entity_destruction_queue *entity_destruction_queue);
 
@@ -40,14 +40,10 @@ private:
 
   graphics::Graphics *_graphics;
   graphics::Scene_diff *const *_scene_diff;
+  graphics::Surface *_surface;
   physics::Space *_space;
   Entity_construction_queue *_entity_construction_queue;
   Entity_destruction_queue *_entity_destruction_queue;
-  graphics::Material *_gas_material;
-  graphics::Material *_liquid_material;
-  graphics::Mesh *_mesh;
-  graphics::Surface *_gas_surface;
-  graphics::Surface *_liquid_surface;
   std::mt19937 _random_number_engine;
   std::uint64_t _next_entity_reference_value;
   std::unordered_map<Entity_reference, Test_entity> _entities;

@@ -4,6 +4,9 @@
 
 namespace marlon {
 namespace physics {
+namespace {
+constexpr auto particle_contact_offset = 0.1f;
+}
 Particle_reference
 Space::create_particle(Particle_create_info const &create_info) {
   Particle_reference const reference{_next_particle_reference_value};
@@ -28,7 +31,8 @@ void Space::destroy_particle(Particle_reference particle) {
 
 Static_rigid_body_reference Space::create_static_rigid_body(
     Static_rigid_body_create_info const &create_info) {
-  Static_rigid_body_reference const reference{_next_particle_reference_value};
+  Static_rigid_body_reference const reference{
+      _next_static_rigid_body_reference_value};
   Static_rigid_body const value{.collision_flags = create_info.collision_flags,
                                 .collision_mask = create_info.collision_mask,
                                 .position = create_info.position,
@@ -109,8 +113,8 @@ Space::find_particle_particle_collisions(std::span<Particle *const> particles) {
         auto const displacement =
             particle_b->current_position - particle_a->current_position;
         auto const distance2 = math::length2(displacement);
-        auto const contact_distance =
-            particle_a->radius + particle_b->radius + 0.2f;
+        auto const contact_distance = particle_a->radius + particle_b->radius +
+                                      2.0f * particle_contact_offset;
         auto const contact_distance2 = contact_distance * contact_distance;
         if (distance2 < contact_distance2) {
           retval.emplace_back(particle_a, particle_b);
@@ -134,7 +138,8 @@ Space::find_particle_static_rigid_body_collisions(
           (static_rigid_body->collision_mask & particle->collision_flags)) {
         if (auto const contact = static_rigid_body->shape->collide_particle(
                 static_rigid_body->position, static_rigid_body->orientation,
-                particle->current_position, particle->radius + 0.1f)) {
+                particle->current_position,
+                particle->radius + particle_contact_offset)) {
           retval.emplace_back(particle, static_rigid_body);
         }
       }

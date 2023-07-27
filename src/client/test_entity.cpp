@@ -6,55 +6,16 @@ namespace marlon {
 namespace client {
 Test_entity_manager::Test_entity_manager(
     graphics::Graphics *graphics, graphics::Scene_diff *const *scene_diff,
-    physics::Space *space, Entity_construction_queue *entity_construction_queue,
+    graphics::Surface *surface, physics::Space *space,
+    Entity_construction_queue *entity_construction_queue,
     Entity_destruction_queue *entity_destruction_queue)
-    : _graphics{graphics}, _scene_diff{scene_diff}, _space{space},
-      _entity_construction_queue{entity_construction_queue},
+    : _graphics{graphics}, _scene_diff{scene_diff}, _surface{surface},
+      _space{space}, _entity_construction_queue{entity_construction_queue},
       _entity_destruction_queue{entity_destruction_queue},
-      _gas_material{nullptr}, _liquid_material{nullptr}, _mesh{nullptr},
-      _gas_surface{nullptr}, _liquid_surface{nullptr},
       _random_number_engine{std::random_device{}()},
-      _next_entity_reference_value{} {
-  std::vector<math::Vec3f> const vertices{
-      {-1.0f, -1.0f, -1.0f}, {-1.0f, -1.0f, 1.0f}, {-1.0f, 1.0f, -1.0f},
-      {-1.0f, 1.0f, 1.0f},   {1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, 1.0f},
-      {1.0f, 1.0f, -1.0f},   {1.0f, 1.0f, 1.0f}};
-  std::vector<std::uint32_t> const indices{0, 1, 2, 3, 2, 1, 1, 5, 3, 7, 3, 5,
-                                           5, 4, 7, 6, 7, 4, 4, 0, 6, 2, 6, 0,
-                                           0, 4, 1, 5, 1, 4, 3, 7, 2, 6, 2, 7};
-  auto gas_material =
-      graphics->create_material_unique({.albedo = {1.0f, 1.0f, 1.0f}});
-  auto liquid_material =
-      graphics->create_material_unique({.albedo = {0.0f, 0.375f, 1.0f}});
-  auto mesh = graphics->create_mesh_unique(
-      {.index_format = graphics::Mesh_index_format::uint32,
-       .index_count = static_cast<std::uint32_t>(indices.size()),
-       .index_data = indices.data(),
-       .vertex_format = {.position_fetch_info =
-                             {.format =
-                                  graphics::Mesh_vertex_position_format::float3,
-                              .offset = 0u},
-                         .stride = 12u},
-       .vertex_count = static_cast<std::uint32_t>(vertices.size()),
-       .vertex_data = vertices.data()});
-  auto gas_surface = graphics->create_surface_unique(
-      {.material = gas_material.get(), .mesh = mesh.get()});
-  auto liquid_surface = graphics->create_surface_unique(
-      {.material = liquid_material.get(), .mesh = mesh.get()});
-  _gas_material = gas_material.release();
-  _liquid_material = liquid_material.release();
-  _mesh = mesh.release();
-  _gas_surface = gas_surface.release();
-  _liquid_surface = liquid_surface.release();
-}
+      _next_entity_reference_value{} {}
 
-Test_entity_manager::~Test_entity_manager() {
-  _graphics->destroy_surface(_gas_surface);
-  _graphics->destroy_surface(_liquid_surface);
-  _graphics->destroy_mesh(_mesh);
-  _graphics->destroy_material(_gas_material);
-  _graphics->destroy_material(_liquid_material);
-}
+Test_entity_manager::~Test_entity_manager() {}
 
 namespace {
 template <typename Random_number_engine>
@@ -82,8 +43,6 @@ math::Vec3f sample_ball(Random_number_engine &random_number_engine) {
 
 Entity_reference
 Test_entity_manager::create_entity(Entity_create_info const &) {
-  auto const surfaces = std::array<graphics::Surface *, 3>{
-      _liquid_surface, _liquid_surface, _liquid_surface};
   auto const collision_flags_array =
       std::array<std::uint64_t, 3>{0b01u, 0b01u, 0b01u};
   auto const collision_masks =
@@ -105,7 +64,6 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
   auto const index = [](int n) {
     return n >= 3 ? 1 : n;
   }(index_distribution(_random_number_engine));
-  auto const surface = surfaces[index];
   auto const collision_flags = collision_flags_array[index];
   auto const collision_mask = collision_masks[index];
   auto const position =
@@ -125,7 +83,7 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
   value.scene_node = _graphics->record_scene_node_creation(
       *_scene_diff, {.translation = position, .scale = scale});
   value.surface_instance = _graphics->record_surface_instance_creation(
-      *_scene_diff, {.surface = surface, .scene_node = value.scene_node});
+      *_scene_diff, {.surface = _surface, .scene_node = value.scene_node});
   value.particle =
       _space->create_particle({.collision_flags = collision_flags,
                                .collision_mask = collision_mask,
