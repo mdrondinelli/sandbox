@@ -1,6 +1,7 @@
 #ifndef MARLON_MATH_MAT_H
 #define MARLON_MATH_MAT_H
 
+#include "quat.h"
 #include "vec.h"
 
 namespace marlon {
@@ -127,6 +128,83 @@ constexpr auto operator*(Mat<T, N1, N2> const &a,
     }
   }
   return ab;
+}
+
+template <typename T>
+constexpr Mat<T, 3, 4> make_translation_mat3x4(math::Vec3f const &v) noexcept {
+  return {{T(1), T(0), T(0), v.x},
+          {T(0), T(1), T(0), v.y},
+          {T(0), T(0), T(1), v.z}};
+}
+
+template <typename T>
+constexpr Mat<T, 3, 4> make_translation_mat4x4(math::Vec3f const &v) noexcept {
+  return {{T(1), T(0), T(0), v.x},
+          {T(0), T(1), T(0), v.y},
+          {T(0), T(0), T(1), v.z},
+          {T(0), T(0), T(0), T(1)}};
+}
+
+template <typename T>
+constexpr Mat<T, 3, 3> make_rotation_mat3x3(Quat<T> const &q) noexcept {
+  return {{T(1) - T(2) * q.v.y * q.v.y - T(2) * q.v.z * q.v.z,
+           T(2) * q.v.x * q.v.y - T(2) * q.w * q.v.z,
+           T(2) * q.v.x * q.v.z + T(2) * q.w * q.v.y},
+          {T(2) * q.v.x * q.v.y + T(2) * q.w * q.v.z,
+           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.z * q.v.z,
+           T(2) * q.v.y * q.v.z - T(2) * q.w * q.v.x},
+          {T(2) * q.v.x * q.v.z - T(2) * q.w * q.v.y,
+           T(2) * q.v.y * q.v.z + T(2) * q.w * q.v.x,
+           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.y * q.v.y}};
+}
+
+template <typename T>
+constexpr Mat<T, 3, 4> make_rotation_mat3x4(Quat<T> const &q) noexcept {
+  return {{T(1) - T(2) * q.v.y * q.v.y - T(2) * q.v.z * q.v.z,
+           T(2) * q.v.x * q.v.y - T(2) * q.w * q.v.z,
+           T(2) * q.v.x * q.v.z + T(2) * q.w * q.v.y, T(0)},
+          {T(2) * q.v.x * q.v.y + T(2) * q.w * q.v.z,
+           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.z * q.v.z,
+           T(2) * q.v.y * q.v.z - T(2) * q.w * q.v.x, T(0)},
+          {T(2) * q.v.x * q.v.z - T(2) * q.w * q.v.y,
+           T(2) * q.v.y * q.v.z + T(2) * q.w * q.v.x,
+           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.y * q.v.y, T(0)}};
+}
+
+template <typename T>
+constexpr Mat<T, 4, 4> make_rotation_mat4x4(Quat<T> const &q) noexcept {
+  return {{T(1) - T(2) * q.v.y * q.v.y - T(2) * q.v.z * q.v.z,
+           T(2) * q.v.x * q.v.y - T(2) * q.w * q.v.z,
+           T(2) * q.v.x * q.v.z + T(2) * q.w * q.v.y, T(0)},
+          {T(2) * q.v.x * q.v.y + T(2) * q.w * q.v.z,
+           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.z * q.v.z,
+           T(2) * q.v.y * q.v.z - T(2) * q.w * q.v.x, T(0)},
+          {T(2) * q.v.x * q.v.z - T(2) * q.w * q.v.y,
+           T(2) * q.v.y * q.v.z + T(2) * q.w * q.v.x,
+           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.y * q.v.y, T(0)},
+          {T(0), T(0), T(0), T(1)}};
+}
+
+template <typename T>
+constexpr Mat<T, 3, 4>
+make_rigid_transform_mat3x4(math::Vec3f const &translation,
+                            Quat<T> const &rotation) noexcept {
+  auto retval = make_rotation_mat3x4(rotation);
+  retval[0][3] = translation.x;
+  retval[1][3] = translation.y;
+  retval[2][3] = translation.z;
+  return retval;
+}
+
+template <typename T>
+constexpr Mat<T, 4, 4>
+make_rigid_transform_mat4x4(math::Vec3f const &translation,
+                            Quat<T> const &rotation) noexcept {
+  auto retval = make_rotation_mat4x4(rotation);
+  retval[0][3] = translation.x;
+  retval[1][3] = translation.y;
+  retval[2][3] = translation.z;
+  return retval;
 }
 } // namespace math
 } // namespace marlon
