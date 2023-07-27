@@ -47,8 +47,7 @@ private:
   struct Static_rigid_body {
     std::uint64_t collision_flags;
     std::uint64_t collision_mask;
-    math::Vec3f position;
-    math::Quatf orientation;
+    math::Mat3x4f transform;
     Shape *shape;
   };
 

@@ -5,10 +5,11 @@ namespace physics {
 Ball::Ball(float radius) noexcept : _radius{radius} {}
 
 std::optional<Contact>
-Ball::collide_particle(math::Vec3f const &shape_position,
-                       math::Quatf const & /*shape_orientation*/,
+Ball::collide_particle(math::Mat3x4f const &shape_transform,
                        math::Vec3f const &particle_position,
                        float particle_radius) const noexcept {
+  auto const shape_position = math::Vec3f{
+      shape_transform[0][3], shape_transform[1][3], shape_transform[2][3]};
   auto const displacement = particle_position - shape_position;
   auto const distance2 = math::length2(displacement);
   auto const contact_distance = _radius + particle_radius;

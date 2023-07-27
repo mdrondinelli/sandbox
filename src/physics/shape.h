@@ -3,6 +3,7 @@
 
 #include <optional>
 
+#include "../math/mat.h"
 #include "../math/quat.h"
 #include "../math/vec.h"
 #include "contact.h"
@@ -14,8 +15,7 @@ public:
   virtual ~Shape() = default;
 
   virtual std::optional<Contact>
-  collide_particle(math::Vec3f const &shape_position,
-                   math::Quatf const &shape_orientation,
+  collide_particle(math::Mat3x4f const &shape_transform,
                    math::Vec3f const &particle_position,
                    float particle_radius) const noexcept = 0;
 };
