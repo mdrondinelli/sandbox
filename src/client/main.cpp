@@ -6,7 +6,7 @@
 #include <GLFW/glfw3.h>
 
 #include "../graphics/gl/graphics.h"
-#include "../physics/space.h"
+#include "../physics/physics.h"
 #include "glfw_instance.h"
 #include "glfw_window.h"
 #include "test_entity.h"
@@ -21,7 +21,7 @@ client::Glfw_unique_window_ptr create_window_unique() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  return client::make_glfw_unique_window(1600, 900, "title");
+  return client::make_glfw_unique_window(1920, 1080, "title");
 }
 
 std::unique_ptr<graphics::Gl_graphics>
@@ -61,12 +61,11 @@ void tick(physics::Space *space,
           client::Entity_construction_queue *entity_construction_queue,
           client::Entity_destruction_queue *entity_destruction_queue,
           client::Test_entity_manager *test_entity_manager, float delta_time) {
-  for (int i = 0; i < 16; ++i)
-    test_entity_manager->create_entity({});
+  for (int i = 0; i < 8; ++i)
+    entity_construction_queue->push(test_entity_manager, {});
+  test_entity_manager->tick_entities(delta_time);
+  space->simulate({.delta_time = delta_time, .substep_count = 1});
   entity_construction_queue->consume();
-  space->simulate({.acceleration = {0.0, -9.8f, 0.0f},
-                   .delta_time = delta_time,
-                   .substep_count = 2});
   entity_destruction_queue->consume();
 }
 
@@ -134,7 +133,7 @@ int main() {
   auto const graphics = create_graphics_unique(window.get());
   glfwSwapInterval(0);
   auto const ground_material =
-      graphics->create_material_unique({.albedo = {0.5f, 0.5f, 0.5f}});
+      graphics->create_material_unique({.albedo = {0.00f, 0.005f, 0.02f}});
   auto const ground_mesh = create_cube_mesh_unique(graphics.get());
   auto const ground_surface = graphics->create_surface_unique(
       {.material = ground_material.get(), .mesh = ground_mesh.get()});
@@ -150,7 +149,7 @@ int main() {
                           .zoom_y = 1.0f,
                       });
   auto const camera_scene_node = graphics->record_scene_node_creation(
-      scene_diff_raw, {.translation = {0.0f, 1.5f, 10.0f}});
+      scene_diff_raw, {.translation = {0.0f, 1.5f, 8.0f}});
   auto const camera_instance = graphics->record_camera_instance_creation(
       scene_diff_raw, {.camera = camera, .scene_node = camera_scene_node});
   auto const ground_scene_node = graphics->record_scene_node_creation(
@@ -159,6 +158,12 @@ int main() {
       scene_diff_raw,
       {.surface = ground_surface.get(), .scene_node = ground_scene_node});
   physics::Space space;
+  physics::Half_space ground_shape{math::Vec3f{0.0f, 1.0f, 0.0f}};
+  space.create_static_rigid_body({.collision_flags = 1,
+                                  .collision_mask = 1,
+                                  .position = math::Vec3f::zero(),
+                                  .orientation = math::Quatf::identity(),
+                                  .shape = &ground_shape});
   client::Entity_construction_queue entity_construction_queue;
   client::Entity_destruction_queue entity_destruction_queue;
   client::Test_entity_manager test_entity_manager{

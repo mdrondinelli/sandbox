@@ -41,9 +41,9 @@ vec3 tonemap(vec3 v) {
 }
 
 void main() {
-  float attenuation_factor = 1.0 / dot(view_space_position, view_space_position);
-  float exposure_factor = 4.0;
-  vec3 unbounded_color = exposure_factor * attenuation_factor * albedo;
+  float light_attenuation_factor = 1.0 / dot(view_space_position, view_space_position);
+  float light_factor = 8.0;
+  vec3 unbounded_color = (light_factor * light_attenuation_factor + 0.01) * albedo;
   vec3 bounded_color = tonemap(unbounded_color);
   fragColor = vec4(bounded_color, 1.0);
 }

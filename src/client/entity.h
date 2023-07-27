@@ -26,6 +26,8 @@ public:
   create_entity(Entity_create_info const &create_info) = 0;
 
   virtual void destroy_entity(Entity_reference entity) = 0;
+
+  virtual void tick_entities(float delta_time) = 0;
 };
 
 constexpr bool operator==(Entity_reference lhs, Entity_reference rhs) noexcept {

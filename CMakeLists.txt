@@ -31,6 +31,7 @@ add_library(
   "src/graphics/glad/glad.cpp")
 add_library(
   physics
+  "src/physics/half_space.cpp"
   "src/physics/particle.cpp"
   "src/physics/space.cpp")
 set(

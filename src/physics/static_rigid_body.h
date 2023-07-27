@@ -1,0 +1,40 @@
+#ifndef MARLON_PHYSICS_STATIC_RIGID_BODY_H
+#define MARLON_PHYSICS_STATIC_RIGID_BODY_H
+
+#include <cstdint>
+
+#include "../math/quat.h"
+#include "../math/vec.h"
+#include "shape.h"
+
+namespace marlon {
+namespace physics {
+struct Static_rigid_body_reference {
+  std::uint64_t value;
+};
+
+struct Static_rigid_body_create_info {
+  std::uint64_t collision_flags{};
+  std::uint64_t collision_mask{};
+  math::Vec3f position{math::Vec3f::zero()};
+  math::Quatf orientation{math::Quatf::identity()};
+  Shape *shape{};
+};
+
+constexpr bool operator==(Static_rigid_body_reference lhs,
+                          Static_rigid_body_reference rhs) noexcept {
+  return lhs.value == rhs.value;
+}
+} // namespace physics
+} // namespace marlon
+
+namespace std {
+template <> struct hash<marlon::physics::Static_rigid_body_reference> {
+  std::size_t operator()(
+      marlon::physics::Static_rigid_body_reference reference) const noexcept {
+    return hash<std::uint64_t>{}(reference.value);
+  }
+};
+} // namespace std
+
+#endif
