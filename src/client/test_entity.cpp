@@ -48,11 +48,11 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
   auto const collision_masks =
       std::array<std::uint64_t, 3>{0b01u, 0b01u, 0b11u};
   auto const centers = std::array<math::Vec3f, 3>{
-      math::Vec3f{-3.0f, 0.0f, -3.0f}, math::Vec3f{0.0f, 0.0f, 0.0f},
+      math::Vec3f{-3.0f, 0.0f, -3.0f}, math::Vec3f{0.0f, 2.5f, 0.0f},
       math::Vec3f{3.0f, 0.0f, 3.0f}};
   auto const radii = std::array<float, 3>{0.05f, 0.05f, 0.05f};
   auto const velocities = std::array<math::Vec3f, 3>{
-      math::Vec3f{0.0f, 9.0f, 0.0f}, math::Vec3f{0.0f, 12.0f, 0.0f},
+      math::Vec3f{0.0f, 9.0f, 0.0f}, math::Vec3f{0.0f, -3.0f, 0.0f},
       math::Vec3f{0.0f, 9.0f, 0.0f}};
   auto const velocity_jitter_factors = std::array<float, 3>{0.0f, 0.0f, 0.0f};
   auto const accelerations = std::array<math::Vec3f, 3>{
@@ -111,7 +111,7 @@ void Test_entity_manager::destroy_entity(Entity_reference reference) {
 void Test_entity_manager::tick_entities(float delta_time) {
   for (auto &[reference, value] : _entities) {
     value.time_alive += delta_time;
-    if (value.time_alive > 3.0f) {
+    if (value.time_alive > 2.0f) {
       _entity_destruction_queue->push(this, reference);
     }
   }

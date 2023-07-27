@@ -206,6 +206,8 @@ int main() {
       graphics->create_material_unique({.albedo = {0.0f, 0.375f, 1.0f}});
   auto const ground_material =
       graphics->create_material_unique({.albedo = {0.00f, 0.005f, 0.02f}});
+  auto const ball_material =
+      graphics->create_material_unique({.albedo = {0.2f, 0.0f, 0.0f}});
   auto const cube_mesh = create_cube_mesh_unique(graphics.get());
   auto const icosahedron_mesh = create_icosahedron_mesh_unique(graphics.get());
   auto const sphere_mesh = create_icosahedron_mesh_unique(graphics.get(), 2);
@@ -214,7 +216,7 @@ int main() {
   auto const ground_surface = graphics->create_surface_unique(
       {.material = ground_material.get(), .mesh = cube_mesh.get()});
   auto const ball_surface = graphics->create_surface_unique(
-      {.material = particle_material.get(), .mesh = sphere_mesh.get()});
+      {.material = ball_material.get(), .mesh = sphere_mesh.get()});
   auto const scene = graphics->create_scene_unique({});
   auto const scene_diff =
       graphics->create_scene_diff_unique({.scene = scene.get()});
