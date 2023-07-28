@@ -20,6 +20,8 @@ template <typename T> struct Vec<T, 2> {
 
   static auto zero() { return Vec<T, 2>{T(0), T(0)}; }
 
+  Vec() = default;
+
   constexpr Vec(T x, T y) : x{x}, y{y} {}
 
   template <typename F>
@@ -54,6 +56,8 @@ template <typename T> struct Vec<T, 3> {
   T z;
 
   static auto zero() { return Vec<T, 3>{T(0), T(0), T(0)}; }
+
+  Vec() = default;
 
   constexpr Vec(T x, T y, T z) : x{x}, y{y}, z{z} {}
 
@@ -99,6 +103,8 @@ template <typename T> struct Vec<T, 4> {
 
   static auto zero() { return Vec<T, 4>{T(0), T(0), T(0), T(0)}; }
 
+  Vec() = default;
+  
   constexpr Vec(T x, T y, T z, T w) : x{x}, y{y}, z{z}, w{w} {}
 
   template <typename F>

@@ -23,6 +23,8 @@ template <typename T> struct Quat {
     return Quat{std::cos(half_angle), std::sin(half_angle) * axis};
   }
 
+  Quat() noexcept = default;
+
   constexpr Quat(T w, Vec<T, 3> const &v) noexcept : w{w}, v{v} {}
 };
 

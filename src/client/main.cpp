@@ -9,6 +9,7 @@
 #include "../physics/physics.h"
 #include "glfw_instance.h"
 #include "glfw_window.h"
+#include "static_prop_entity.h"
 #include "test_entity.h"
 
 namespace client = marlon::client;
@@ -130,23 +131,28 @@ create_icosahedron_mesh_unique(graphics::Graphics *graphics,
 void tick(physics::Space *space,
           client::Entity_construction_queue *entity_construction_queue,
           client::Entity_destruction_queue *entity_destruction_queue,
+          std::span<client::Entity_manager *const> entity_managers,
           client::Test_entity_manager *test_entity_manager, float delta_time) {
-  for (int i = 0; i < 8; ++i)
+  for (int i = 0; i < 8; ++i) {
     entity_construction_queue->push(test_entity_manager, {});
-  test_entity_manager->tick_entities(delta_time);
+  }
+  for (auto const entity_manager : entity_managers) {
+    entity_manager->tick_entities(delta_time);
+  }
   space->simulate({.delta_time = delta_time, .substep_count = 1});
   entity_construction_queue->consume();
   entity_destruction_queue->consume();
 }
 
-void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
-                   graphics::Render_target *render_target,
-                   graphics::Scene *scene, graphics::Scene_diff *scene_diff,
-                   graphics::Camera_instance *camera_instance,
-                   physics::Space *space,
-                   client::Entity_construction_queue *entity_construction_queue,
-                   client::Entity_destruction_queue *entity_destruction_queue,
-                   client::Test_entity_manager *test_entity_manager) {
+void run_game_loop(
+    GLFWwindow *window, graphics::Graphics *graphics,
+    graphics::Render_target *render_target, graphics::Scene *scene,
+    graphics::Scene_diff *scene_diff,
+    graphics::Camera_instance *camera_instance, physics::Space *space,
+    client::Entity_construction_queue *entity_construction_queue,
+    client::Entity_destruction_queue *entity_destruction_queue,
+    std::span<client::Entity_manager *const> entity_managers,
+    client::Test_entity_manager *test_entity_manager) {
   auto const tick_rate = 32.0;
   auto const tick_duration = 1.0 / tick_rate;
   auto previous_time = glfwGetTime();
@@ -172,7 +178,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
         // scene_diff =
         graphics->apply_scene_diff(scene_diff);
         tick(space, entity_construction_queue, entity_destruction_queue,
-             test_entity_manager, tick_duration);
+             static_prop_entity_manager, test_entity_manager, tick_duration);
       } while (accumulator >= tick_duration);
     }
     graphics->apply_scene_diff(
@@ -288,6 +294,13 @@ int main() {
                                   .shape = &ball_shape});
   client::Entity_construction_queue entity_construction_queue;
   client::Entity_destruction_queue entity_destruction_queue;
+  client::Static_prop_entity_manager static_prop_entity_manager{
+      graphics.get(),
+      &scene_diff_raw,
+      particle_surface.get(),
+      &space,
+      &entity_construction_queue,
+      &entity_destruction_queue};
   client::Test_entity_manager test_entity_manager{graphics.get(),
                                                   &scene_diff_raw,
                                                   particle_surface.get(),
