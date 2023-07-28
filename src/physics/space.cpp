@@ -33,12 +33,14 @@ Static_rigid_body_reference Space::create_static_rigid_body(
     Static_rigid_body_create_info const &create_info) {
   Static_rigid_body_reference const reference{
       _next_static_rigid_body_reference_value};
-  Static_rigid_body const value{
-      .collision_flags = create_info.collision_flags,
-      .collision_mask = create_info.collision_mask,
-      .transform = math::make_rigid_transform_mat3x4(create_info.position,
-                                                     create_info.orientation),
-      .shape = create_info.shape};
+  auto const transform = math::make_rigid_transform_mat3x4(
+      create_info.position, create_info.orientation);
+  auto const transform_inverse = math::rigid_inverse(transform);
+  Static_rigid_body const value{.collision_flags = create_info.collision_flags,
+                                .collision_mask = create_info.collision_mask,
+                                .transform = transform,
+                                .transform_inverse = transform_inverse,
+                                .shape = create_info.shape};
   _static_rigid_bodies.emplace(reference, value);
   ++_next_static_rigid_body_reference_value;
   return reference;
@@ -138,7 +140,9 @@ Space::find_particle_static_rigid_body_collisions(
       if ((particle->collision_mask & static_rigid_body->collision_flags) &&
           (static_rigid_body->collision_mask & particle->collision_flags)) {
         if (auto const contact = static_rigid_body->shape->collide_particle(
-                static_rigid_body->transform, particle->current_position,
+                static_rigid_body->transform,
+                static_rigid_body->transform_inverse,
+                particle->current_position,
                 particle->radius + particle_contact_offset)) {
           retval.emplace_back(particle, static_rigid_body);
         }
@@ -190,8 +194,8 @@ void Space::solve_particle_static_rigid_body_collisions(
     std::span<std::pair<Particle *, Static_rigid_body *> const> collisions) {
   for (auto const [particle, static_rigid_body] : collisions) {
     if (auto contact = static_rigid_body->shape->collide_particle(
-            static_rigid_body->transform, particle->current_position,
-            particle->radius)) {
+            static_rigid_body->transform, static_rigid_body->transform_inverse,
+            particle->current_position, particle->radius)) {
       particle->current_position += contact->depth * contact->normal;
     }
   }

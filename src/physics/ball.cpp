@@ -6,6 +6,7 @@ Ball::Ball(float radius) noexcept : _radius{radius} {}
 
 std::optional<Contact>
 Ball::collide_particle(math::Mat3x4f const &shape_transform,
+                       math::Mat3x4f const & /*shape_transform_inverse*/,
                        math::Vec3f const &particle_position,
                        float particle_radius) const noexcept {
   auto const shape_position = math::Vec3f{

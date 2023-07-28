@@ -206,6 +206,35 @@ make_rigid_transform_mat4x4(math::Vec3f const &translation,
   retval[2][3] = translation.z;
   return retval;
 }
+
+template <typename T>
+constexpr Mat<T, 3, 4> rigid_inverse(math::Mat<T, 3, 4> const &m) noexcept {
+  auto const translation = math::Vec3f{m[0][3], m[1][3], m[2][3]};
+  auto const retval_upper_left = math::Mat3x3f{{m[0][0], m[1][0], m[2][0]},
+                                               {m[0][1], m[1][1], m[2][1]},
+                                               {m[0][2], m[1][2], m[2][2]}};
+  return {{retval_upper_left[0][0], retval_upper_left[0][1],
+           retval_upper_left[0][2], -dot(retval_upper_left[0], translation)},
+          {retval_upper_left[1][0], retval_upper_left[1][1],
+           retval_upper_left[1][2], -dot(retval_upper_left[1], translation)},
+          {retval_upper_left[2][0], retval_upper_left[2][1],
+           retval_upper_left[2][2], -dot(retval_upper_left[2], translation)}};
+}
+
+template <typename T>
+constexpr Mat<T, 4, 4> rigid_inverse(math::Mat<T, 4, 4> const &m) noexcept {
+  auto const translation = math::Vec3f{m[0][3], m[1][3], m[2][3]};
+  auto const retval_upper_left = math::Mat3x3f{{m[0][0], m[1][0], m[2][0]},
+                                               {m[0][1], m[1][1], m[2][1]},
+                                               {m[0][2], m[1][2], m[2][2]}};
+  return {{retval_upper_left[0][0], retval_upper_left[0][1],
+           retval_upper_left[0][2], -dot(retval_upper_left[0], translation)},
+          {retval_upper_left[1][0], retval_upper_left[1][1],
+           retval_upper_left[1][2], -dot(retval_upper_left[1], translation)},
+          {retval_upper_left[2][0], retval_upper_left[2][1],
+           retval_upper_left[2][2], -dot(retval_upper_left[2], translation)},
+          {T(0), T(0), T(0), T(1)}};
+}
 } // namespace math
 } // namespace marlon
 

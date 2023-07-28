@@ -2,6 +2,7 @@
 #define MARLON_PHYSICS_PHYSICS_H
 
 #include "ball.h"
+#include "box.h"
 #include "half_space.h"
 #include "particle.h"
 #include "shape.h"

@@ -6,6 +6,7 @@ Half_space::Half_space(math::Vec3f const &normal) noexcept : _normal{normal} {}
 
 std::optional<Contact>
 Half_space::collide_particle(math::Mat3x4f const &shape_transform,
+                             math::Mat3x4f const & /*shape_transform_inverse*/,
                              math::Vec3f const &particle_position,
                              float particle_radius) const noexcept {
   auto const plane_position = math::Vec3f{

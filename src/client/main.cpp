@@ -217,6 +217,8 @@ int main() {
       {.material = ground_material.get(), .mesh = cube_mesh.get()});
   auto const ball_surface = graphics->create_surface_unique(
       {.material = ball_material.get(), .mesh = sphere_mesh.get()});
+  auto const box_surface = graphics->create_surface_unique(
+      {.material = ball_material.get(), .mesh = cube_mesh.get()});
   auto const scene = graphics->create_scene_unique({});
   auto const scene_diff =
       graphics->create_scene_diff_unique({.scene = scene.get()});
@@ -237,23 +239,52 @@ int main() {
   graphics->record_surface_instance_creation(
       scene_diff_raw,
       {.surface = ground_surface.get(), .scene_node = ground_scene_node});
-  auto const ball_scene_node = graphics->record_scene_node_creation(
-      scene_diff_raw, {.translation = {0.0f, 1.5f, 0.0f}, .scale = 0.5f});
+  auto const left_ball_scene_node = graphics->record_scene_node_creation(
+      scene_diff_raw, {.translation = {-1.0f, 0.5f, -1.0f}, .scale = 0.5f});
   graphics->record_surface_instance_creation(
       scene_diff_raw,
-      {.surface = ball_surface.get(), .scene_node = ball_scene_node});
+      {.surface = ball_surface.get(), .scene_node = left_ball_scene_node});
+  auto const box_scene_node = graphics->record_scene_node_creation(
+      scene_diff_raw,
+      {.translation = {0.0f, 1.5f, 0.0f},
+       .rotation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                           math::deg_to_rad(-45.0f)) *
+                   math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
+                                           math::deg_to_rad(45.0f)),
+       .scale = 0.5f});
+  graphics->record_surface_instance_creation(
+      scene_diff_raw,
+      {.surface = box_surface.get(), .scene_node = box_scene_node});
+  auto const right_ball_scene_node = graphics->record_scene_node_creation(
+      scene_diff_raw, {.translation = {1.0f, 0.5f, 1.0f}, .scale = 0.5f});
+  graphics->record_surface_instance_creation(
+      scene_diff_raw,
+      {.surface = ball_surface.get(), .scene_node = right_ball_scene_node});
   physics::Space space;
   physics::Half_space ground_shape{math::Vec3f{0.0f, 1.0f, 0.0f}};
+  physics::Ball ball_shape{0.5f};
+  physics::Box box_shape{0.5f, 0.5f, 0.5f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f::zero(),
                                   .orientation = math::Quatf::identity(),
                                   .shape = &ground_shape});
-  physics::Ball ball_shape{0.5f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
-                                  .position = {0.0f, 1.5f, 0.0f},
-                                  .orientation = math::Quatf::identity(),
+                                  .position = {-1.0f, 0.5f, -1.0f},
+                                  .shape = &ball_shape});
+  space.create_static_rigid_body(
+      {.collision_flags = 1,
+       .collision_mask = 1,
+       .position = {0.0f, 1.5f, 0.0f},
+       .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                              math::deg_to_rad(-45.0f)) *
+                      math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
+                                              math::deg_to_rad(45.0f)),
+       .shape = &box_shape});
+  space.create_static_rigid_body({.collision_flags = 1,
+                                  .collision_mask = 1,
+                                  .position = {1.0f, 0.5f, 1.0f},
                                   .shape = &ball_shape});
   client::Entity_construction_queue entity_construction_queue;
   client::Entity_destruction_queue entity_destruction_queue;

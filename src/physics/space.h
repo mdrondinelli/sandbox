@@ -48,6 +48,7 @@ private:
     std::uint64_t collision_flags;
     std::uint64_t collision_mask;
     math::Mat3x4f transform;
+    math::Mat3x4f transform_inverse;
     Shape *shape;
   };
 

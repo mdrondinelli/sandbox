@@ -16,6 +16,7 @@ public:
 
   virtual std::optional<Contact>
   collide_particle(math::Mat3x4f const &shape_transform,
+                   math::Mat3x4f const &shape_transform_inverse,
                    math::Vec3f const &particle_position,
                    float particle_radius) const noexcept = 0;
 };
