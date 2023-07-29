@@ -11,6 +11,7 @@ struct Static_prop_entity_manager_create_info {
   graphics::Graphics *graphics{};
   graphics::Scene_diff *const *scene_diff{};
   graphics::Surface *surface{};
+  float surface_scale{1.0f};
   physics::Space *space{};
   physics::Shape *shape{};
 };
@@ -36,6 +37,7 @@ private:
   graphics::Graphics *_graphics;
   graphics::Scene_diff *const *_scene_diff;
   graphics::Surface *_surface;
+  float _surface_scale;
   physics::Space *_space;
   physics::Shape *_shape;
   std::uint64_t _next_entity_reference_value;
@@ -43,8 +45,8 @@ private:
 };
 
 struct Static_prop_entity_parameters {
-  math::Vec3f position;
-  math::Quatf orientation;
+  math::Vec3f position{math::Vec3f::zero()};
+  math::Quatf orientation{math::Quatf::identity()};
 };
 } // namespace client
 } // namespace marlon

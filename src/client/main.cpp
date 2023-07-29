@@ -1,3 +1,4 @@
+#include <array>
 #include <iostream>
 #include <vector>
 
@@ -22,7 +23,7 @@ client::Glfw_unique_window_ptr create_window_unique() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  return client::make_glfw_unique_window(1920, 1080, "title");
+  return client::make_glfw_unique_window(1280, 720, "title");
 }
 
 std::unique_ptr<graphics::Gl_graphics>
@@ -144,22 +145,21 @@ void tick(physics::Space *space,
   entity_destruction_queue->consume();
 }
 
-void run_game_loop(
-    GLFWwindow *window, graphics::Graphics *graphics,
-    graphics::Render_target *render_target, graphics::Scene *scene,
-    graphics::Scene_diff *scene_diff,
-    graphics::Camera_instance *camera_instance, physics::Space *space,
-    client::Entity_construction_queue *entity_construction_queue,
-    client::Entity_destruction_queue *entity_destruction_queue,
-    std::span<client::Entity_manager *const> entity_managers,
-    client::Test_entity_manager *test_entity_manager) {
+void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
+                   graphics::Render_target *render_target,
+                   graphics::Scene *scene, graphics::Scene_diff *scene_diff,
+                   graphics::Camera_instance *camera_instance,
+                   physics::Space *space,
+                   client::Entity_construction_queue *entity_construction_queue,
+                   client::Entity_destruction_queue *entity_destruction_queue,
+                   std::span<client::Entity_manager *const> entity_managers,
+                   client::Test_entity_manager *test_entity_manager) {
   auto const tick_rate = 32.0;
   auto const tick_duration = 1.0 / tick_rate;
   auto previous_time = glfwGetTime();
   auto accumulator = 0.0;
   auto fps_time_accumulator = 0.0;
   auto fps_frame_accumulator = 0;
-  // graphics::Unique_scene_diff_ptr scene_diff{nullptr, graphics};
   for (;;) {
     glfwPollEvents();
     if (glfwWindowShouldClose(window)) {
@@ -172,25 +172,15 @@ void run_game_loop(
     if (accumulator >= tick_duration) {
       do {
         accumulator -= tick_duration;
-        // if (scene_diff.get() != nullptr) {
-        //   graphics->apply_scene_diff(scene_diff.get());
-        // }
-        // scene_diff =
         graphics->apply_scene_diff(scene_diff);
         tick(space, entity_construction_queue, entity_destruction_queue,
-             static_prop_entity_manager, test_entity_manager, tick_duration);
+             entity_managers, test_entity_manager, tick_duration);
       } while (accumulator >= tick_duration);
     }
     graphics->apply_scene_diff(
         scene_diff,
         static_cast<float>(elapsed_time /
                            (elapsed_time + tick_duration - accumulator)));
-    // else if (scene_diff.get() != nullptr) {
-    //   graphics->apply_scene_diff(
-    //       scene_diff.get(),
-    //       static_cast<float>(elapsed_time /
-    //                          (elapsed_time + tick_duration - accumulator)));
-    // }
     graphics->render(scene, camera_instance, render_target);
     glfwSwapBuffers(window);
     fps_time_accumulator += elapsed_time;
@@ -212,7 +202,7 @@ int main() {
       graphics->create_material_unique({.albedo = {0.0f, 0.375f, 1.0f}});
   auto const ground_material =
       graphics->create_material_unique({.albedo = {0.00f, 0.005f, 0.02f}});
-  auto const ball_material =
+  auto const solid_material =
       graphics->create_material_unique({.albedo = {0.2f, 0.0f, 0.0f}});
   auto const cube_mesh = create_cube_mesh_unique(graphics.get());
   auto const icosahedron_mesh = create_icosahedron_mesh_unique(graphics.get());
@@ -222,9 +212,9 @@ int main() {
   auto const ground_surface = graphics->create_surface_unique(
       {.material = ground_material.get(), .mesh = cube_mesh.get()});
   auto const ball_surface = graphics->create_surface_unique(
-      {.material = ball_material.get(), .mesh = sphere_mesh.get()});
+      {.material = solid_material.get(), .mesh = sphere_mesh.get()});
   auto const box_surface = graphics->create_surface_unique(
-      {.material = ball_material.get(), .mesh = cube_mesh.get()});
+      {.material = solid_material.get(), .mesh = cube_mesh.get()});
   auto const scene = graphics->create_scene_unique({});
   auto const scene_diff =
       graphics->create_scene_diff_unique({.scene = scene.get()});
@@ -245,27 +235,6 @@ int main() {
   graphics->record_surface_instance_creation(
       scene_diff_raw,
       {.surface = ground_surface.get(), .scene_node = ground_scene_node});
-  auto const left_ball_scene_node = graphics->record_scene_node_creation(
-      scene_diff_raw, {.translation = {-1.0f, 0.5f, -1.0f}, .scale = 0.5f});
-  graphics->record_surface_instance_creation(
-      scene_diff_raw,
-      {.surface = ball_surface.get(), .scene_node = left_ball_scene_node});
-  auto const box_scene_node = graphics->record_scene_node_creation(
-      scene_diff_raw,
-      {.translation = {0.0f, 1.5f, 0.0f},
-       .rotation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                           math::deg_to_rad(-45.0f)) *
-                   math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
-                                           math::deg_to_rad(45.0f)),
-       .scale = 0.5f});
-  graphics->record_surface_instance_creation(
-      scene_diff_raw,
-      {.surface = box_surface.get(), .scene_node = box_scene_node});
-  auto const right_ball_scene_node = graphics->record_scene_node_creation(
-      scene_diff_raw, {.translation = {1.0f, 0.5f, 1.0f}, .scale = 0.5f});
-  graphics->record_surface_instance_creation(
-      scene_diff_raw,
-      {.surface = ball_surface.get(), .scene_node = right_ball_scene_node});
   physics::Space space;
   physics::Half_space ground_shape{math::Vec3f{0.0f, 1.0f, 0.0f}};
   physics::Ball ball_shape{0.5f};
@@ -275,43 +244,51 @@ int main() {
                                   .position = math::Vec3f::zero(),
                                   .orientation = math::Quatf::identity(),
                                   .shape = &ground_shape});
-  space.create_static_rigid_body({.collision_flags = 1,
-                                  .collision_mask = 1,
-                                  .position = {-1.0f, 0.5f, -1.0f},
-                                  .shape = &ball_shape});
-  space.create_static_rigid_body(
-      {.collision_flags = 1,
-       .collision_mask = 1,
-       .position = {0.0f, 1.5f, 0.0f},
-       .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                              math::deg_to_rad(-45.0f)) *
-                      math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
-                                              math::deg_to_rad(45.0f)),
-       .shape = &box_shape});
-  space.create_static_rigid_body({.collision_flags = 1,
-                                  .collision_mask = 1,
-                                  .position = {1.0f, 0.5f, 1.0f},
-                                  .shape = &ball_shape});
   client::Entity_construction_queue entity_construction_queue;
   client::Entity_destruction_queue entity_destruction_queue;
-  client::Static_prop_entity_manager static_prop_entity_manager{
-      graphics.get(),
-      &scene_diff_raw,
-      particle_surface.get(),
-      &space,
-      &entity_construction_queue,
-      &entity_destruction_queue};
+  client::Static_prop_entity_manager ball_entity_manager{
+      {.graphics = graphics.get(),
+       .scene_diff = &scene_diff_raw,
+       .surface = ball_surface.get(),
+       .surface_scale = 0.5f,
+       .space = &space,
+       .shape = &ball_shape}};
+  client::Static_prop_entity_manager box_entity_manager{
+      {.graphics = graphics.get(),
+       .scene_diff = &scene_diff_raw,
+       .surface = box_surface.get(),
+       .surface_scale = 0.5f,
+       .space = &space,
+       .shape = &box_shape}};
   client::Test_entity_manager test_entity_manager{graphics.get(),
                                                   &scene_diff_raw,
                                                   particle_surface.get(),
                                                   &space,
                                                   &entity_construction_queue,
                                                   &entity_destruction_queue};
+  auto const entity_managers = std::array<client::Entity_manager *, 3>{
+      &ball_entity_manager, &box_entity_manager, &test_entity_manager};
+  auto const left_ball_params =
+      client::Static_prop_entity_parameters{.position = {-1.0f, 0.5f, -1.0f}};
+  auto const right_ball_params =
+      client::Static_prop_entity_parameters{.position = {1.0f, 0.5f, 1.0f}};
+  auto const box_params = client::Static_prop_entity_parameters{
+      .position = {0.0f, 1.5f, 0.0f},
+      .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                             math::deg_to_rad(-45.0f)) *
+                     math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
+                                             math::deg_to_rad(45.0f))};
+  entity_construction_queue.push(&ball_entity_manager,
+                                 {.parameters = &left_ball_params});
+  entity_construction_queue.push(&ball_entity_manager,
+                                 {.parameters = &right_ball_params});
+  entity_construction_queue.push(&box_entity_manager,
+                                 {.parameters = &box_params});
   graphics->apply_scene_diff(scene_diff_raw);
   auto const render_target = graphics->get_default_render_target();
   run_game_loop(window.get(), graphics.get(), render_target, scene.get(),
                 scene_diff_raw, camera_instance, &space,
                 &entity_construction_queue, &entity_destruction_queue,
-                &test_entity_manager);
+                entity_managers, &test_entity_manager);
   return 0;
 }
