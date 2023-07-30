@@ -218,22 +218,35 @@ int main() {
   auto const scene = graphics->create_scene_unique({});
   auto const scene_diff =
       graphics->create_scene_diff_unique({.scene = scene.get()});
-  auto const scene_diff_raw = scene_diff.get();
+  class Scene_diff_provider : public client::Scene_diff_provider {
+  public:
+    explicit Scene_diff_provider(graphics::Scene_diff *scene_diff) noexcept
+        : _scene_diff{scene_diff} {}
+
+    graphics::Scene_diff *get_scene_diff() const noexcept final {
+      return _scene_diff;
+    };
+
+  private:
+    graphics::Scene_diff *_scene_diff;
+  };
+  auto const scene_diff_provider = Scene_diff_provider{scene_diff.get()};
   auto const camera = graphics->record_camera_creation(
-      scene_diff_raw, {
-                          .near_plane_distance = 0.001f,
-                          .far_plane_distance = 1000.0f,
-                          .zoom_x = 9.0f / 16.0f,
-                          .zoom_y = 1.0f,
-                      });
+      scene_diff.get(), {
+                            .near_plane_distance = 0.001f,
+                            .far_plane_distance = 1000.0f,
+                            .zoom_x = 9.0f / 16.0f,
+                            .zoom_y = 1.0f,
+                        });
   auto const camera_scene_node = graphics->record_scene_node_creation(
-      scene_diff_raw, {.translation = {0.0f, 1.5f, 8.0f}});
+      scene_diff.get(), {.translation = {0.0f, 1.5f, 8.0f}});
   auto const camera_instance = graphics->record_camera_instance_creation(
-      scene_diff_raw, {.camera = camera, .scene_node = camera_scene_node});
+      scene_diff.get(), {.camera = camera, .scene_node = camera_scene_node});
   auto const ground_scene_node = graphics->record_scene_node_creation(
-      scene_diff_raw, {.translation = {0.0f, -100.0f, 0.0f}, .scale = 100.0f});
+      scene_diff.get(),
+      {.translation = {0.0f, -100.0f, 0.0f}, .scale = 100.0f});
   graphics->record_surface_instance_creation(
-      scene_diff_raw,
+      scene_diff.get(),
       {.surface = ground_surface.get(), .scene_node = ground_scene_node});
   physics::Space space;
   physics::Half_space ground_shape{math::Vec3f{0.0f, 1.0f, 0.0f}};
@@ -248,20 +261,20 @@ int main() {
   client::Entity_destruction_queue entity_destruction_queue;
   client::Static_prop_entity_manager ball_entity_manager{
       {.graphics = graphics.get(),
-       .scene_diff = &scene_diff_raw,
+       .scene_diff_provider = &scene_diff_provider,
        .surface = ball_surface.get(),
        .surface_scale = 0.5f,
        .space = &space,
        .shape = &ball_shape}};
   client::Static_prop_entity_manager box_entity_manager{
       {.graphics = graphics.get(),
-       .scene_diff = &scene_diff_raw,
+       .scene_diff_provider = &scene_diff_provider,
        .surface = box_surface.get(),
        .surface_scale = 0.5f,
        .space = &space,
        .shape = &box_shape}};
   client::Test_entity_manager test_entity_manager{graphics.get(),
-                                                  &scene_diff_raw,
+                                                  &scene_diff_provider,
                                                   particle_surface.get(),
                                                   &space,
                                                   &entity_construction_queue,
@@ -284,10 +297,10 @@ int main() {
                                  {.parameters = &right_ball_params});
   entity_construction_queue.push(&box_entity_manager,
                                  {.parameters = &box_params});
-  graphics->apply_scene_diff(scene_diff_raw);
+  graphics->apply_scene_diff(scene_diff.get());
   auto const render_target = graphics->get_default_render_target();
   run_game_loop(window.get(), graphics.get(), render_target, scene.get(),
-                scene_diff_raw, camera_instance, &space,
+                scene_diff.get(), camera_instance, &space,
                 &entity_construction_queue, &entity_destruction_queue,
                 entity_managers, &test_entity_manager);
   return 0;

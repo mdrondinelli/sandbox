@@ -7,13 +7,15 @@
 #include "../graphics/graphics.h"
 #include "../physics/physics.h"
 #include "entity.h"
+#include "scene_diff_provider.h"
 
 namespace marlon {
 namespace client {
 class Test_entity_manager : public Entity_manager {
 public:
   explicit Test_entity_manager(
-      graphics::Graphics *graphics, graphics::Scene_diff *const *scene_diff,
+      graphics::Graphics *graphics,
+      Scene_diff_provider const *scene_diff_provider,
       graphics::Surface *surface, physics::Space *space,
       Entity_construction_queue *entity_construction_queue,
       Entity_destruction_queue *entity_destruction_queue);
@@ -39,7 +41,7 @@ private:
   };
 
   graphics::Graphics *_graphics;
-  graphics::Scene_diff *const *_scene_diff;
+  Scene_diff_provider const *_scene_diff_provider;
   graphics::Surface *_surface;
   physics::Space *_space;
   Entity_construction_queue *_entity_construction_queue;

@@ -4,7 +4,8 @@ namespace marlon {
 namespace client {
 Static_prop_entity_manager::Static_prop_entity_manager(
     Static_prop_entity_manager_create_info const &create_info)
-    : _graphics{create_info.graphics}, _scene_diff{create_info.scene_diff},
+    : _graphics{create_info.graphics},
+      _scene_diff_provider{create_info.scene_diff_provider},
       _surface{create_info.surface}, _surface_scale{create_info.surface_scale},
       _space{create_info.space}, _shape{create_info.shape},
       _next_entity_reference_value{} {}
@@ -16,12 +17,13 @@ Entity_reference Static_prop_entity_manager::create_entity(
   auto const reference = Entity_reference{_next_entity_reference_value};
   auto &value = _entities[reference];
   // TODO: consider exceptions in scene node creation
+  auto const scene_diff = _scene_diff_provider->get_scene_diff();
   value.scene_node = _graphics->record_scene_node_creation(
-      *_scene_diff, {.translation = parameters.position,
-                     .rotation = parameters.orientation,
-                     .scale = _surface_scale});
+      scene_diff, {.translation = parameters.position,
+                   .rotation = parameters.orientation,
+                   .scale = _surface_scale});
   value.surface_instance = _graphics->record_surface_instance_creation(
-      *_scene_diff, {.surface = _surface, .scene_node = value.scene_node});
+      scene_diff, {.surface = _surface, .scene_node = value.scene_node});
   if (_shape) {
     value.static_rigid_body =
         _space->create_static_rigid_body({.collision_flags = 1,
@@ -36,9 +38,10 @@ Entity_reference Static_prop_entity_manager::create_entity(
 void Static_prop_entity_manager::destroy_entity(Entity_reference reference) {
   auto const it = _entities.find(reference);
   auto &value = it->second;
-  _graphics->record_surface_instance_destruction(*_scene_diff,
+  auto const scene_diff = _scene_diff_provider->get_scene_diff();
+  _graphics->record_surface_instance_destruction(scene_diff,
                                                  value.surface_instance);
-  _graphics->record_scene_node_destruction(*_scene_diff, value.scene_node);
+  _graphics->record_scene_node_destruction(scene_diff, value.scene_node);
   if (_shape) {
     _space->destroy_static_rigid_body(*value.static_rigid_body);
   }

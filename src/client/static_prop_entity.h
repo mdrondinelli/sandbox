@@ -4,12 +4,13 @@
 #include "../graphics/graphics.h"
 #include "../physics/physics.h"
 #include "entity.h"
+#include "scene_diff_provider.h"
 
 namespace marlon {
 namespace client {
 struct Static_prop_entity_manager_create_info {
   graphics::Graphics *graphics{};
-  graphics::Scene_diff *const *scene_diff{};
+  Scene_diff_provider const *scene_diff_provider{};
   graphics::Surface *surface{};
   float surface_scale{1.0f};
   physics::Space *space{};
@@ -35,7 +36,7 @@ private:
   };
 
   graphics::Graphics *_graphics;
-  graphics::Scene_diff *const *_scene_diff;
+  Scene_diff_provider const *_scene_diff_provider;
   graphics::Surface *_surface;
   float _surface_scale;
   physics::Space *_space;
