@@ -8,9 +8,8 @@ Test_entity_manager::Test_entity_manager(
     Scene_diff_provider const *scene_diff_provider, graphics::Surface *surface,
     physics::Space *space, Entity_construction_queue *entity_construction_queue,
     Entity_destruction_queue *entity_destruction_queue)
-    : _scene_diff_provider{scene_diff_provider},
-      _surface{surface}, _space{space},
-      _entity_construction_queue{entity_construction_queue},
+    : _scene_diff_provider{scene_diff_provider}, _surface{surface},
+      _space{space}, _entity_construction_queue{entity_construction_queue},
       _entity_destruction_queue{entity_destruction_queue},
       _random_number_engine{std::random_device{}()},
       _next_entity_reference_value{} {}
