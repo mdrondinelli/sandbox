@@ -5,11 +5,10 @@
 namespace marlon {
 namespace client {
 Test_entity_manager::Test_entity_manager(
-    graphics::Graphics *graphics,
     Scene_diff_provider const *scene_diff_provider, graphics::Surface *surface,
     physics::Space *space, Entity_construction_queue *entity_construction_queue,
     Entity_destruction_queue *entity_destruction_queue)
-    : _graphics{graphics}, _scene_diff_provider{scene_diff_provider},
+    : _scene_diff_provider{scene_diff_provider},
       _surface{surface}, _space{space},
       _entity_construction_queue{entity_construction_queue},
       _entity_destruction_queue{entity_destruction_queue},
@@ -82,10 +81,10 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
   value.manager = this;
   value.reference = reference;
   auto const scene_diff = _scene_diff_provider->get_scene_diff();
-  value.scene_node = _graphics->record_scene_node_creation(
-      scene_diff, {.translation = position, .scale = scale});
-  value.surface_instance = _graphics->record_surface_instance_creation(
-      scene_diff, {.surface = _surface, .scene_node = value.scene_node});
+  value.scene_node = scene_diff->record_scene_node_creation(
+      {.translation = position, .scale = scale});
+  value.surface_instance = scene_diff->record_surface_instance_creation(
+      {.surface = _surface, .scene_node = value.scene_node});
   value.particle =
       _space->create_particle({.collision_flags = collision_flags,
                                .collision_mask = collision_mask,
@@ -104,9 +103,8 @@ void Test_entity_manager::destroy_entity(Entity_reference reference) {
   auto const it = _entities.find(reference);
   auto &value = it->second;
   auto const scene_diff = _scene_diff_provider->get_scene_diff();
-  _graphics->record_surface_instance_destruction(scene_diff,
-                                                 value.surface_instance);
-  _graphics->record_scene_node_destruction(scene_diff, value.scene_node);
+  scene_diff->record_surface_instance_destruction(value.surface_instance);
+  scene_diff->record_scene_node_destruction(value.scene_node);
   _space->destroy_particle(value.particle);
   _entities.erase(it);
 }
@@ -122,9 +120,8 @@ void Test_entity_manager::tick_entities(float delta_time) {
 
 void Test_entity_manager::Test_entity::on_particle_motion(
     physics::Particle_motion_event const &event) {
-  manager->_graphics->record_scene_node_translation_continuous(
-      manager->_scene_diff_provider->get_scene_diff(), scene_node,
-      event.position);
+  manager->_scene_diff_provider->get_scene_diff()
+      ->record_scene_node_translation_continuous(scene_node, event.position);
 }
 } // namespace client
 } // namespace marlon

@@ -14,7 +14,6 @@ namespace client {
 class Test_entity_manager : public Entity_manager {
 public:
   explicit Test_entity_manager(
-      graphics::Graphics *graphics,
       Scene_diff_provider const *scene_diff_provider,
       graphics::Surface *surface, physics::Space *space,
       Entity_construction_queue *entity_construction_queue,
@@ -40,7 +39,6 @@ private:
     void on_particle_motion(physics::Particle_motion_event const &event) final;
   };
 
-  graphics::Graphics *_graphics;
   Scene_diff_provider const *_scene_diff_provider;
   graphics::Surface *_surface;
   physics::Space *_space;

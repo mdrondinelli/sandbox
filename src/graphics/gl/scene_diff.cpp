@@ -200,5 +200,81 @@ void Gl_scene_diff::Impl::apply_destroyed_cameras() {
 
 Gl_scene_diff::Gl_scene_diff(Scene_diff_create_info const &create_info) noexcept
     : _impl{create_info} {}
+
+Gl_scene_node *Gl_scene_diff::record_scene_node_creation(
+    Scene_node_create_info const &create_info) {
+  return _impl.record_scene_node_creation(create_info);
+}
+
+void Gl_scene_diff::record_scene_node_destruction(Scene_node *scene_node) {
+  _impl.record_scene_node_destruction(static_cast<Gl_scene_node *>(scene_node));
+}
+
+void Gl_scene_diff::record_scene_node_translation_continuous(
+    Scene_node *scene_node, math::Vec3f const &value) {
+  _impl.record_scene_node_translation_continuous(
+      static_cast<Gl_scene_node *>(scene_node), value);
+}
+
+void Gl_scene_diff::record_scene_node_translation_discontinuous(
+    Scene_node *scene_node, math::Vec3f const &value) {
+  _impl.record_scene_node_translation_discontinuous(
+      static_cast<Gl_scene_node *>(scene_node), value);
+}
+
+void Gl_scene_diff::record_scene_node_rotation_continuous(
+    Scene_node *scene_node, math::Quatf const &value) {
+  _impl.record_scene_node_rotation_continuous(
+      static_cast<Gl_scene_node *>(scene_node), value);
+}
+
+void Gl_scene_diff::record_scene_node_rotation_discontinuous(
+    Scene_node *scene_node, math::Quatf const &value) {
+  _impl.record_scene_node_rotation_discontinuous(
+      static_cast<Gl_scene_node *>(scene_node), value);
+}
+
+void Gl_scene_diff::record_scene_node_scale_continuous(Scene_node *scene_node,
+                                                       float value) {
+  _impl.record_scene_node_scale_continuous(
+      static_cast<Gl_scene_node *>(scene_node), value);
+}
+
+void Gl_scene_diff::record_scene_node_scale_discontinuous(
+    Scene_node *scene_node, float value) {
+  _impl.record_scene_node_scale_discontinuous(
+      static_cast<Gl_scene_node *>(scene_node), value);
+}
+
+Gl_camera *
+Gl_scene_diff::record_camera_creation(Camera_create_info const &create_info) {
+  return _impl.record_camera_creation(create_info);
+}
+
+void Gl_scene_diff::record_camera_destruction(Camera *camera) {
+  _impl.record_camera_destruction(static_cast<Gl_camera *>(camera));
+}
+
+Gl_camera_instance *Gl_scene_diff::record_camera_instance_creation(
+    Camera_instance_create_info const &create_info) {
+  return _impl.record_camera_instance_creation(create_info);
+}
+
+void Gl_scene_diff::record_camera_instance_destruction(
+    Camera_instance *camera_instance) {
+  _impl.record_camera_instance_destruction(
+      static_cast<Gl_camera_instance *>(camera_instance));
+}
+
+Gl_surface_instance *Gl_scene_diff::record_surface_instance_creation(
+    Surface_instance_create_info const &create_info) {
+  return _impl.record_surface_instance_creation(create_info);
+}
+
+void Gl_scene_diff::record_surface_instance_destruction(
+    Surface_instance *surface_instance) {
+  _impl.record_surface_instance_destruction(
+      static_cast<Gl_surface_instance *>(surface_instance));
+}
 } // namespace graphics
 } // namespace marlon

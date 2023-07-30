@@ -45,60 +45,6 @@ public:
 
   void apply_scene_diff(Scene_diff *scene_diff, float factor) final;
 
-  Gl_scene_node *
-  record_scene_node_creation(Scene_diff *scene_diff,
-                             Scene_node_create_info const &create_info) final;
-
-  void record_scene_node_destruction(Scene_diff *scene_diff,
-                                     Scene_node *scene_node) final;
-
-  void record_scene_node_translation_continuous(Scene_diff *scene_diff,
-                                                Scene_node *scene_node,
-                                                math::Vec3f const &value) final;
-
-  void
-  record_scene_node_translation_discontinuous(Scene_diff *scene_diff,
-                                              Scene_node *scene_node,
-                                              math::Vec3f const &value) final;
-
-  void record_scene_node_rotation_continuous(Scene_diff *scene_diff,
-                                             Scene_node *scene_node,
-                                             math::Quatf const &value) final;
-
-  void record_scene_node_rotation_discontinuous(Scene_diff *scene_diff,
-                                                Scene_node *scene_node,
-                                                math::Quatf const &value) final;
-
-  void record_scene_node_scale_continuous(Scene_diff *scene_diff,
-                                          Scene_node *scene_node,
-                                          float value) final;
-
-  void record_scene_node_scale_discontinuous(Scene_diff *scene_diff,
-                                             Scene_node *scene_node,
-                                             float value) final;
-
-  Gl_camera *
-  record_camera_creation(Scene_diff *scene_diff,
-                         Camera_create_info const &create_info) final;
-
-  void record_camera_destruction(Scene_diff *scene_diff, Camera *camera) final;
-
-  Gl_camera_instance *record_camera_instance_creation(
-      Scene_diff *scene_diff,
-      Camera_instance_create_info const &create_info) final;
-
-  void
-  record_camera_instance_destruction(Scene_diff *scene_diff,
-                                     Camera_instance *camera_instance) final;
-
-  Gl_surface_instance *record_surface_instance_creation(
-      Scene_diff *scene_diff,
-      Surface_instance_create_info const &create_info) final;
-
-  void
-  record_surface_instance_destruction(Scene_diff *scene_diff,
-                                      Surface_instance *surface_instance) final;
-
   Gl_default_render_target *get_default_render_target() noexcept;
 
   void destroy_render_target(Render_target *target) noexcept final;

@@ -9,7 +9,6 @@
 namespace marlon {
 namespace client {
 struct Static_prop_entity_manager_create_info {
-  graphics::Graphics *graphics{};
   Scene_diff_provider const *scene_diff_provider{};
   graphics::Surface *surface{};
   float surface_scale{1.0f};
@@ -35,7 +34,6 @@ private:
     std::optional<physics::Static_rigid_body_reference> static_rigid_body{};
   };
 
-  graphics::Graphics *_graphics;
   Scene_diff_provider const *_scene_diff_provider;
   graphics::Surface *_surface;
   float _surface_scale;

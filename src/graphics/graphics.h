@@ -152,64 +152,6 @@ public:
 
   virtual void apply_scene_diff(Scene_diff *scene_diff) = 0;
 
-  virtual Scene_node *
-  record_scene_node_creation(Scene_diff *scene_diff,
-                             Scene_node_create_info const &create_info) = 0;
-
-  virtual void record_scene_node_destruction(Scene_diff *scene_diff,
-                                             Scene_node *scene_node) = 0;
-
-  virtual void
-  record_scene_node_translation_continuous(Scene_diff *scene_diff,
-                                           Scene_node *scene_node,
-                                           math::Vec3f const &value) = 0;
-
-  virtual void
-  record_scene_node_translation_discontinuous(Scene_diff *scene_diff,
-                                              Scene_node *scene_node,
-                                              math::Vec3f const &value) = 0;
-
-  virtual void
-  record_scene_node_rotation_continuous(Scene_diff *scene_diff,
-                                        Scene_node *scene_node,
-                                        math::Quatf const &value) = 0;
-
-  virtual void
-  record_scene_node_rotation_discontinuous(Scene_diff *scene_diff,
-                                           Scene_node *scene_node,
-                                           math::Quatf const &value) = 0;
-
-  virtual void record_scene_node_scale_continuous(Scene_diff *scene_diff,
-                                                  Scene_node *scene_node,
-                                                  float value) = 0;
-
-  virtual void record_scene_node_scale_discontinuous(Scene_diff *scene_diff,
-                                                     Scene_node *scene_node,
-                                                     float value) = 0;
-
-  virtual Camera *
-  record_camera_creation(Scene_diff *scene_diff,
-                         Camera_create_info const &create_info) = 0;
-
-  virtual void record_camera_destruction(Scene_diff *scene_diff,
-                                         Camera *camera) = 0;
-
-  virtual Camera_instance *record_camera_instance_creation(
-      Scene_diff *scene_diff,
-      Camera_instance_create_info const &create_info) = 0;
-
-  virtual void
-  record_camera_instance_destruction(Scene_diff *scene_diff,
-                                     Camera_instance *camera_instance) = 0;
-
-  virtual Surface_instance *record_surface_instance_creation(
-      Scene_diff *scene_diff,
-      Surface_instance_create_info const &create_info) = 0;
-
-  virtual void
-  record_surface_instance_destruction(Scene_diff *scene_diff,
-                                      Surface_instance *surface_instance) = 0;
-
   // Render_target creation is implementation-specific
 
   virtual void destroy_render_target(Render_target *target) noexcept = 0;

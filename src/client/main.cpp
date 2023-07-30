@@ -231,22 +231,19 @@ int main() {
     graphics::Scene_diff *_scene_diff;
   };
   auto const scene_diff_provider = Scene_diff_provider{scene_diff.get()};
-  auto const camera = graphics->record_camera_creation(
-      scene_diff.get(), {
-                            .near_plane_distance = 0.001f,
-                            .far_plane_distance = 1000.0f,
-                            .zoom_x = 9.0f / 16.0f,
-                            .zoom_y = 1.0f,
-                        });
-  auto const camera_scene_node = graphics->record_scene_node_creation(
-      scene_diff.get(), {.translation = {0.0f, 1.5f, 8.0f}});
-  auto const camera_instance = graphics->record_camera_instance_creation(
-      scene_diff.get(), {.camera = camera, .scene_node = camera_scene_node});
-  auto const ground_scene_node = graphics->record_scene_node_creation(
-      scene_diff.get(),
+  auto const camera = scene_diff->record_camera_creation({
+      .near_plane_distance = 0.001f,
+      .far_plane_distance = 1000.0f,
+      .zoom_x = 9.0f / 16.0f,
+      .zoom_y = 1.0f,
+  });
+  auto const camera_scene_node = scene_diff->record_scene_node_creation(
+      {.translation = {0.0f, 1.5f, 8.0f}});
+  auto const camera_instance = scene_diff->record_camera_instance_creation(
+      {.camera = camera, .scene_node = camera_scene_node});
+  auto const ground_scene_node = scene_diff->record_scene_node_creation(
       {.translation = {0.0f, -100.0f, 0.0f}, .scale = 100.0f});
-  graphics->record_surface_instance_creation(
-      scene_diff.get(),
+  scene_diff->record_surface_instance_creation(
       {.surface = ground_surface.get(), .scene_node = ground_scene_node});
   physics::Space space;
   physics::Half_space ground_shape{math::Vec3f{0.0f, 1.0f, 0.0f}};
@@ -260,25 +257,20 @@ int main() {
   client::Entity_construction_queue entity_construction_queue;
   client::Entity_destruction_queue entity_destruction_queue;
   client::Static_prop_entity_manager ball_entity_manager{
-      {.graphics = graphics.get(),
-       .scene_diff_provider = &scene_diff_provider,
+      {.scene_diff_provider = &scene_diff_provider,
        .surface = ball_surface.get(),
        .surface_scale = 0.5f,
        .space = &space,
        .shape = &ball_shape}};
   client::Static_prop_entity_manager box_entity_manager{
-      {.graphics = graphics.get(),
-       .scene_diff_provider = &scene_diff_provider,
+      {.scene_diff_provider = &scene_diff_provider,
        .surface = box_surface.get(),
        .surface_scale = 0.5f,
        .space = &space,
        .shape = &box_shape}};
-  client::Test_entity_manager test_entity_manager{graphics.get(),
-                                                  &scene_diff_provider,
-                                                  particle_surface.get(),
-                                                  &space,
-                                                  &entity_construction_queue,
-                                                  &entity_destruction_queue};
+  client::Test_entity_manager test_entity_manager{
+      &scene_diff_provider, particle_surface.get(), &space,
+      &entity_construction_queue, &entity_destruction_queue};
   auto const entity_managers = std::array<client::Entity_manager *, 3>{
       &ball_entity_manager, &box_entity_manager, &test_entity_manager};
   auto const left_ball_params =
