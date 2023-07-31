@@ -50,27 +50,26 @@ private:
     Shape *shape;
   };
 
-  std::vector<Particle *> flatten_particles();
+  void flatten_particles();
 
-  std::vector<Static_rigid_body *> flatten_static_rigid_bodies();
+  void flatten_static_rigid_bodies();
 
-  std::vector<std::pair<Particle *, Particle *>>
-  find_particle_particle_collisions(std::span<Particle *const> particles);
+  void find_particle_particle_collisions();
 
-  std::vector<std::pair<Particle *, Static_rigid_body *>>
-  find_particle_static_rigid_body_collisions(
-      std::span<Particle *const> particles,
-      std::span<Static_rigid_body *const> static_rigid_bodies);
+  void find_particle_static_rigid_body_collisions();
 
-  void solve_particle_particle_collisions(
-      std::span<std::pair<Particle *, Particle *> const> collisions);
+  void solve_particle_particle_collisions();
 
-  void solve_particle_static_rigid_body_collisions(
-      std::span<std::pair<Particle *, Static_rigid_body *> const> collisions);
+  void solve_particle_static_rigid_body_collisions();
 
   std::unordered_map<Particle_reference, Particle> _particles;
   std::unordered_map<Static_rigid_body_reference, Static_rigid_body>
       _static_rigid_bodies;
+  std::vector<Particle *> _flattened_particles;
+  std::vector<Static_rigid_body *> _flattened_static_rigid_bodies;
+  std::vector<std::pair<Particle *, Particle *>> _particle_particle_collisions;
+  std::vector<std::pair<Particle *, Static_rigid_body *>>
+      _particle_static_rigid_body_collisions;
   std::uint64_t _next_particle_reference_value{};
   std::uint64_t _next_static_rigid_body_reference_value{};
 };

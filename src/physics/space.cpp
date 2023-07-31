@@ -54,22 +54,18 @@ void Space::destroy_static_rigid_body(
 void Space::simulate(Space_simulate_info const &simulate_info) {
   auto const h = simulate_info.delta_time / simulate_info.substep_count;
   auto const h_inv = 1.0f / h;
-  auto const flattened_particles = flatten_particles();
-  auto const flattened_static_rigid_bodies = flatten_static_rigid_bodies();
-  auto const particle_particle_collisions =
-      find_particle_particle_collisions(flattened_particles);
-  auto const particle_static_rigid_body_collisions =
-      find_particle_static_rigid_body_collisions(flattened_particles,
-                                                 flattened_static_rigid_bodies);
+  flatten_particles();
+  flatten_static_rigid_bodies();
+  find_particle_particle_collisions();
+  find_particle_static_rigid_body_collisions();
   for (auto i = 0; i < simulate_info.substep_count; ++i) {
     for (auto &[reference, value] : _particles) {
       value.previous_position = value.current_position;
       value.velocity += h * value.acceleration;
       value.current_position += h * value.velocity;
     }
-    solve_particle_particle_collisions(particle_particle_collisions);
-    solve_particle_static_rigid_body_collisions(
-        particle_static_rigid_body_collisions);
+    solve_particle_particle_collisions();
+    solve_particle_static_rigid_body_collisions();
     for (auto &[reference, value] : _particles) {
       value.velocity =
           h_inv * (value.current_position - value.previous_position);
@@ -86,31 +82,28 @@ void Space::simulate(Space_simulate_info const &simulate_info) {
   }
 }
 
-std::vector<Space::Particle *> Space::flatten_particles() {
-  std::vector<Particle *> retval;
-  retval.reserve(_particles.size());
+void Space::flatten_particles() {
+  _flattened_particles.clear();
+  _flattened_particles.reserve(_particles.size());
   for (auto &pair : _particles) {
-    retval.emplace_back(&pair.second);
+    _flattened_particles.emplace_back(&pair.second);
   }
-  return retval;
 }
 
-std::vector<Space::Static_rigid_body *> Space::flatten_static_rigid_bodies() {
-  std::vector<Static_rigid_body *> retval;
-  retval.reserve(_static_rigid_bodies.size());
+void Space::flatten_static_rigid_bodies() {
+  _flattened_static_rigid_bodies.clear();
+  _flattened_static_rigid_bodies.reserve(_static_rigid_bodies.size());
   for (auto &pair : _static_rigid_bodies) {
-    retval.emplace_back(&pair.second);
+    _flattened_static_rigid_bodies.emplace_back(&pair.second);
   }
-  return retval;
 }
 
-std::vector<std::pair<Space::Particle *, Space::Particle *>>
-Space::find_particle_particle_collisions(std::span<Particle *const> particles) {
-  std::vector<std::pair<Particle *, Particle *>> retval;
-  for (std::size_t i{}; i + 1 < particles.size(); ++i) {
-    for (std::size_t j{i + 1}; j < particles.size(); ++j) {
-      auto const particle_a = particles[i];
-      auto const particle_b = particles[j];
+void Space::find_particle_particle_collisions() {
+  _particle_particle_collisions.clear();
+  for (std::size_t i{}; i + 1 < _flattened_particles.size(); ++i) {
+    for (std::size_t j{i + 1}; j < _flattened_particles.size(); ++j) {
+      auto const particle_a = _flattened_particles[i];
+      auto const particle_b = _flattened_particles[j];
       if ((particle_a->collision_mask & particle_b->collision_flags) &&
           (particle_b->collision_mask & particle_a->collision_flags)) {
         auto const displacement =
@@ -120,23 +113,19 @@ Space::find_particle_particle_collisions(std::span<Particle *const> particles) {
                                       2.0f * particle_contact_offset;
         auto const contact_distance2 = contact_distance * contact_distance;
         if (distance2 < contact_distance2) {
-          retval.emplace_back(particle_a, particle_b);
+          _particle_particle_collisions.emplace_back(particle_a, particle_b);
         }
       }
     }
   }
-  return retval;
 }
 
-std::vector<std::pair<Space::Particle *, Space::Static_rigid_body *>>
-Space::find_particle_static_rigid_body_collisions(
-    std::span<Particle *const> particles,
-    std::span<Static_rigid_body *const> static_rigid_bodies) {
-  std::vector<std::pair<Particle *, Static_rigid_body *>> retval;
-  for (std::size_t i{}; i < particles.size(); ++i) {
-    for (std::size_t j{}; j < static_rigid_bodies.size(); ++j) {
-      auto const particle = particles[i];
-      auto const static_rigid_body = static_rigid_bodies[j];
+void Space::find_particle_static_rigid_body_collisions() {
+  _particle_static_rigid_body_collisions.clear();
+  for (std::size_t i{}; i < _flattened_particles.size(); ++i) {
+    for (std::size_t j{}; j < _flattened_static_rigid_bodies.size(); ++j) {
+      auto const particle = _flattened_particles[i];
+      auto const static_rigid_body = _flattened_static_rigid_bodies[j];
       if ((particle->collision_mask & static_rigid_body->collision_flags) &&
           (static_rigid_body->collision_mask & particle->collision_flags)) {
         if (auto const contact = static_rigid_body->shape->collide_particle(
@@ -144,17 +133,16 @@ Space::find_particle_static_rigid_body_collisions(
                 static_rigid_body->transform_inverse,
                 particle->current_position,
                 particle->radius + particle_contact_offset)) {
-          retval.emplace_back(particle, static_rigid_body);
+          _particle_static_rigid_body_collisions.emplace_back(
+              particle, static_rigid_body);
         }
       }
     }
   }
-  return retval;
 }
 
-void Space::solve_particle_particle_collisions(
-    std::span<std::pair<Particle *, Particle *> const> collisions) {
-  for (auto const [particle_a, particle_b] : collisions) {
+void Space::solve_particle_particle_collisions() {
+  for (auto const [particle_a, particle_b] : _particle_particle_collisions) {
     auto const displacement =
         particle_b->current_position - particle_a->current_position;
     auto const distance2 = math::length2(displacement);
@@ -190,9 +178,9 @@ void Space::solve_particle_particle_collisions(
   }
 }
 
-void Space::solve_particle_static_rigid_body_collisions(
-    std::span<std::pair<Particle *, Static_rigid_body *> const> collisions) {
-  for (auto const [particle, static_rigid_body] : collisions) {
+void Space::solve_particle_static_rigid_body_collisions() {
+  for (auto const [particle, static_rigid_body] :
+       _particle_static_rigid_body_collisions) {
     if (auto contact = static_rigid_body->shape->collide_particle(
             static_rigid_body->transform, static_rigid_body->transform_inverse,
             particle->current_position, particle->radius)) {
