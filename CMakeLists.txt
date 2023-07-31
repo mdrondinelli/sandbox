@@ -24,9 +24,11 @@ add_library(
   "src/graphics/gl/scene_node.cpp"
   "src/graphics/gl/surface.cpp"
   "src/graphics/gl/surface_instance.cpp"
+  "src/graphics/gl/texture.cpp"
   "src/graphics/gl/unique_buffer.cpp"
   "src/graphics/gl/unique_shader.cpp"
   "src/graphics/gl/unique_shader_program.cpp"
+  "src/graphics/gl/unique_texture.cpp"
   "src/graphics/gl/unique_vertex_array.cpp"
   "src/graphics/glad/glad.cpp")
 add_library(
