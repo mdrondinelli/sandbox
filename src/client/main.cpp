@@ -205,11 +205,11 @@ int main() {
   auto const graphics = create_graphics_unique(window.get());
   glfwSwapInterval(0);
   auto const particle_material =
-      graphics->create_material_unique({.albedo = {0.0f, 0.375f, 1.0f}});
+      graphics->create_material_unique({.base_color = {0.0f, 0.375f, 1.0f}});
   auto const ground_material =
-      graphics->create_material_unique({.albedo = {0.00f, 0.005f, 0.02f}});
+      graphics->create_material_unique({.base_color = {0.00f, 0.005f, 0.02f}});
   auto const solid_material =
-      graphics->create_material_unique({.albedo = {0.2f, 0.0f, 0.0f}});
+      graphics->create_material_unique({.base_color = {0.2f, 0.0f, 0.0f}});
   auto const cube_mesh = create_cube_mesh_unique(graphics.get());
   auto const icosahedron_mesh = create_icosahedron_mesh_unique(graphics.get());
   auto const sphere_mesh = create_icosahedron_mesh_unique(graphics.get(), 2);

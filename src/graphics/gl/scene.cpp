@@ -79,11 +79,11 @@ void Gl_scene::Impl::draw_surface_instances(
                               1, GL_TRUE, &model_view_matrix[0][0]);
     glProgramUniformMatrix4fv(shader_program, model_view_clip_matrix_location,
                               1, GL_TRUE, &model_view_clip_matrix[0][0]);
-    auto const albedo = surface_instance->_impl.get_surface()
+    auto const base_color = surface_instance->_impl.get_surface()
                             ->_impl.get_material()
                             ->_impl.get_albedo();
-    glProgramUniform3f(shader_program, albedo_location, albedo.r, albedo.g,
-                       albedo.b);
+    glProgramUniform3f(shader_program, albedo_location, base_color.r, base_color.g,
+                       base_color.b);
     auto const &mesh_impl =
         surface_instance->_impl.get_surface()->_impl.get_mesh()->_impl;
     mesh_impl.bind_vertex_array();
