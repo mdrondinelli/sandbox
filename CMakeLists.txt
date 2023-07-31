@@ -31,6 +31,7 @@ add_library(
   "src/graphics/gl/unique_texture_handle.cpp"
   "src/graphics/gl/unique_vertex_array_handle.cpp"
   "src/graphics/glad/glad.cpp")
+target_link_libraries(graphics ${CMAKE_SOURCE_DIR}/lib/ktx.lib)
 add_library(
   physics
   "src/physics/ball.cpp"

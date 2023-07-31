@@ -11,6 +11,7 @@ public:
   explicit Gl_texture(Texture_create_info const &create_info);
 
 private:
+  Gl_unique_texture_handle _handle;
 };
 } // namespace graphics
 } // namespace marlon
