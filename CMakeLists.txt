@@ -25,11 +25,11 @@ add_library(
   "src/graphics/gl/surface.cpp"
   "src/graphics/gl/surface_instance.cpp"
   "src/graphics/gl/texture.cpp"
-  "src/graphics/gl/unique_buffer.cpp"
-  "src/graphics/gl/unique_shader.cpp"
-  "src/graphics/gl/unique_shader_program.cpp"
-  "src/graphics/gl/unique_texture.cpp"
-  "src/graphics/gl/unique_vertex_array.cpp"
+  "src/graphics/gl/unique_buffer_handle.cpp"
+  "src/graphics/gl/unique_shader_handle.cpp"
+  "src/graphics/gl/unique_shader_program_handle.cpp"
+  "src/graphics/gl/unique_texture_handle.cpp"
+  "src/graphics/gl/unique_vertex_array_handle.cpp"
   "src/graphics/glad/glad.cpp")
 add_library(
   physics

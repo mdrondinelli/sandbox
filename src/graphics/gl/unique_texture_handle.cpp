@@ -1,4 +1,4 @@
-#include "unique_texture.h"
+#include "unique_texture_handle.h"
 
 #include <glad/glad.h>
 

@@ -13,7 +13,7 @@
 #include "surface.h"
 #include "surface_instance.h"
 #include "texture.h"
-#include "unique_shader_program.h"
+#include "unique_shader_program_handle.h"
 
 namespace marlon {
 namespace graphics {

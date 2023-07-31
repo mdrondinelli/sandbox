@@ -4,7 +4,7 @@
 
 #include <glad/glad.h>
 
-#include "unique_shader.h"
+#include "unique_shader_handle.h"
 
 namespace marlon {
 namespace graphics {

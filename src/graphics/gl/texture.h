@@ -2,7 +2,7 @@
 #define MARLON_GRAPHICS_GL_TEXTURE_H
 
 #include "../texture.h"
-#include "unique_texture.h"
+#include "unique_texture_handle.h"
 
 namespace marlon {
 namespace graphics {

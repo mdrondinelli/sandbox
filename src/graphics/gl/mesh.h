@@ -4,8 +4,8 @@
 #include <cstdint>
 
 #include "../mesh.h"
-#include "unique_buffer.h"
-#include "unique_vertex_array.h"
+#include "unique_buffer_handle.h"
+#include "unique_vertex_array_handle.h"
 
 namespace marlon {
 namespace graphics {
