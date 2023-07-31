@@ -51,8 +51,8 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
       math::Vec3f{3.0f, 0.0f, 3.0f}};
   auto const radii = std::array<float, 3>{0.05f, 0.05f, 0.05f};
   auto const velocities = std::array<math::Vec3f, 3>{
-      math::Vec3f{0.0f, 9.0f, 0.0f}, math::Vec3f{0.0f, -3.0f, 0.0f},
-      math::Vec3f{0.0f, 9.0f, 0.0f}};
+      math::Vec3f{0.0f, 6.0f, 0.0f}, math::Vec3f{0.0f, -3.0f, 0.0f},
+      math::Vec3f{0.0f, 6.0f, 0.0f}};
   auto const velocity_jitter_factors = std::array<float, 3>{0.0f, 0.0f, 0.0f};
   auto const accelerations = std::array<math::Vec3f, 3>{
       math::Vec3f{0.0f, -9.8f, 0.0f}, math::Vec3f{0.0f, -9.8f, 0.0f},
