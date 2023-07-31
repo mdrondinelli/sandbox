@@ -16,6 +16,7 @@
 #include "scene_node.h"
 #include "surface.h"
 #include "surface_instance.h"
+#include "texture.h"
 
 namespace marlon {
 namespace graphics {
@@ -42,6 +43,16 @@ class Surface_instance;
 struct Surface_instance_create_info;
 
 class Graphics;
+
+class Texture_deleter {
+public:
+  Texture_deleter(Graphics *owner) noexcept : _owner{owner} {}
+
+  void operator()(Texture *texture) const noexcept;
+
+private:
+  Graphics *_owner;
+};
 
 class Material_deleter {
 public:
@@ -93,6 +104,7 @@ private:
   Graphics *_owner;
 };
 
+using Unique_texture_ptr = std::unique_ptr<Texture, Texture_deleter>;
 using Unique_material_ptr = std::unique_ptr<Material, Material_deleter>;
 using Unique_mesh_ptr = std::unique_ptr<Mesh, Mesh_deleter>;
 using Unique_surface_ptr = std::unique_ptr<Surface, Surface_deleter>;
@@ -102,6 +114,10 @@ using Unique_scene_diff_ptr = std::unique_ptr<Scene_diff, Scene_diff_deleter>;
 class Graphics {
 public:
   virtual ~Graphics() = default;
+
+  virtual Texture *create_texture(Texture_create_info const &create_info) = 0;
+
+  virtual void destroy_texture(Texture *texture) noexcept = 0;
 
   virtual Material *
   create_material(Material_create_info const &create_info) = 0;
@@ -163,6 +179,10 @@ public:
   // TODO: interface for compositing or figure out how multi view rendering will
   // work compositing could be used for first person view models
 };
+
+inline void Texture_deleter::operator()(Texture *texture) const noexcept {
+  _owner->destroy_texture(texture);
+}
 
 inline void Material_deleter::operator()(Material *material) const noexcept {
   _owner->destroy_material(material);
