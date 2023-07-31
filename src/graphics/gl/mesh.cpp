@@ -33,17 +33,29 @@ Gl_mesh::Impl::Impl(Mesh_create_info const &create_info)
       _vertex_array.get(), 0, _vertex_buffer.get(), 0,
       static_cast<GLsizei>(create_info.vertex_format.stride));
   glEnableVertexArrayAttrib(_vertex_array.get(), 0);
-  const auto [position_size, position_type] = [&]() {
+  glEnableVertexArrayAttrib(_vertex_array.get(), 1);
+  const auto [position_size, position_type, position_normalized] = [&]() {
     switch (create_info.vertex_format.position_fetch_info.format) {
     case Mesh_vertex_position_format::float3:
-      return std::tuple{3, GL_FLOAT};
+      return std::tuple{3, GL_FLOAT, static_cast<GLboolean>(GL_FALSE)};
+    }
+    throw;
+  }();
+  const auto [texcoord_size, texcoord_type, texcoord_normalized] = [&]() {
+    switch (create_info.vertex_format.texcoord_fetch_info.format) {
+    case Mesh_vertex_texcoord_format::float2:
+      return std::tuple{2, GL_FLOAT, static_cast<GLboolean>(GL_FALSE)};
     }
     throw;
   }();
   glVertexArrayAttribFormat(
-      _vertex_array.get(), 0, position_size, position_type, GL_FALSE,
+      _vertex_array.get(), 0, position_size, position_type, position_normalized,
       create_info.vertex_format.position_fetch_info.offset);
+  glVertexArrayAttribFormat(
+      _vertex_array.get(), 1, texcoord_size, texcoord_type, texcoord_normalized,
+      create_info.vertex_format.texcoord_fetch_info.offset);
   glVertexArrayAttribBinding(_vertex_array.get(), 0, 0);
+  glVertexArrayAttribBinding(_vertex_array.get(), 1, 0);
 }
 
 void Gl_mesh::Impl::bind_vertex_array() const noexcept {
@@ -64,5 +76,5 @@ void Gl_mesh::Impl::draw() const noexcept {
 }
 
 Gl_mesh::Gl_mesh(Mesh_create_info const &create_info) : _impl{create_info} {}
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon

@@ -1,4 +1,5 @@
 #include <array>
+#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -17,6 +18,11 @@ namespace client = marlon::client;
 namespace graphics = marlon::graphics;
 namespace math = marlon::math;
 namespace physics = marlon::physics;
+
+struct Vertex {
+  math::Vec3f position;
+  math::Vec2f texcoord;
+};
 
 client::Glfw_unique_window_ptr create_window_unique() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -37,15 +43,61 @@ create_graphics_unique(GLFWwindow *window) {
   return std::make_unique<graphics::Gl_graphics>();
 }
 
+graphics::Unique_texture_ptr load_texture(graphics::Graphics *graphics,
+                                          const char *path) {
+  std::ifstream in{path, std::ios_base::binary};
+  if (in) {
+    in.seekg(0, std::ios_base::end);
+    auto const file_size = static_cast<std::size_t>(in.tellg());
+    auto data = std::vector<unsigned char>();
+    data.resize(file_size);
+    in.seekg(0, std::ios_base::beg);
+    in.read(reinterpret_cast<char *>(data.data()), file_size);
+    std::cout << "read " << file_size << " bytes from " << path << std::endl;
+    auto retval = graphics->create_texture_unique(
+        {.source = graphics::Texture_memory_source{.data = data.data(),
+                                                   .size = data.size()}});
+    return retval;
+  } else {
+    throw std::runtime_error{"Failed to open texture file."};
+  }
+}
+
 graphics::Unique_mesh_ptr
 create_cube_mesh_unique(graphics::Graphics *graphics) {
-  std::vector<math::Vec3f> const vertices{
-      {-1.0f, -1.0f, -1.0f}, {-1.0f, -1.0f, 1.0f}, {-1.0f, 1.0f, -1.0f},
-      {-1.0f, 1.0f, 1.0f},   {1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, 1.0f},
-      {1.0f, 1.0f, -1.0f},   {1.0f, 1.0f, 1.0f}};
-  std::vector<std::uint32_t> const indices{0, 1, 2, 3, 2, 1, 1, 5, 3, 7, 3, 5,
-                                           5, 4, 7, 6, 7, 4, 4, 0, 6, 2, 6, 0,
-                                           0, 4, 1, 5, 1, 4, 3, 7, 2, 6, 2, 7};
+  std::vector<Vertex> const vertices{// -x face
+                                     {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
+                                     {{-1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}},
+                                     {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
+                                     {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+                                     // +x face
+                                     {{1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}},
+                                     {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
+                                     {{1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+                                     {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
+                                     // -y face
+                                     {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
+                                     {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
+                                     {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}},
+                                     {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}},
+                                     // +y face
+                                     {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+                                     {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},
+                                     {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
+                                     {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
+                                     // -z face
+                                     {{1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
+                                     {{-1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
+                                     {{1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
+                                     {{-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
+                                     // +z face
+                                     {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}},
+                                     {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}},
+                                     {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+                                     {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}};
+  std::vector<std::uint32_t> const indices{
+      0,  1,  2,  3,  2,  1,  4,  5,  6,  7,  6,  5,  8,  9,  10, 11, 10, 9,
+      12, 13, 14, 15, 14, 13, 16, 17, 18, 19, 18, 17, 20, 21, 22, 23, 22, 21};
   return graphics->create_mesh_unique(
       {.index_format = graphics::Mesh_index_format::uint32,
        .index_count = static_cast<std::uint32_t>(indices.size()),
@@ -54,7 +106,11 @@ create_cube_mesh_unique(graphics::Graphics *graphics) {
                              {.format =
                                   graphics::Mesh_vertex_position_format::float3,
                               .offset = 0u},
-                         .stride = 12u},
+                         .texcoord_fetch_info =
+                             {.format =
+                                  graphics::Mesh_vertex_texcoord_format::float2,
+                              .offset = 12u},
+                         .stride = 20u},
        .vertex_count = static_cast<std::uint32_t>(vertices.size()),
        .vertex_data = vertices.data()});
 }
@@ -63,19 +119,19 @@ graphics::Unique_mesh_ptr
 create_icosahedron_mesh_unique(graphics::Graphics *graphics,
                                int subdivisions = 0) {
   auto const phi = std::numbers::phi_v<float>;
-  std::vector<math::Vec3f> vertices{
-      math::normalize(math::Vec3f{phi, 1.0f, 0.0f}),
-      math::normalize(math::Vec3f{phi, -1.0f, 0.0f}),
-      math::normalize(math::Vec3f{-phi, -1.0f, 0.0f}),
-      math::normalize(math::Vec3f{-phi, 1.0f, 0.0f}),
-      math::normalize(math::Vec3f{1.0f, 0.0f, phi}),
-      math::normalize(math::Vec3f{-1.0f, 0.0f, phi}),
-      math::normalize(math::Vec3f{-1.0f, 0.0f, -phi}),
-      math::normalize(math::Vec3f{1.0f, 0.0f, -phi}),
-      math::normalize(math::Vec3f{0.0f, phi, 1.0f}),
-      math::normalize(math::Vec3f{0.0f, phi, -1.0f}),
-      math::normalize(math::Vec3f{0.0f, -phi, -1.0f}),
-      math::normalize(math::Vec3f{0.0f, -phi, 1.0f})};
+  std::vector<Vertex> vertices{
+      {math::normalize(math::Vec3f{phi, 1.0f, 0.0f})},
+      {math::normalize(math::Vec3f{phi, -1.0f, 0.0f})},
+      {math::normalize(math::Vec3f{-phi, -1.0f, 0.0f})},
+      {math::normalize(math::Vec3f{-phi, 1.0f, 0.0f})},
+      {math::normalize(math::Vec3f{1.0f, 0.0f, phi})},
+      {math::normalize(math::Vec3f{-1.0f, 0.0f, phi})},
+      {math::normalize(math::Vec3f{-1.0f, 0.0f, -phi})},
+      {math::normalize(math::Vec3f{1.0f, 0.0f, -phi})},
+      {math::normalize(math::Vec3f{0.0f, phi, 1.0f})},
+      {math::normalize(math::Vec3f{0.0f, phi, -1.0f})},
+      {math::normalize(math::Vec3f{0.0f, -phi, -1.0f})},
+      {math::normalize(math::Vec3f{0.0f, -phi, 1.0f})}};
   std::vector<std::uint32_t> indices{
       0, 9, 8,  0, 8,  4,  0,  4, 1, 0, 1, 7,  0, 7,  9,  3, 8,  9,  3, 9,
       6, 3, 6,  2, 3,  2,  5,  3, 5, 8, 4, 8,  5, 11, 1,  4, 11, 4,  5, 11,
@@ -90,9 +146,12 @@ create_icosahedron_mesh_unique(graphics::Graphics *graphics,
       auto const &vertex_0 = vertices[index_0];
       auto const &vertex_1 = vertices[index_1];
       auto const &vertex_2 = vertices[index_2];
-      auto const new_vertex_0 = math::normalize(0.5f * (vertex_0 + vertex_1));
-      auto const new_vertex_1 = math::normalize(0.5f * (vertex_1 + vertex_2));
-      auto const new_vertex_2 = math::normalize(0.5f * (vertex_2 + vertex_0));
+      auto const new_vertex_0 = Vertex{
+          math::normalize(0.5f * (vertex_0.position + vertex_1.position))};
+      auto const new_vertex_1 = Vertex{
+          math::normalize(0.5f * (vertex_1.position + vertex_2.position))};
+      auto const new_vertex_2 = Vertex{
+          math::normalize(0.5f * (vertex_2.position + vertex_0.position))};
       auto const new_vertex_0_index =
           static_cast<std::uint32_t>(vertices.size());
       auto const new_vertex_1_index =
@@ -124,7 +183,11 @@ create_icosahedron_mesh_unique(graphics::Graphics *graphics,
                              {.format =
                                   graphics::Mesh_vertex_position_format::float3,
                               .offset = 0u},
-                         .stride = 12u},
+                         .texcoord_fetch_info =
+                             {.format =
+                                  graphics::Mesh_vertex_texcoord_format::float2,
+                              .offset = 12u},
+                         .stride = 20u},
        .vertex_count = static_cast<std::uint32_t>(vertices.size()),
        .vertex_data = vertices.data()});
 }
@@ -204,12 +267,17 @@ int main() {
   auto const window = create_window_unique();
   auto const graphics = create_graphics_unique(window.get());
   glfwSwapInterval(0);
-  auto const particle_material =
-      graphics->create_material_unique({.base_color = {0.0f, 0.375f, 1.0f}});
-  auto const ground_material =
-      graphics->create_material_unique({.base_color = {0.00f, 0.005f, 0.02f}});
-  auto const solid_material =
-      graphics->create_material_unique({.base_color = {0.2f, 0.0f, 0.0f}});
+  auto const brick_texture = load_texture(
+      graphics.get(),
+      "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
+  auto const particle_material = graphics->create_material_unique(
+      {.base_color_texture = brick_texture.get(),
+       .base_color_tint = {0.0f, 0.375f, 1.0f}});
+  auto const ground_material = graphics->create_material_unique(
+      {.base_color_texture = brick_texture.get(),
+       .base_color_tint = {0.00f, 0.005f, 0.02f}});
+  auto const solid_material = graphics->create_material_unique(
+      {.base_color_texture = brick_texture.get()});
   auto const cube_mesh = create_cube_mesh_unique(graphics.get());
   auto const icosahedron_mesh = create_icosahedron_mesh_unique(graphics.get());
   auto const sphere_mesh = create_icosahedron_mesh_unique(graphics.get(), 2);
@@ -244,7 +312,7 @@ int main() {
       .zoom_y = 1.0f,
   });
   auto const camera_scene_node = scene_diff->record_scene_node_creation(
-      {.translation = {0.0f, 1.5f, 8.0f}});
+      {.translation = {0.0f, 1.5f, 5.0f}});
   auto const camera_instance = scene_diff->record_camera_instance_creation(
       {.camera = camera, .scene_node = camera_scene_node});
   auto const ground_scene_node = scene_diff->record_scene_node_creation(

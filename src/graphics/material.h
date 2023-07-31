@@ -2,11 +2,13 @@
 #define MARLON_GRAPHICS_MATERIAL_H
 
 #include "rgb_spectrum.h"
+#include "texture.h"
 
 namespace marlon {
 namespace graphics {
 struct Material_create_info {
-  Rgb_spectrum base_color{0.0f, 0.0f, 0.0f};
+  Texture *base_color_texture{};
+  Rgb_spectrum base_color_tint{1.0f, 1.0f, 1.0f};
 };
 
 class Material {};

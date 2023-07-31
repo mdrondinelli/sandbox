@@ -1,5 +1,7 @@
 #include "graphics.h"
 
+#include <cassert>
+
 #include <stdexcept>
 
 #include <glad/glad.h>
@@ -11,24 +13,33 @@ namespace graphics {
 namespace {
 constexpr auto vert_src = R"(#version 460 core
 layout(location = 0) in vec3 model_space_position;
+layout(location = 1) in vec2 texcoord;
 
-out vec3 view_space_position;
+out Vertex_data {
+  vec3 view_space_position;
+  vec2 texcoord;
+} vertex_data;
 
 layout(location = 0) uniform mat4 model_view_matrix;
 layout(location = 1) uniform mat4 model_view_clip_matrix;
 
 void main() {
-  view_space_position = (model_view_matrix * vec4(model_space_position, 1.0)).xyz;
+  vertex_data.view_space_position = (model_view_matrix * vec4(model_space_position, 1.0)).xyz;
+  vertex_data.texcoord = texcoord;
   gl_Position = model_view_clip_matrix * vec4(model_space_position, 1.0);
 }
 )";
 
 constexpr auto frag_src = R"(#version 460 core
-in vec3 view_space_position;
+in Vertex_data {
+  vec3 view_space_position;
+  vec2 texcoord;
+} vertex_data;
 
 layout(location = 0) out vec4 fragColor;
 
-layout(location = 2) uniform vec3 base_color;
+layout(binding = 0) uniform sampler2D base_color_texture;
+layout(location = 2) uniform vec3 base_color_tint;
 
 float luminance(vec3 v) {
   return dot(v, vec3(0.2126, 0.7152, 0.0722));
@@ -41,11 +52,8 @@ vec3 tonemap(vec3 v) {
 }
 
 void main() {
-  float light_attenuation_factor = 1.0 / dot(view_space_position, view_space_position);
-  float light_factor = 8.0;
-  vec3 unbounded_color = (light_factor * light_attenuation_factor + 0.01) * base_color;
-  vec3 bounded_color = tonemap(unbounded_color);
-  fragColor = vec4(bounded_color, 1.0);
+  vec3 base_color = texture(base_color_texture, vertex_data.texcoord).rgb * base_color_tint;
+  fragColor = vec4(base_color, 1.0);
 }
 )";
 } // namespace
@@ -105,6 +113,7 @@ void Gl_graphics::destroy_texture(Texture *texture) noexcept {
 
 Gl_material *
 Gl_graphics::create_material(Material_create_info const &create_info) {
+  assert(create_info.base_color_texture != nullptr);
   return new Gl_material{create_info};
 }
 

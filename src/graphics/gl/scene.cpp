@@ -75,23 +75,25 @@ void Gl_scene::Impl::draw_surface_instances(
                                                 {0.0f, 0.0f, 0.0f, 1.0f}};
     auto const model_view_matrix = view_matrix * model_matrix_4x4;
     auto const model_view_clip_matrix = view_clip_matrix * model_matrix_4x4;
-    glProgramUniformMatrix4fv(shader_program, model_view_matrix_location,
-                              1, GL_TRUE, &model_view_matrix[0][0]);
+    glProgramUniformMatrix4fv(shader_program, model_view_matrix_location, 1,
+                              GL_TRUE, &model_view_matrix[0][0]);
     glProgramUniformMatrix4fv(shader_program, model_view_clip_matrix_location,
                               1, GL_TRUE, &model_view_clip_matrix[0][0]);
-    auto const base_color = surface_instance->_impl.get_surface()
-                            ->_impl.get_material()
-                            ->_impl.get_albedo();
-    glProgramUniform3f(shader_program, albedo_location, base_color.r, base_color.g,
-                       base_color.b);
-    auto const &mesh_impl =
-        surface_instance->_impl.get_surface()->_impl.get_mesh()->_impl;
-    mesh_impl.bind_vertex_array();
-    mesh_impl.draw();
+    auto const surface = surface_instance->_impl.get_surface();
+    auto const material = surface->_impl.get_material();
+    auto const base_color_texture =
+        material->_impl.get_base_color_texture()->_handle.get();
+    glBindTextureUnit(0, base_color_texture);
+    auto const base_color_tint = material->_impl.get_base_color_tint();
+    glProgramUniform3f(shader_program, albedo_location, base_color_tint.r,
+                       base_color_tint.g, base_color_tint.b);
+    auto const mesh = surface->_impl.get_mesh();
+    mesh->_impl.bind_vertex_array();
+    mesh->_impl.draw();
   }
 }
 
 Gl_scene::Gl_scene(Scene_create_info const &create_info) noexcept
     : _impl{create_info} {}
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon

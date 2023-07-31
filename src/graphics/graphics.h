@@ -119,6 +119,11 @@ public:
 
   virtual void destroy_texture(Texture *texture) noexcept = 0;
 
+  Unique_texture_ptr
+  create_texture_unique(Texture_create_info const &create_info) {
+    return Unique_texture_ptr{create_texture(create_info), this};
+  }
+
   virtual Material *
   create_material(Material_create_info const &create_info) = 0;
 

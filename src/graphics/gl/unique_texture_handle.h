@@ -26,6 +26,8 @@ public:
     return *this;
   }
 
+  std::uint32_t get() const noexcept { return _handle; }
+  
 private:
   void swap(Gl_unique_texture_handle &other) noexcept {
     std::swap(_handle, other._handle);

@@ -7,6 +7,8 @@
 namespace marlon {
 namespace graphics {
 class Gl_texture : public Texture {
+  friend class Gl_scene;
+
 public:
   explicit Gl_texture(Texture_create_info const &create_info);
 
