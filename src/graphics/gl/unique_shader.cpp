@@ -4,12 +4,10 @@
 
 namespace marlon {
 namespace graphics {
-Gl_unique_shader::~Gl_unique_shader() {
-  glDeleteShader(_handle);
-}
+Gl_unique_shader_handle::~Gl_unique_shader_handle() { glDeleteShader(_handle); }
 
-Gl_unique_shader make_gl_unique_shader(std::uint32_t type) {
-  return Gl_unique_shader{glCreateShader(type)};
+Gl_unique_shader_handle gl_make_unique_shader(std::uint32_t type) {
+  return Gl_unique_shader_handle{glCreateShader(type)};
 }
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon

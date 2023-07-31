@@ -24,9 +24,9 @@ public:
   private:
     std::uint32_t _index_count;
     Mesh_index_format _index_format;
-    Gl_unique_buffer _index_buffer;
-    Gl_unique_buffer _vertex_buffer;
-    Gl_unique_vertex_array _vertex_array;
+    Gl_unique_buffer_handle _index_buffer;
+    Gl_unique_buffer_handle _vertex_buffer;
+    Gl_unique_vertex_array_handle _vertex_array;
   };
 
   explicit Gl_mesh(Mesh_create_info const &create_info);

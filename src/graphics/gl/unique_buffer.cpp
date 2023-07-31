@@ -4,12 +4,14 @@
 
 namespace marlon {
 namespace graphics {
-Gl_unique_buffer::~Gl_unique_buffer() { glDeleteBuffers(1, &_handle); }
+Gl_unique_buffer_handle::~Gl_unique_buffer_handle() {
+  glDeleteBuffers(1, &_handle);
+}
 
-Gl_unique_buffer make_gl_unique_buffer() {
+Gl_unique_buffer_handle gl_make_unique_buffer() {
   GLuint handle;
   glCreateBuffers(1, &handle);
-  return Gl_unique_buffer{handle};
+  return Gl_unique_buffer_handle{handle};
 }
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon

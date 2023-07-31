@@ -59,7 +59,7 @@ public:
 
 private:
   std::unique_ptr<Gl_default_render_target> _default_render_target;
-  Gl_unique_shader_program _shader_program;
+  Gl_unique_shader_program_handle _shader_program;
 };
 } // namespace graphics
 } // namespace marlon

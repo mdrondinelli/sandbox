@@ -9,9 +9,9 @@ namespace graphics {
 Gl_mesh::Impl::Impl(Mesh_create_info const &create_info)
     : _index_count{create_info.index_count},
       _index_format{create_info.index_format},
-      _index_buffer{make_gl_unique_buffer()},
-      _vertex_buffer{make_gl_unique_buffer()},
-      _vertex_array{make_gl_unique_vertex_array()} {
+      _index_buffer{gl_make_unique_buffer()},
+      _vertex_buffer{gl_make_unique_buffer()},
+      _vertex_array{gl_make_unique_vertex_array()} {
   const auto index_size = [&]() {
     switch (create_info.index_format) {
     case Mesh_index_format::uint16:

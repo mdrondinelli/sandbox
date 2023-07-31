@@ -52,9 +52,9 @@ void main() {
 
 Gl_graphics::Gl_graphics()
     : _default_render_target{std::make_unique<Gl_default_render_target>()},
-      _shader_program{make_gl_unique_shader_program()} {
+      _shader_program{gl_make_unique_shader_program()} {
   GLint status;
-  auto const vertex_shader{make_gl_unique_shader(GL_VERTEX_SHADER)};
+  auto const vertex_shader{gl_make_unique_shader(GL_VERTEX_SHADER)};
   glShaderSource(vertex_shader.get(), 1, &vert_src, nullptr);
   glCompileShader(vertex_shader.get());
   glGetShaderiv(vertex_shader.get(), GL_COMPILE_STATUS, &status);
@@ -66,7 +66,7 @@ Gl_graphics::Gl_graphics()
     glGetShaderInfoLog(vertex_shader.get(), log_size, nullptr, log.data());
     throw std::runtime_error{log.data()};
   }
-  auto const fragment_shader{make_gl_unique_shader(GL_FRAGMENT_SHADER)};
+  auto const fragment_shader{gl_make_unique_shader(GL_FRAGMENT_SHADER)};
   glShaderSource(fragment_shader.get(), 1, &frag_src, nullptr);
   glCompileShader(fragment_shader.get());
   glGetShaderiv(fragment_shader.get(), GL_COMPILE_STATUS, &status);
