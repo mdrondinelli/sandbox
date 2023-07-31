@@ -12,6 +12,7 @@
 #include "scene_diff.h"
 #include "surface.h"
 #include "surface_instance.h"
+#include "texture.h"
 #include "unique_shader_program.h"
 
 namespace marlon {
@@ -19,6 +20,10 @@ namespace graphics {
 class Gl_graphics : public Graphics {
 public:
   Gl_graphics();
+
+  Gl_texture *create_texture(Texture_create_info const &create_info) final;
+
+  void destroy_texture(Texture *texture) noexcept final;
 
   Gl_mesh *create_mesh(Mesh_create_info const &create_info) final;
 

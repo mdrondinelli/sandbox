@@ -2,6 +2,7 @@
 #define MARLON_GRAPHICS_TEXTURE_H
 
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 
 #include <variant>

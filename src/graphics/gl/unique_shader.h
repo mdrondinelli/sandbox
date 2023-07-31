@@ -27,13 +27,15 @@ public:
   std::uint32_t get() const noexcept { return _handle; }
 
 private:
-  void swap(Gl_unique_shader &other) noexcept { std::swap(_handle, other._handle); }
+  void swap(Gl_unique_shader &other) noexcept {
+    std::swap(_handle, other._handle);
+  }
 
   std::uint32_t _handle;
 };
 
 Gl_unique_shader make_gl_unique_shader(std::uint32_t type);
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

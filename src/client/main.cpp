@@ -160,6 +160,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto accumulator = 0.0;
   auto fps_time_accumulator = 0.0;
   auto fps_frame_accumulator = 0;
+  auto worst_frame_time = 0.0;
   for (;;) {
     glfwPollEvents();
     if (glfwWindowShouldClose(window)) {
@@ -185,10 +186,15 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
     glfwSwapBuffers(window);
     fps_time_accumulator += elapsed_time;
     ++fps_frame_accumulator;
+    if (elapsed_time > worst_frame_time) {
+      worst_frame_time = elapsed_time;
+    }
     while (fps_time_accumulator >= 1.0) {
-      std::cout << fps_frame_accumulator << " fps" << std::endl;
+      std::cout << "frames per second: " << fps_frame_accumulator << std::endl;
+      std::cout << "worst frame time: " << worst_frame_time << std::endl;
       fps_time_accumulator -= 1.0;
       fps_frame_accumulator = 0;
+      worst_frame_time = 0.0;
     }
   }
 }

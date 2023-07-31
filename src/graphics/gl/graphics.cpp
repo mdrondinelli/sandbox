@@ -94,12 +94,13 @@ Gl_graphics::Gl_graphics()
   }
 }
 
-Gl_mesh *Gl_graphics::create_mesh(Mesh_create_info const &create_info) {
-  return new Gl_mesh{create_info};
+Gl_texture *
+Gl_graphics::create_texture(Texture_create_info const &create_info) {
+  return new Gl_texture{create_info};
 }
 
-void Gl_graphics::destroy_mesh(Mesh *mesh) noexcept {
-  delete static_cast<Gl_mesh *>(mesh);
+void Gl_graphics::destroy_texture(Texture *texture) noexcept {
+  delete static_cast<Gl_texture *>(texture);
 }
 
 Gl_material *
@@ -109,6 +110,14 @@ Gl_graphics::create_material(Material_create_info const &create_info) {
 
 void Gl_graphics::destroy_material(Material *material) noexcept {
   delete static_cast<Gl_material *>(material);
+}
+
+Gl_mesh *Gl_graphics::create_mesh(Mesh_create_info const &create_info) {
+  return new Gl_mesh{create_info};
+}
+
+void Gl_graphics::destroy_mesh(Mesh *mesh) noexcept {
+  delete static_cast<Gl_mesh *>(mesh);
 }
 
 Gl_surface *
@@ -145,8 +154,7 @@ void Gl_graphics::apply_scene_diff(Scene_diff *scene_diff, float factor) {
   static_cast<Gl_scene_diff *>(scene_diff)->_impl.apply(factor);
 }
 
-Gl_default_render_target *
-Gl_graphics::get_default_render_target() noexcept {
+Gl_default_render_target *Gl_graphics::get_default_render_target() noexcept {
   return _default_render_target.get();
 }
 
@@ -155,8 +163,8 @@ void Gl_graphics::destroy_render_target(Render_target *) noexcept {
 }
 
 void Gl_graphics::render(Scene *source_scene,
-                              Camera_instance *source_camera_instance,
-                              Render_target *target) {
+                         Camera_instance *source_camera_instance,
+                         Render_target *target) {
   auto const gl_source_scene = static_cast<Gl_scene *>(source_scene);
   auto const gl_source_camera_instance =
       static_cast<Gl_camera_instance *>(source_camera_instance);
@@ -179,5 +187,5 @@ void Gl_graphics::render(Scene *source_scene,
   gl_source_scene->_impl.draw_surface_instances(
       _shader_program.get(), 0, 1, 2, view_matrix, clip_matrix * view_matrix);
 }
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
