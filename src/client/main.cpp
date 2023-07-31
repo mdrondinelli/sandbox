@@ -271,24 +271,24 @@ int main() {
       graphics.get(),
       "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
   auto const particle_material = graphics->create_material_unique(
-      {.base_color_texture = brick_texture.get(),
-       .base_color_tint = {0.0f, 0.375f, 1.0f}});
-  auto const ground_material = graphics->create_material_unique(
-      {.base_color_texture = brick_texture.get(),
-       .base_color_tint = {0.00f, 0.005f, 0.02f}});
-  auto const solid_material = graphics->create_material_unique(
+      {.base_color_tint = {0.0f, 0.375f, 1.0f}});
+  auto const blue_material = graphics->create_material_unique(
+      {.base_color_tint = {0.00f, 0.005f, 0.02f}});
+  auto const red_material =
+      graphics->create_material_unique({.base_color_tint = {0.1f, 0.0f, 0.0f}});
+  auto const brick_material = graphics->create_material_unique(
       {.base_color_texture = brick_texture.get()});
   auto const cube_mesh = create_cube_mesh_unique(graphics.get());
   auto const icosahedron_mesh = create_icosahedron_mesh_unique(graphics.get());
-  auto const sphere_mesh = create_icosahedron_mesh_unique(graphics.get(), 2);
+  auto const sphere_mesh = create_icosahedron_mesh_unique(graphics.get(), 3);
   auto const particle_surface = graphics->create_surface_unique(
       {.material = particle_material.get(), .mesh = icosahedron_mesh.get()});
   auto const ground_surface = graphics->create_surface_unique(
-      {.material = ground_material.get(), .mesh = cube_mesh.get()});
+      {.material = blue_material.get(), .mesh = cube_mesh.get()});
   auto const ball_surface = graphics->create_surface_unique(
-      {.material = solid_material.get(), .mesh = sphere_mesh.get()});
+      {.material = red_material.get(), .mesh = sphere_mesh.get()});
   auto const box_surface = graphics->create_surface_unique(
-      {.material = solid_material.get(), .mesh = cube_mesh.get()});
+      {.material = brick_material.get(), .mesh = cube_mesh.get()});
   auto const scene = graphics->create_scene_unique({});
   auto const scene_diff =
       graphics->create_scene_diff_unique({.scene = scene.get()});
@@ -312,7 +312,7 @@ int main() {
       .zoom_y = 1.0f,
   });
   auto const camera_scene_node = scene_diff->record_scene_node_creation(
-      {.translation = {0.0f, 1.5f, 5.0f}});
+      {.translation = {0.0f, 1.5f, 4.0f}});
   auto const camera_instance = scene_diff->record_camera_instance_creation(
       {.camera = camera, .scene_node = camera_scene_node});
   auto const ground_scene_node = scene_diff->record_scene_node_creation(
@@ -322,7 +322,7 @@ int main() {
   physics::Space space;
   physics::Half_space ground_shape{math::Vec3f{0.0f, 1.0f, 0.0f}};
   physics::Ball ball_shape{0.5f};
-  physics::Box box_shape{0.5f, 0.5f, 0.5f};
+  physics::Box box_shape{1.0f, 1.0f, 1.0f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f::zero(),
@@ -339,7 +339,7 @@ int main() {
   client::Static_prop_entity_manager box_entity_manager{
       {.scene_diff_provider = &scene_diff_provider,
        .surface = box_surface.get(),
-       .surface_scale = 0.5f,
+       .surface_scale = 1.0f,
        .space = &space,
        .shape = &box_shape}};
   client::Test_entity_manager test_entity_manager{
@@ -348,9 +348,9 @@ int main() {
   auto const entity_managers = std::array<client::Entity_manager *, 3>{
       &ball_entity_manager, &box_entity_manager, &test_entity_manager};
   auto const left_ball_params =
-      client::Static_prop_entity_parameters{.position = {-1.0f, 0.5f, -1.0f}};
+      client::Static_prop_entity_parameters{.position = {-1.5f, 0.5f, -1.5f}};
   auto const right_ball_params =
-      client::Static_prop_entity_parameters{.position = {1.0f, 0.5f, 1.0f}};
+      client::Static_prop_entity_parameters{.position = {1.5f, 0.5f, 1.5f}};
   auto const box_params = client::Static_prop_entity_parameters{
       .position = {0.0f, 1.5f, 0.0f},
       .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},

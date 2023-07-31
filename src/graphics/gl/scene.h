@@ -42,9 +42,10 @@ public:
     bool release_surface_instance(Gl_surface_instance *surface_instance);
 
     void draw_surface_instances(std::uint32_t shader_program,
+                                std::uint32_t default_base_color_texture,
                                 std::int32_t model_view_matrix_location,
                                 std::int32_t model_view_clip_matrix_location,
-                                std::int32_t albedo_location,
+                                std::int32_t base_color_tint_location,
                                 math::Mat4x4f const &view_matrix,
                                 math::Mat4x4f const &view_clip_matrix);
 
@@ -60,7 +61,7 @@ public:
 private:
   Impl _impl;
 };
-} // namespace rendering
+} // namespace graphics
 } // namespace marlon
 
 #endif

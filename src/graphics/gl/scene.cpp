@@ -63,7 +63,8 @@ bool Gl_scene::Impl::release_surface_instance(
 }
 
 void Gl_scene::Impl::draw_surface_instances(
-    std::uint32_t shader_program, std::int32_t model_view_matrix_location,
+    std::uint32_t shader_program, std::uint32_t default_base_color_texture,
+    std::int32_t model_view_matrix_location,
     std::int32_t model_view_clip_matrix_location, std::int32_t albedo_location,
     math::Mat4x4f const &view_matrix, math::Mat4x4f const &view_clip_matrix) {
   for (auto const surface_instance : _surface_instances) {
@@ -81,9 +82,12 @@ void Gl_scene::Impl::draw_surface_instances(
                               1, GL_TRUE, &model_view_clip_matrix[0][0]);
     auto const surface = surface_instance->_impl.get_surface();
     auto const material = surface->_impl.get_material();
-    auto const base_color_texture =
-        material->_impl.get_base_color_texture()->_handle.get();
-    glBindTextureUnit(0, base_color_texture);
+    auto const base_color_texture = material->_impl.get_base_color_texture();
+    if (base_color_texture != nullptr) {
+      glBindTextureUnit(0, base_color_texture->_handle.get());
+    } else {
+      glBindTextureUnit(0, default_base_color_texture);
+    }
     auto const base_color_tint = material->_impl.get_base_color_tint();
     glProgramUniform3f(shader_program, albedo_location, base_color_tint.r,
                        base_color_tint.g, base_color_tint.b);

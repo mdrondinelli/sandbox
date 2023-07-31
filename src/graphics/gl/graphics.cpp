@@ -2,6 +2,7 @@
 
 #include <cassert>
 
+#include <array>
 #include <stdexcept>
 
 #include <glad/glad.h>
@@ -60,7 +61,8 @@ void main() {
 
 Gl_graphics::Gl_graphics()
     : _default_render_target{std::make_unique<Gl_default_render_target>()},
-      _shader_program{gl_make_unique_shader_program()} {
+      _shader_program{gl_make_unique_shader_program()},
+      _default_base_color_texture{gl_make_unique_texture(GL_TEXTURE_2D)} {
   GLint status;
   auto const vertex_shader{gl_make_unique_shader(GL_VERTEX_SHADER)};
   glShaderSource(vertex_shader.get(), 1, &vert_src, nullptr);
@@ -100,6 +102,12 @@ Gl_graphics::Gl_graphics()
     glGetProgramInfoLog(_shader_program.get(), log_size, nullptr, log.data());
     throw std::runtime_error{log.data()};
   }
+  auto const default_base_color_texture_pixels =
+      std::array<std::uint8_t, 4>{0xFF, 0xFF, 0xFF, 0xFF};
+  glTextureStorage2D(_default_base_color_texture.get(), 1, GL_RGBA8, 1, 1);
+  glTextureSubImage2D(_default_base_color_texture.get(), 0, 0, 0, 1, 1, GL_RGBA,
+                      GL_UNSIGNED_BYTE,
+                      default_base_color_texture_pixels.data());
 }
 
 Gl_texture *
@@ -113,7 +121,6 @@ void Gl_graphics::destroy_texture(Texture *texture) noexcept {
 
 Gl_material *
 Gl_graphics::create_material(Material_create_info const &create_info) {
-  assert(create_info.base_color_texture != nullptr);
   return new Gl_material{create_info};
 }
 
@@ -194,7 +201,8 @@ void Gl_graphics::render(Scene *source_scene,
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glUseProgram(_shader_program.get());
   gl_source_scene->_impl.draw_surface_instances(
-      _shader_program.get(), 0, 1, 2, view_matrix, clip_matrix * view_matrix);
+      _shader_program.get(), _default_base_color_texture.get(), 0, 1, 2,
+      view_matrix, clip_matrix * view_matrix);
 }
 } // namespace graphics
 } // namespace marlon
