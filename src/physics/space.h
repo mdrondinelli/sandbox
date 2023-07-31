@@ -28,8 +28,6 @@ public:
 
   void simulate(Space_simulate_info const &simulate_info);
 
-  // void step(Space_step_info const &step_info);
-
 private:
   struct Particle {
     std::uint64_t collision_flags;
