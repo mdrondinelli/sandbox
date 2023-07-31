@@ -1,6 +1,6 @@
 #include "space.h"
 
-#include <unordered_map>
+#include <ankerl/unordered_dense.h>
 
 namespace marlon {
 namespace physics {
@@ -75,29 +75,28 @@ public:
     _static_rigid_bodies.erase(static_rigid_body);
   }
 
-  void simulate(Space_simulate_info const &simulate_info) {
-    auto const h = simulate_info.delta_time / simulate_info.substep_count;
+  void simulate(float delta_time, int substep_count) {
+    auto const h = delta_time / substep_count;
     auto const h_inv = 1.0f / h;
     flatten_particles();
     flatten_static_rigid_bodies();
     find_particle_particle_collisions();
     find_particle_static_rigid_body_collisions();
-    for (auto i = 0; i < simulate_info.substep_count; ++i) {
-      for (auto &[reference, value] : _particles) {
-        value.previous_position = value.current_position;
-        value.velocity += h * value.acceleration;
-        value.current_position += h * value.velocity;
+    for (auto i = 0; i < substep_count; ++i) {
+      for (auto const particle : _flattened_particles) {
+        particle->previous_position = particle->current_position;
+        particle->velocity += h * particle->acceleration;
+        particle->current_position += h * particle->velocity;
       }
       solve_particle_particle_collisions();
       solve_particle_static_rigid_body_collisions();
-      for (auto &[reference, value] : _particles) {
-        value.velocity =
-            h_inv * (value.current_position - value.previous_position);
+      for (auto const particle : _flattened_particles) {
+        particle->velocity =
+            h_inv * (particle->current_position - particle->previous_position);
       }
     }
     for (auto &[reference, value] : _particles) {
-      auto const damping_factor =
-          std::pow(value.damping_factor, simulate_info.delta_time);
+      auto const damping_factor = std::pow(value.damping_factor, delta_time);
       value.velocity *= damping_factor;
       if (value.motion_callback != nullptr) {
         value.motion_callback->on_particle_motion(
@@ -216,8 +215,8 @@ private:
     }
   }
 
-  std::unordered_map<Particle_reference, Particle> _particles;
-  std::unordered_map<Static_rigid_body_reference, Static_rigid_body>
+  ankerl::unordered_dense::map<Particle_reference, Particle> _particles;
+  ankerl::unordered_dense::map<Static_rigid_body_reference, Static_rigid_body>
       _static_rigid_bodies;
   std::vector<Particle *> _flattened_particles;
   std::vector<Static_rigid_body *> _flattened_static_rigid_bodies;
@@ -251,8 +250,8 @@ void Space::destroy_static_rigid_body(
   _impl->destroy_static_rigid_body(static_rigid_body);
 }
 
-void Space::simulate(Space_simulate_info const &simulate_info) {
-  _impl->simulate(simulate_info);
+void Space::simulate(float delta_time, int substep_count) {
+  _impl->simulate(delta_time, substep_count);
 }
 } // namespace physics
 } // namespace marlon

@@ -51,6 +51,7 @@ add_executable(
 add_executable(client_tests ${CLIENT_SOURCES})
 target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)
 target_include_directories(graphics PRIVATE include)
+target_include_directories(physics PRIVATE include)
 target_include_directories(client PRIVATE include)
 target_include_directories(client_tests PRIVATE include)
 target_link_libraries(client glfw graphics physics)

@@ -28,7 +28,7 @@ public:
 
   void destroy_static_rigid_body(Static_rigid_body_reference static_rigid_body);
 
-  void simulate(Space_simulate_info const &simulate_info);
+  void simulate(float delta_time, int substep_count);
 
 private:
   class Impl;

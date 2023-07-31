@@ -203,7 +203,7 @@ void tick(physics::Space *space,
   for (auto const entity_manager : entity_managers) {
     entity_manager->tick_entities(delta_time);
   }
-  space->simulate({.delta_time = delta_time, .substep_count = 1});
+  space->simulate(delta_time, 1);
   entity_construction_queue->consume();
   entity_destruction_queue->consume();
 }
