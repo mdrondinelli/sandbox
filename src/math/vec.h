@@ -7,6 +7,8 @@
 
 #include <type_traits>
 
+#include "unreachable.h"
+
 namespace marlon {
 namespace math {
 static_assert(sizeof(float) == 4);
@@ -33,19 +35,25 @@ template <typename T> struct Vec<T, 2> {
 
   constexpr T const &operator[](int n) const noexcept {
     assert(n >= 0 && n < 2);
-    if (n == 0) {
+    switch (n) {
+    case 0:
       return x;
-    } else {
+    case 1:
       return y;
+    default:
+      unreachable();
     }
   }
 
   constexpr T &operator[](int n) noexcept {
     assert(n >= 0 && n < 2);
-    if (n == 0) {
+    switch (n) {
+    case 0:
       return x;
-    } else {
+    case 1:
       return y;
+    default:
+      unreachable();
     }
   }
 };
@@ -77,8 +85,10 @@ template <typename T> struct Vec<T, 3> {
       return x;
     case 1:
       return y;
-    default:
+    case 2:
       return z;
+    default:
+      unreachable();
     }
   }
 
@@ -89,8 +99,10 @@ template <typename T> struct Vec<T, 3> {
       return x;
     case 1:
       return y;
-    default:
+    case 2:
       return z;
+    default:
+      unreachable();
     }
   }
 };
@@ -104,7 +116,7 @@ template <typename T> struct Vec<T, 4> {
   static auto zero() { return Vec<T, 4>{T(0), T(0), T(0), T(0)}; }
 
   Vec() = default;
-  
+
   constexpr Vec(T x, T y, T z, T w) : x{x}, y{y}, z{z}, w{w} {}
 
   template <typename F>
@@ -125,8 +137,10 @@ template <typename T> struct Vec<T, 4> {
       return y;
     case 2:
       return z;
-    default:
+    case 3:
       return w;
+    default:
+      unreachable();
     }
   }
 
@@ -139,8 +153,10 @@ template <typename T> struct Vec<T, 4> {
       return y;
     case 2:
       return z;
-    default:
+    case 3:
       return w;
+    default:
+      unreachable();
     }
   }
 };
