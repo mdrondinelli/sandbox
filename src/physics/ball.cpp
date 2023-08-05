@@ -4,6 +4,13 @@ namespace marlon {
 namespace physics {
 Ball::Ball(float radius) noexcept : _radius{radius} {}
 
+Bounding_box Ball::get_bounds(math::Mat3x4f const &transform) const noexcept {
+  return {{transform[0][3] - _radius, transform[1][3] - _radius,
+           transform[2][3] - _radius},
+          {transform[0][3] + _radius, transform[1][3] + _radius,
+           transform[2][3] + _radius}};
+}
+
 std::optional<Contact>
 Ball::collide_particle(math::Mat3x4f const &shape_transform,
                        math::Mat3x4f const & /*shape_transform_inverse*/,

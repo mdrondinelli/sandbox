@@ -9,6 +9,8 @@ class Box : public Shape {
 public:
   explicit Box(float half_width, float half_height, float half_depth) noexcept;
 
+  Bounding_box get_bounds(math::Mat3x4f const &transform) const noexcept final;
+
   std::optional<Contact>
   collide_particle(math::Mat3x4f const &shape_transform,
                    math::Mat3x4f const &shape_transform_inverse,

@@ -9,6 +9,8 @@ class Ball : public Shape {
 public:
   explicit Ball(float radius) noexcept;
 
+  Bounding_box get_bounds(math::Mat3x4f const &transform) const noexcept final;
+
   std::optional<Contact>
   collide_particle(math::Mat3x4f const &shape_transform,
                    math::Mat3x4f const &shape_transform_inverse,

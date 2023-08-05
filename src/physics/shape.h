@@ -6,6 +6,7 @@
 #include "../math/mat.h"
 #include "../math/quat.h"
 #include "../math/vec.h"
+#include "bounding_box.h"
 #include "contact.h"
 
 namespace marlon {
@@ -13,6 +14,9 @@ namespace physics {
 class Shape {
 public:
   virtual ~Shape() = default;
+
+  virtual Bounding_box
+  get_bounds(math::Mat3x4f const &transform) const noexcept = 0;
 
   virtual std::optional<Contact>
   collide_particle(math::Mat3x4f const &shape_transform,

@@ -18,6 +18,7 @@ struct Particle_reference {
 };
 
 struct Particle_create_info {
+  Particle_motion_callback *motion_callback{nullptr};
   std::uint64_t collision_flags{0};
   std::uint64_t collision_mask{0};
   math::Vec3f position{math::Vec3f::zero()};
@@ -26,7 +27,6 @@ struct Particle_create_info {
   float damping_factor{1.0f};
   float mass{1.0f};
   float radius{0.0f};
-  Particle_motion_callback *motion_callback{nullptr};
 };
 
 struct Particle_motion_event {

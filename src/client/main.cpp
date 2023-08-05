@@ -29,7 +29,7 @@ client::Glfw_unique_window_ptr create_window_unique() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  return client::make_glfw_unique_window(1280, 720, "title");
+  return client::make_glfw_unique_window(960, 540, "title");
 }
 
 std::unique_ptr<graphics::Gl_graphics>
@@ -197,7 +197,7 @@ void tick(physics::Space *space,
           client::Entity_destruction_queue *entity_destruction_queue,
           std::span<client::Entity_manager *const> entity_managers,
           client::Test_entity_manager *test_entity_manager, float delta_time) {
-  for (int i = 0; i < 8; ++i) {
+  for (int i = 0; i < 16; ++i) {
     entity_construction_queue->push(test_entity_manager, {});
   }
   for (auto const entity_manager : entity_managers) {
@@ -312,7 +312,7 @@ int main() {
       .zoom_y = 1.0f,
   });
   auto const camera_scene_node = scene_diff->record_scene_node_creation(
-      {.translation = {0.0f, 1.5f, 4.0f}});
+      {.translation = {0.0f, 1.5f, 5.0f}});
   auto const camera_instance = scene_diff->record_camera_instance_creation(
       {.camera = camera, .scene_node = camera_scene_node});
   auto const ground_scene_node = scene_diff->record_scene_node_creation(
@@ -320,12 +320,12 @@ int main() {
   scene_diff->record_surface_instance_creation(
       {.surface = ground_surface.get(), .scene_node = ground_scene_node});
   physics::Space space;
-  physics::Half_space ground_shape{math::Vec3f{0.0f, 1.0f, 0.0f}};
+  physics::Box ground_shape{50.0f, 0.5f, 50.0f};
   physics::Ball ball_shape{0.5f};
   physics::Box box_shape{1.0f, 1.0f, 1.0f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
-                                  .position = math::Vec3f::zero(),
+                                  .position = math::Vec3f{0.0f, -0.5f, 0.0f},
                                   .orientation = math::Quatf::identity(),
                                   .shape = &ground_shape});
   client::Entity_construction_queue entity_construction_queue;
@@ -363,6 +363,7 @@ int main() {
                                  {.parameters = &right_ball_params});
   entity_construction_queue.push(&box_entity_manager,
                                  {.parameters = &box_params});
+  entity_construction_queue.consume();
   graphics->apply_scene_diff(scene_diff.get());
   auto const render_target = graphics->get_default_render_target();
   run_game_loop(window.get(), graphics.get(), render_target, scene.get(),

@@ -85,15 +85,15 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
   value.surface_instance = scene_diff->record_surface_instance_creation(
       {.surface = _surface, .scene_node = value.scene_node});
   value.particle =
-      _space->create_particle({.collision_flags = collision_flags,
+      _space->create_particle({.motion_callback = &value,
+                               .collision_flags = collision_flags,
                                .collision_mask = collision_mask,
                                .position = position,
                                .velocity = velocity,
                                .acceleration = acceleration,
                                .damping_factor = damping_factor,
                                .mass = density * scale * scale * scale,
-                               .radius = scale,
-                               .motion_callback = &value});
+                               .radius = scale});
   ++_next_entity_reference_value;
   return reference;
 }
