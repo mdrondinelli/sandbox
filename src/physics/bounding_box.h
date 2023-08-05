@@ -19,7 +19,7 @@ inline math::Vec3f centroid(Bounding_box const &box) noexcept {
   return 0.5f * (box.min + box.max);
 }
 
-inline Bounding_box inflate(Bounding_box const &box, float amount) noexcept {
+inline Bounding_box expand(Bounding_box const &box, float amount) noexcept {
   return {box.min - math::Vec3f{amount, amount, amount},
           box.max + math::Vec3f{amount, amount, amount}};
 }

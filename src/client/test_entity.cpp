@@ -84,16 +84,16 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
       {.translation = position, .scale = scale});
   value.surface_instance = scene_diff->record_surface_instance_creation(
       {.surface = _surface, .scene_node = value.scene_node});
-  value.particle =
-      _space->create_particle({.motion_callback = &value,
-                               .collision_flags = collision_flags,
-                               .collision_mask = collision_mask,
-                               .position = position,
-                               .velocity = velocity,
-                               .acceleration = acceleration,
-                               .damping_factor = damping_factor,
-                               .mass = density * scale * scale * scale,
-                               .radius = scale});
+  value.particle = _space->create_particle(
+      {.motion_callback = &value,
+       .collision_flags = collision_flags,
+       .collision_mask = collision_mask,
+       .position = position,
+       .velocity = velocity,
+       .acceleration = acceleration,
+       .damping_factor = damping_factor,
+       .mass = density * 4.0f / 3.0f * 3.14f * scale * scale * scale,
+       .radius = scale});
   ++_next_entity_reference_value;
   return reference;
 }
@@ -111,7 +111,7 @@ void Test_entity_manager::destroy_entity(Entity_reference reference) {
 void Test_entity_manager::tick_entities(float delta_time) {
   for (auto &[reference, value] : _entities) {
     value.time_alive += delta_time;
-    if (value.time_alive > 2.0f) {
+    if (value.time_alive > 4.0f) {
       _entity_destruction_queue->push(this, reference);
     }
   }

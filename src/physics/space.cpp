@@ -308,11 +308,11 @@ private:
   std::vector<Node *> _flattened_leaf_nodes;
 };
 
-using Bounding_box_hierarchy_payload =
+using Bounding_box_hierarchy_leaf_payload =
     std::variant<Particle_reference, Static_rigid_body_reference>;
 
 struct Particle {
-  Bounding_box_hierarchy<Bounding_box_hierarchy_payload>::Node
+  Bounding_box_hierarchy<Bounding_box_hierarchy_leaf_payload>::Node
       *bounding_box_hierarchy_leaf;
   Particle_motion_callback *motion_callback;
   std::uint64_t collision_flags;
@@ -327,7 +327,7 @@ struct Particle {
 };
 
 struct Static_rigid_body {
-  Bounding_box_hierarchy<Bounding_box_hierarchy_payload>::Node
+  Bounding_box_hierarchy<Bounding_box_hierarchy_leaf_payload>::Node
       *bounding_box_hierarchy_leaf;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
@@ -336,20 +336,28 @@ struct Static_rigid_body {
   Shape *shape;
 };
 
+struct Particle_static_rigid_body_contact {
+  Particle *particle;
+  Static_rigid_body *static_rigid_body;
+  math::Vec3f normal;
+  float separating_velocity;
+  float normal_force_lagrange;
+  float tangent_force_lagrange;
+};
+
 constexpr auto contact_offset = 0.1f;
 } // namespace
 
 class Space::Impl {
 public:
   Particle_reference create_particle(Particle_create_info const &create_info) {
-    auto const bounding_box_radius = create_info.radius + contact_offset;
     auto const bounding_box =
-        Bounding_box{create_info.position - math::Vec3f{bounding_box_radius,
-                                                        bounding_box_radius,
-                                                        bounding_box_radius},
-                     create_info.position + math::Vec3f{bounding_box_radius,
-                                                        bounding_box_radius,
-                                                        bounding_box_radius}};
+        Bounding_box{create_info.position - math::Vec3f{create_info.radius,
+                                                        create_info.radius,
+                                                        create_info.radius},
+                     create_info.position + math::Vec3f{create_info.radius,
+                                                        create_info.radius,
+                                                        create_info.radius}};
     Particle_reference const reference{_next_particle_reference_value};
     Particle const value{
         .bounding_box_hierarchy_leaf =
@@ -386,8 +394,7 @@ public:
     auto const transform = math::make_rigid_transform_mat3x4(
         create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
-    auto const bounding_box =
-        inflate(create_info.shape->get_bounds(transform), contact_offset);
+    auto const bounding_box = create_info.shape->get_bounds(transform);
     Static_rigid_body_reference const reference{
         _next_static_rigid_body_reference_value};
     Static_rigid_body const value{
@@ -420,7 +427,7 @@ public:
     auto const h_inv = 1.0f / h;
     flatten_particles();
     flatten_static_rigid_bodies();
-    find_collisions();
+    find_contacts(delta_time);
     // find_particle_particle_collisions();
     // find_particle_static_rigid_body_collisions();
     for (auto i = 0; i < substep_count; ++i) {
@@ -429,25 +436,31 @@ public:
         particle->velocity += h * particle->acceleration;
         particle->current_position += h * particle->velocity;
       }
-      solve_particle_particle_collisions();
-      solve_particle_static_rigid_body_collisions();
+      solve_particle_particle_contact_positions();
+      solve_particle_static_rigid_body_contact_positions();
+      for (auto &contact : _particle_static_rigid_body_contacts) {
+        contact.separating_velocity =
+            math::dot(contact.particle->velocity, contact.normal);
+      }
+      // auto const restitution_coefficient = 0.0f;
+      // for (auto &contact : _particle_static_rigid_body_contacts) {
+      //   if (contact.normal != math::Vec3f::zero()) {
+      //     auto const v = contact.particle->velocity;
+      //     auto const v_n = math::dot(v, contact.normal);
+      //     contact.delta_velocity +=
+      //         contact.normal *
+      //         (-v_n + std::min(-restitution_coefficient * v_n, 0.0f));
+      //   }
+      // }
       for (auto const particle : _flattened_particles) {
         particle->velocity =
             h_inv * (particle->current_position - particle->previous_position);
       }
+      solve_particle_static_rigid_body_contact_velocities(h);
     }
     for (auto &[reference, value] : _particles) {
-      auto const bounding_box_radius = value.radius + contact_offset;
-      auto const bounding_box =
-          Bounding_box{value.current_position -
-                           math::Vec3f{bounding_box_radius, bounding_box_radius,
-                                       bounding_box_radius},
-                       value.current_position +
-                           math::Vec3f{bounding_box_radius, bounding_box_radius,
-                                       bounding_box_radius}};
-      value.bounding_box_hierarchy_leaf->bounds = bounding_box;
-      auto const damping_factor = std::pow(value.damping_factor, delta_time);
-      value.velocity *= damping_factor;
+      // auto const damping_factor = std::pow(value.damping_factor, delta_time);
+      // value.velocity *= damping_factor;
       if (value.motion_callback != nullptr) {
         value.motion_callback->on_particle_motion(
             {reference, value.current_position, value.velocity});
@@ -472,31 +485,50 @@ private:
     }
   }
 
-  void find_collisions() {
-    _particle_particle_collisions.clear();
-    _particle_static_rigid_body_collisions.clear();
+  void find_contacts(float delta_time) {
+    auto const safety_factor = 1.0f;
+    for (auto const particle : _flattened_particles) {
+      auto const radius =
+          particle->radius +
+          safety_factor * delta_time * math::length(particle->velocity);
+      auto const half_extents = math::Vec3f{radius, radius, radius};
+      particle->bounding_box_hierarchy_leaf->bounds = {
+          particle->current_position - half_extents,
+          particle->current_position + half_extents};
+    }
+    _particle_particle_contacts.clear();
+    _particle_static_rigid_body_contacts.clear();
     _bounding_box_hierarchy.build();
     _bounding_box_hierarchy.for_each_overlapping_leaf_pair(
-        [this](
-            std::variant<Particle_reference, Static_rigid_body_reference> const
-                &first_reference,
-            std::variant<Particle_reference, Static_rigid_body_reference> const
-                &second_reference) {
+        [this](Bounding_box_hierarchy_leaf_payload const &first_reference,
+               Bounding_box_hierarchy_leaf_payload const &second_reference) {
           if (first_reference.index() == 0) {
             if (second_reference.index() == 0) {
-              _particle_particle_collisions.emplace_back(
+              _particle_particle_contacts.emplace_back(
                   &_particles.at(std::get<0>(first_reference)),
                   &_particles.at(std::get<0>(second_reference)));
             } else {
-              _particle_static_rigid_body_collisions.emplace_back(
-                  &_particles.at(std::get<0>(first_reference)),
-                  &_static_rigid_bodies.at(std::get<1>(second_reference)));
+              _particle_static_rigid_body_contacts.emplace_back(
+                  Particle_static_rigid_body_contact{
+                      .particle = &_particles.at(std::get<0>(first_reference)),
+                      .static_rigid_body = &_static_rigid_bodies.at(
+                          std::get<1>(second_reference)),
+                      .normal = math::Vec3f::zero(),
+                      .separating_velocity = 0.0f,
+                      .normal_force_lagrange = 0.0f,
+                      .tangent_force_lagrange = 0.0f});
             }
           } else {
             if (second_reference.index() == 0) {
-              _particle_static_rigid_body_collisions.emplace_back(
-                  &_particles.at(std::get<0>(second_reference)),
-                  &_static_rigid_bodies.at(std::get<1>(first_reference)));
+              _particle_static_rigid_body_contacts.emplace_back(
+                  Particle_static_rigid_body_contact{
+                      .particle = &_particles.at(std::get<0>(second_reference)),
+                      .static_rigid_body = &_static_rigid_bodies.at(
+                          std::get<1>(first_reference)),
+                      .normal = math::Vec3f::zero(),
+                      .separating_velocity = 0.0f,
+                      .normal_force_lagrange = 0.0f,
+                      .tangent_force_lagrange = 0.0f});
             } else {
               // ignore static rigid bodies colliding with each other
             }
@@ -504,53 +536,10 @@ private:
         });
   }
 
-  void find_particle_particle_collisions() {
-    _particle_particle_collisions.clear();
-    for (std::size_t i{}; i + 1 < _flattened_particles.size(); ++i) {
-      for (std::size_t j{i + 1}; j < _flattened_particles.size(); ++j) {
-        auto const particle_a = _flattened_particles[i];
-        auto const particle_b = _flattened_particles[j];
-        if ((particle_a->collision_mask & particle_b->collision_flags) &&
-            (particle_b->collision_mask & particle_a->collision_flags)) {
-          auto const displacement =
-              particle_b->current_position - particle_a->current_position;
-          auto const distance2 = math::length2(displacement);
-          auto const contact_distance =
-              particle_a->radius + particle_b->radius + 2.0f * contact_offset;
-          auto const contact_distance2 = contact_distance * contact_distance;
-          if (distance2 < contact_distance2) {
-            _particle_particle_collisions.emplace_back(particle_a, particle_b);
-          }
-        }
-      }
-    }
-  }
-
-  void find_particle_static_rigid_body_collisions() {
-    _particle_static_rigid_body_collisions.clear();
-    for (std::size_t i{}; i < _flattened_particles.size(); ++i) {
-      for (std::size_t j{}; j < _flattened_static_rigid_bodies.size(); ++j) {
-        auto const particle = _flattened_particles[i];
-        auto const static_rigid_body = _flattened_static_rigid_bodies[j];
-        if ((particle->collision_mask & static_rigid_body->collision_flags) &&
-            (static_rigid_body->collision_mask & particle->collision_flags)) {
-          if (auto const contact = static_rigid_body->shape->collide_particle(
-                  static_rigid_body->transform,
-                  static_rigid_body->transform_inverse,
-                  particle->current_position,
-                  particle->radius + contact_offset)) {
-            _particle_static_rigid_body_collisions.emplace_back(
-                particle, static_rigid_body);
-          }
-        }
-      }
-    }
-  }
-
-  void solve_particle_particle_collisions() {
-    for (auto const [particle_a, particle_b] : _particle_particle_collisions) {
+  void solve_particle_particle_contact_positions() {
+    for (auto const [particle_a, particle_b] : _particle_particle_contacts) {
       auto const displacement =
-          particle_b->current_position - particle_a->current_position;
+          particle_a->current_position - particle_b->current_position;
       auto const distance2 = math::length2(displacement);
       auto const contact_distance = particle_a->radius + particle_b->radius;
       auto const contact_distance2 = contact_distance * contact_distance;
@@ -558,40 +547,87 @@ private:
         if (distance2 == 0.0f) {
           // particles coincide, pick arbitrary contact normal
           math::Vec3f const contact_normal{1.0f, 0.0f, 0.0f};
-          auto const penetration_depth = contact_distance;
-          auto const normalizing_factor =
-              1.0f / (particle_a->inverse_mass + particle_b->inverse_mass);
-          particle_a->current_position -= normalizing_factor *
-                                          particle_a->inverse_mass *
-                                          penetration_depth * contact_normal;
-          particle_b->current_position += normalizing_factor *
-                                          particle_b->inverse_mass *
-                                          penetration_depth * contact_normal;
+          auto const separation = -contact_distance;
+          auto const positional_impulse =
+              -separation /
+              (particle_a->inverse_mass + particle_b->inverse_mass) *
+              contact_normal;
+          particle_a->current_position +=
+              positional_impulse * particle_a->inverse_mass;
+          particle_b->current_position -=
+              positional_impulse * particle_b->inverse_mass;
         } else {
           auto const distance = std::sqrt(distance2);
           auto const contact_normal = displacement / distance;
-          auto const penetration_depth = contact_distance - distance;
-          auto const normalizing_factor =
-              1.0f / (particle_a->inverse_mass + particle_b->inverse_mass);
-          particle_a->current_position -= normalizing_factor *
-                                          particle_a->inverse_mass *
-                                          penetration_depth * contact_normal;
-          particle_b->current_position += normalizing_factor *
-                                          particle_b->inverse_mass *
-                                          penetration_depth * contact_normal;
+          auto const separation = distance - contact_distance;
+          auto const positional_impulse =
+              -separation /
+              (particle_a->inverse_mass + particle_b->inverse_mass) *
+              contact_normal;
+          particle_a->current_position +=
+              positional_impulse * particle_a->inverse_mass;
+          particle_b->current_position -=
+              positional_impulse * particle_b->inverse_mass;
         }
       }
     }
   }
 
-  void solve_particle_static_rigid_body_collisions() {
-    for (auto const [particle, static_rigid_body] :
-         _particle_static_rigid_body_collisions) {
-      if (auto contact = static_rigid_body->shape->collide_particle(
+  void solve_particle_static_rigid_body_contact_positions() {
+    for (auto &contact : _particle_static_rigid_body_contacts) {
+      auto const particle = contact.particle;
+      auto const static_rigid_body = contact.static_rigid_body;
+      if (auto contact_geometry = static_rigid_body->shape->collide_particle(
               static_rigid_body->transform,
               static_rigid_body->transform_inverse, particle->current_position,
               particle->radius)) {
-        particle->current_position += contact->depth * contact->normal;
+        auto const delta_normal_force_lagrange =
+            contact_geometry->depth / particle->inverse_mass;
+        auto const relative_motion =
+            -(particle->current_position - particle->previous_position);
+        auto const relative_tangential_motion =
+            relative_motion -
+            math::dot(relative_motion, contact_geometry->normal) *
+                contact_geometry->normal;
+        auto const delta_tangent_force_lagrange =
+            math::length(relative_tangential_motion) / particle->inverse_mass;
+        contact.normal = contact_geometry->normal;
+        contact.normal_force_lagrange += delta_normal_force_lagrange;
+        contact.tangent_force_lagrange += delta_tangent_force_lagrange;
+        particle->current_position +=
+            contact_geometry->depth * contact_geometry->normal;
+        auto const static_friction_coefficient = 1.0f;
+        if (contact.tangent_force_lagrange <
+            static_friction_coefficient * contact.normal_force_lagrange) {
+          particle->current_position += relative_tangential_motion;
+        }
+      }
+    }
+  }
+
+  void solve_particle_static_rigid_body_contact_velocities(float h) {
+    auto const restitution_coefficient = 0.0f;
+    auto const dynamic_friction_coefficient = 1.0f;
+    for (auto &contact : _particle_static_rigid_body_contacts) {
+      if (contact.normal != math::Vec3f::zero()) {
+        auto const v = contact.particle->velocity;
+        auto const v_n = math::dot(v, contact.normal);
+        auto const v_t = v - contact.normal * v_n;
+        auto const v_t_length2 = math::length2(v_t);
+        if (v_t_length2 != 0.0f) {
+          auto const v_t_length = std::sqrt(v_t_length2);
+          auto const friction_delta_velocity =
+              -v_t / v_t_length *
+              std::min(dynamic_friction_coefficient *
+                           contact.normal_force_lagrange / h,
+                       v_t_length);
+          contact.particle->velocity += friction_delta_velocity;
+        }
+        auto const restitution_delta_velocity =
+            contact.normal * (-v_n + std::max(-restitution_coefficient *
+                                                  contact.separating_velocity,
+                                              0.0f));
+        contact.particle->velocity += restitution_delta_velocity;
       }
     }
   }
@@ -604,9 +640,9 @@ private:
       _static_rigid_bodies;
   std::vector<Particle *> _flattened_particles;
   std::vector<Static_rigid_body *> _flattened_static_rigid_bodies;
-  std::vector<std::pair<Particle *, Particle *>> _particle_particle_collisions;
-  std::vector<std::pair<Particle *, Static_rigid_body *>>
-      _particle_static_rigid_body_collisions;
+  std::vector<std::pair<Particle *, Particle *>> _particle_particle_contacts;
+  std::vector<Particle_static_rigid_body_contact>
+      _particle_static_rigid_body_contacts;
   std::uint64_t _next_particle_reference_value{};
   std::uint64_t _next_static_rigid_body_reference_value{};
 };
