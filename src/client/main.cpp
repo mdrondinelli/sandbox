@@ -197,7 +197,7 @@ void tick(physics::Space *space,
           client::Entity_destruction_queue *entity_destruction_queue,
           std::span<client::Entity_manager *const> entity_managers,
           client::Test_entity_manager *test_entity_manager, float delta_time) {
-  for (int i = 0; i < 16; ++i) {
+  for (int i = 0; i < 8; ++i) {
     entity_construction_queue->push(test_entity_manager, {});
   }
   for (auto const entity_manager : entity_managers) {

@@ -336,14 +336,13 @@ struct Static_rigid_body {
   Shape *shape;
 };
 
-constexpr auto particle_contact_offset = 0.1f;
+constexpr auto contact_offset = 0.1f;
 } // namespace
 
 class Space::Impl {
 public:
   Particle_reference create_particle(Particle_create_info const &create_info) {
-    auto const bounding_box_radius =
-        create_info.radius + particle_contact_offset;
+    auto const bounding_box_radius = create_info.radius + contact_offset;
     auto const bounding_box =
         Bounding_box{create_info.position - math::Vec3f{bounding_box_radius,
                                                         bounding_box_radius,
@@ -387,7 +386,8 @@ public:
     auto const transform = math::make_rigid_transform_mat3x4(
         create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
-    auto const bounding_box = create_info.shape->get_bounds(transform);
+    auto const bounding_box =
+        inflate(create_info.shape->get_bounds(transform), contact_offset);
     Static_rigid_body_reference const reference{
         _next_static_rigid_body_reference_value};
     Static_rigid_body const value{
@@ -437,7 +437,7 @@ public:
       }
     }
     for (auto &[reference, value] : _particles) {
-      auto const bounding_box_radius = value.radius + particle_contact_offset;
+      auto const bounding_box_radius = value.radius + contact_offset;
       auto const bounding_box =
           Bounding_box{value.current_position -
                            math::Vec3f{bounding_box_radius, bounding_box_radius,
@@ -515,9 +515,8 @@ private:
           auto const displacement =
               particle_b->current_position - particle_a->current_position;
           auto const distance2 = math::length2(displacement);
-          auto const contact_distance = particle_a->radius +
-                                        particle_b->radius +
-                                        2.0f * particle_contact_offset;
+          auto const contact_distance =
+              particle_a->radius + particle_b->radius + 2.0f * contact_offset;
           auto const contact_distance2 = contact_distance * contact_distance;
           if (distance2 < contact_distance2) {
             _particle_particle_collisions.emplace_back(particle_a, particle_b);
@@ -539,7 +538,7 @@ private:
                   static_rigid_body->transform,
                   static_rigid_body->transform_inverse,
                   particle->current_position,
-                  particle->radius + particle_contact_offset)) {
+                  particle->radius + contact_offset)) {
             _particle_static_rigid_body_collisions.emplace_back(
                 particle, static_rigid_body);
           }
