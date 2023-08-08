@@ -16,7 +16,6 @@ public:
   explicit Test_entity_manager(
       Scene_diff_provider const *scene_diff_provider,
       graphics::Surface *surface, physics::Space *space,
-      Entity_construction_queue *entity_construction_queue,
       Entity_destruction_queue *entity_destruction_queue);
 
   ~Test_entity_manager();
@@ -42,7 +41,6 @@ private:
   Scene_diff_provider const *_scene_diff_provider;
   graphics::Surface *_surface;
   physics::Space *_space;
-  Entity_construction_queue *_entity_construction_queue;
   Entity_destruction_queue *_entity_destruction_queue;
   std::mt19937 _random_number_engine;
   std::uint64_t _next_entity_reference_value;

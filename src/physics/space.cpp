@@ -356,8 +356,6 @@ struct Particle_static_rigid_body_contact {
   float tangent_force_lagrange;
   float separating_velocity;
 };
-
-constexpr auto contact_offset = 0.1f;
 } // namespace
 
 class Space::Impl {
@@ -390,7 +388,7 @@ public:
             create_info.dynamic_friction_coefficient,
         .restitution_coefficient = create_info.restitution_coefficient};
     try {
-      _particles.emplace(reference, value).first;
+      _particles.emplace(reference, value);
     } catch (...) {
       _bounding_box_hierarchy.destroy_leaf(value.bounding_box_hierarchy_leaf);
       throw;
@@ -427,7 +425,7 @@ public:
             create_info.dynamic_friction_coefficient,
         .restitution_coefficient = create_info.restitution_coefficient};
     try {
-      _static_rigid_bodies.emplace(reference, value).first;
+      _static_rigid_bodies.emplace(reference, value);
     } catch (...) {
       _bounding_box_hierarchy.destroy_leaf(value.bounding_box_hierarchy_leaf);
       throw;

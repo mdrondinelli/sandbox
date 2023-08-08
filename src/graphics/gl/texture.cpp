@@ -4,8 +4,11 @@
 
 #include <stdexcept>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlanguage-extension-token"
 #include <glad/glad.h>
 #include <ktx.h>
+#pragma clang diagnostic pop
 
 namespace marlon {
 namespace graphics {

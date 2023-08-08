@@ -5,7 +5,10 @@
 #include <array>
 #include <stdexcept>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlanguage-extension-token"
 #include <glad/glad.h>
+#pragma clang diagnostic pop
 
 #include "unique_shader_handle.h"
 

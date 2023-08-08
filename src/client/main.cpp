@@ -3,7 +3,10 @@
 #include <iostream>
 #include <vector>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlanguage-extension-token"
 #include <glad/glad.h>
+#pragma clang diagnostic pop
 
 #include <GLFW/glfw3.h>
 
@@ -36,7 +39,7 @@ std::unique_ptr<graphics::Gl_graphics>
 create_graphics_unique(GLFWwindow *window) {
   glfwMakeContextCurrent(window);
   if (!gladLoadGLLoader([](char const *procname) {
-        return static_cast<void *>(glfwGetProcAddress(procname));
+        return reinterpret_cast<void *>(glfwGetProcAddress(procname));
       })) {
     throw std::runtime_error{"Failed to initialize OpenGL"};
   }
@@ -120,18 +123,18 @@ create_icosahedron_mesh_unique(graphics::Graphics *graphics,
                                int subdivisions = 0) {
   auto const phi = std::numbers::phi_v<float>;
   std::vector<Vertex> vertices{
-      {math::normalize(math::Vec3f{phi, 1.0f, 0.0f})},
-      {math::normalize(math::Vec3f{phi, -1.0f, 0.0f})},
-      {math::normalize(math::Vec3f{-phi, -1.0f, 0.0f})},
-      {math::normalize(math::Vec3f{-phi, 1.0f, 0.0f})},
-      {math::normalize(math::Vec3f{1.0f, 0.0f, phi})},
-      {math::normalize(math::Vec3f{-1.0f, 0.0f, phi})},
-      {math::normalize(math::Vec3f{-1.0f, 0.0f, -phi})},
-      {math::normalize(math::Vec3f{1.0f, 0.0f, -phi})},
-      {math::normalize(math::Vec3f{0.0f, phi, 1.0f})},
-      {math::normalize(math::Vec3f{0.0f, phi, -1.0f})},
-      {math::normalize(math::Vec3f{0.0f, -phi, -1.0f})},
-      {math::normalize(math::Vec3f{0.0f, -phi, 1.0f})}};
+      {math::normalize(math::Vec3f{phi, 1.0f, 0.0f}), {}},
+      {math::normalize(math::Vec3f{phi, -1.0f, 0.0f}), {}},
+      {math::normalize(math::Vec3f{-phi, -1.0f, 0.0f}), {}},
+      {math::normalize(math::Vec3f{-phi, 1.0f, 0.0f}), {}},
+      {math::normalize(math::Vec3f{1.0f, 0.0f, phi}), {}},
+      {math::normalize(math::Vec3f{-1.0f, 0.0f, phi}), {}},
+      {math::normalize(math::Vec3f{-1.0f, 0.0f, -phi}), {}},
+      {math::normalize(math::Vec3f{1.0f, 0.0f, -phi}), {}},
+      {math::normalize(math::Vec3f{0.0f, phi, 1.0f}), {}},
+      {math::normalize(math::Vec3f{0.0f, phi, -1.0f}), {}},
+      {math::normalize(math::Vec3f{0.0f, -phi, -1.0f}), {}},
+      {math::normalize(math::Vec3f{0.0f, -phi, 1.0f}), {}}};
   std::vector<std::uint32_t> indices{
       0, 9, 8,  0, 8,  4,  0,  4, 1, 0, 1, 7,  0, 7,  9,  3, 8,  9,  3, 9,
       6, 3, 6,  2, 3,  2,  5,  3, 5, 8, 4, 8,  5, 11, 1,  4, 11, 4,  5, 11,
@@ -139,7 +142,7 @@ create_icosahedron_mesh_unique(graphics::Graphics *graphics,
   for (int i = 0; i < subdivisions; ++i) {
     auto const indices_copy = indices;
     indices.clear();
-    for (int j = 0; j != indices_copy.size(); j += 3) {
+    for (auto j = std::size_t{}; j != indices_copy.size(); j += 3) {
       auto const index_0 = indices_copy[j + 0];
       auto const index_1 = indices_copy[j + 1];
       auto const index_2 = indices_copy[j + 2];
@@ -147,11 +150,11 @@ create_icosahedron_mesh_unique(graphics::Graphics *graphics,
       auto const &vertex_1 = vertices[index_1];
       auto const &vertex_2 = vertices[index_2];
       auto const new_vertex_0 = Vertex{
-          math::normalize(0.5f * (vertex_0.position + vertex_1.position))};
+          math::normalize(0.5f * (vertex_0.position + vertex_1.position)), {}};
       auto const new_vertex_1 = Vertex{
-          math::normalize(0.5f * (vertex_1.position + vertex_2.position))};
+          math::normalize(0.5f * (vertex_1.position + vertex_2.position)), {}};
       auto const new_vertex_2 = Vertex{
-          math::normalize(0.5f * (vertex_2.position + vertex_0.position))};
+          math::normalize(0.5f * (vertex_2.position + vertex_0.position)), {}};
       auto const new_vertex_0_index =
           static_cast<std::uint32_t>(vertices.size());
       auto const new_vertex_1_index =
@@ -263,7 +266,17 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   }
 }
 
+int factorial(int n) {
+  int retval = 1;
+  while (n > 1) {
+    retval *= n;
+    --n;
+  }
+  return retval;
+}
+
 int main() {
+  std::cout << "testing ubsan: " << (factorial(13)) << std::endl;
   client::Glfw_shared_instance const glfw;
   auto const window = create_window_unique();
   auto const graphics = create_graphics_unique(window.get());
@@ -358,7 +371,7 @@ int main() {
        .restitution_coefficient = 0.0f}};
   client::Test_entity_manager test_entity_manager{
       &scene_diff_provider, particle_surface.get(), &space,
-      &entity_construction_queue, &entity_destruction_queue};
+      &entity_destruction_queue};
   auto const entity_managers = std::array<client::Entity_manager *, 3>{
       &ball_entity_manager, &box_entity_manager, &test_entity_manager};
   auto const left_ball_params =

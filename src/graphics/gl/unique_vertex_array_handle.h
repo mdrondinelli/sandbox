@@ -24,6 +24,7 @@ public:
   operator=(Gl_unique_vertex_array_handle &&other) noexcept {
     auto temp{std::move(other)};
     swap(temp);
+    return *this;
   }
 
   std::uint32_t get() const noexcept { return _handle; }

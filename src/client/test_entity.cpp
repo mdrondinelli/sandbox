@@ -6,11 +6,9 @@ namespace marlon {
 namespace client {
 Test_entity_manager::Test_entity_manager(
     Scene_diff_provider const *scene_diff_provider, graphics::Surface *surface,
-    physics::Space *space, Entity_construction_queue *entity_construction_queue,
-    Entity_destruction_queue *entity_destruction_queue)
+    physics::Space *space, Entity_destruction_queue *entity_destruction_queue)
     : _scene_diff_provider{scene_diff_provider}, _surface{surface},
-      _space{space}, _entity_construction_queue{entity_construction_queue},
-      _entity_destruction_queue{entity_destruction_queue},
+      _space{space}, _entity_destruction_queue{entity_destruction_queue},
       _random_number_engine{std::random_device{}()},
       _next_entity_reference_value{} {}
 
@@ -54,9 +52,6 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
       math::Vec3f{0.0f, 9.0f, 0.0f}, math::Vec3f{0.0f, -3.0f, 0.0f},
       math::Vec3f{-0.0f, 9.0f, -0.0f}};
   auto const velocity_jitter_factors = std::array<float, 3>{0.0f, 0.0f, 0.0f};
-  auto const accelerations = std::array<math::Vec3f, 3>{
-      math::Vec3f{0.0f, -9.8f, 0.0f}, math::Vec3f{0.0f, -9.8f, 0.0f},
-      math::Vec3f{0.0f, -9.8f, 0.0f}};
   // auto const damping_factors = std::array<float, 3>{0.9f, 0.9f, 0.9f};
   auto const densities = std::array<float, 3>{1000.0f, 1000.0f, 1000.0f};
   std::uniform_int_distribution index_distribution{0, 5};
@@ -70,7 +65,6 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
   auto const velocity =
       velocity_jitter_factors[index] * sample_ball(_random_number_engine) +
       velocities[index];
-  auto const acceleration = accelerations[index];
   // auto const damping_factor = damping_factors[index];
   std::uniform_real_distribution<float> scale_distribution{0.01f, 0.05f};
   auto const density = densities[index];
@@ -90,8 +84,8 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
        .collision_mask = collision_mask,
        .position = position,
        .velocity = velocity,
-      //  .acceleration = acceleration,
-      //  .damping_factor = damping_factor,
+       //  .acceleration = acceleration,
+       //  .damping_factor = damping_factor,
        .mass = density * 4.0f / 3.0f * 3.14f * scale * scale * scale,
        .radius = scale,
        .static_friction_coefficient = 1.1f,
@@ -114,7 +108,7 @@ void Test_entity_manager::destroy_entity(Entity_reference reference) {
 void Test_entity_manager::tick_entities(float delta_time) {
   for (auto &[reference, value] : _entities) {
     value.time_alive += delta_time;
-    if (value.time_alive > 30.0f) {
+    if (value.time_alive > 2.0f) {
       _entity_destruction_queue->push(this, reference);
     }
   }

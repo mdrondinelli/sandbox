@@ -26,7 +26,9 @@ Glfw_unique_window_ptr make_glfw_unique_window(int width, int height,
   return Glfw_unique_window_ptr{window};
 }
 
-TEST_CASE("glfw::Glfw_unique_window_ptr") {
+#pragma clang diagnostic ignored "-Wunused-function"
+
+TEST_CASE("Glfw_unique_window_ptr") {
   REQUIRE_THROWS(make_glfw_unique_window(800, 600, "title"));
   const Glfw_shared_instance instance;
   const auto window = make_glfw_unique_window(800, 600, "title");
