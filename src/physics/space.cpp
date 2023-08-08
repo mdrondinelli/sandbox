@@ -320,6 +320,7 @@ struct Particle {
   math::Vec3f previous_position;
   math::Vec3f current_position;
   math::Vec3f velocity;
+  float mass;
   float inverse_mass;
   float radius;
   float static_friction_coefficient;
@@ -381,6 +382,7 @@ public:
         .previous_position = create_info.position,
         .current_position = create_info.position,
         .velocity = create_info.velocity,
+        .mass = create_info.mass,
         .inverse_mass = 1.0f / create_info.mass,
         .radius = create_info.radius,
         .static_friction_coefficient = create_info.static_friction_coefficient,
@@ -599,7 +601,7 @@ private:
               static_rigid_body->transform_inverse, particle->current_position,
               particle->radius)) {
         auto const delta_normal_force_lagrange =
-            contact_geometry->depth / particle->inverse_mass;
+            contact_geometry->depth * particle->mass;
         auto const relative_motion =
             particle->current_position - particle->previous_position;
         auto const relative_tangential_motion =
@@ -607,7 +609,7 @@ private:
             math::dot(relative_motion, contact_geometry->normal) *
                 contact_geometry->normal;
         auto const delta_tangent_force_lagrange =
-            math::length(relative_tangential_motion) / particle->inverse_mass;
+            math::length(relative_tangential_motion) * particle->mass;
         contact.normal = contact_geometry->normal;
         contact.normal_force_lagrange = delta_normal_force_lagrange;
         contact.tangent_force_lagrange = delta_tangent_force_lagrange;
