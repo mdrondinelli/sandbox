@@ -29,7 +29,7 @@ client::Glfw_unique_window_ptr create_window_unique() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  return client::make_glfw_unique_window(960, 540, "title");
+  return client::make_glfw_unique_window(1280, 720, "title");
 }
 
 std::unique_ptr<graphics::Gl_graphics>
@@ -197,7 +197,7 @@ void tick(physics::Space *space,
           client::Entity_destruction_queue *entity_destruction_queue,
           std::span<client::Entity_manager *const> entity_managers,
           client::Test_entity_manager *test_entity_manager, float delta_time) {
-  for (int i = 0; i < 8; ++i) {
+  for (int i = 0; i < 4; ++i) {
     entity_construction_queue->push(test_entity_manager, {});
   }
   for (auto const entity_manager : entity_managers) {
@@ -217,7 +217,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
                    client::Entity_destruction_queue *entity_destruction_queue,
                    std::span<client::Entity_manager *const> entity_managers,
                    client::Test_entity_manager *test_entity_manager) {
-  auto const tick_rate = 32.0;
+  auto const tick_rate = 60.0;
   auto const tick_duration = 1.0 / tick_rate;
   auto previous_time = glfwGetTime();
   auto accumulator = 0.0;
@@ -238,7 +238,8 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
         accumulator -= tick_duration;
         graphics->apply_scene_diff(scene_diff);
         tick(space, entity_construction_queue, entity_destruction_queue,
-             entity_managers, test_entity_manager, tick_duration);
+             entity_managers, test_entity_manager,
+             static_cast<float>(tick_duration));
       } while (accumulator >= tick_duration);
     }
     graphics->apply_scene_diff(
@@ -271,7 +272,7 @@ int main() {
       graphics.get(),
       "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
   auto const particle_material = graphics->create_material_unique(
-      {.base_color_tint = {0.0f, 0.375f, 1.0f}});
+      {.base_color_tint = {0.25f, 0.5f, 1.0f}});
   auto const blue_material = graphics->create_material_unique(
       {.base_color_tint = {0.00f, 0.005f, 0.02f}});
   auto const red_material =
@@ -312,14 +313,18 @@ int main() {
       .zoom_y = 1.0f,
   });
   auto const camera_scene_node = scene_diff->record_scene_node_creation(
-      {.translation = {0.0f, 1.5f, 5.0f}});
+      {.translation = {-3.0f, 3.5f, 3.0f},
+       .rotation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                           math::deg_to_rad(-45.0f)) *
+                   math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
+                                           math::deg_to_rad(-30.0f))});
   auto const camera_instance = scene_diff->record_camera_instance_creation(
       {.camera = camera, .scene_node = camera_scene_node});
   auto const ground_scene_node = scene_diff->record_scene_node_creation(
       {.translation = {0.0f, -100.0f, 0.0f}, .scale = 100.0f});
   scene_diff->record_surface_instance_creation(
       {.surface = ground_surface.get(), .scene_node = ground_scene_node});
-  physics::Space space;
+  physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
   physics::Box ground_shape{50.0f, 0.5f, 50.0f};
   physics::Ball ball_shape{0.5f};
   physics::Box box_shape{1.0f, 1.0f, 1.0f};
@@ -327,7 +332,10 @@ int main() {
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
                                   .orientation = math::Quatf::identity(),
-                                  .shape = &ground_shape});
+                                  .shape = &ground_shape,
+                                  .static_friction_coefficient = 1.1f,
+                                  .dynamic_friction_coefficient = 0.6f,
+                                  .restitution_coefficient = 0.0f});
   client::Entity_construction_queue entity_construction_queue;
   client::Entity_destruction_queue entity_destruction_queue;
   client::Static_prop_entity_manager ball_entity_manager{
@@ -335,13 +343,19 @@ int main() {
        .surface = ball_surface.get(),
        .surface_scale = 0.5f,
        .space = &space,
-       .shape = &ball_shape}};
+       .shape = &ball_shape,
+       .static_friction_coefficient = 1.1f,
+       .dynamic_friction_coefficient = 0.75f,
+       .restitution_coefficient = 0.0f}};
   client::Static_prop_entity_manager box_entity_manager{
       {.scene_diff_provider = &scene_diff_provider,
        .surface = box_surface.get(),
        .surface_scale = 1.0f,
        .space = &space,
-       .shape = &box_shape}};
+       .shape = &box_shape,
+       .static_friction_coefficient = 1.1f,
+       .dynamic_friction_coefficient = 0.6f,
+       .restitution_coefficient = 0.0f}};
   client::Test_entity_manager test_entity_manager{
       &scene_diff_provider, particle_surface.get(), &space,
       &entity_construction_queue, &entity_destruction_queue};

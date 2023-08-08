@@ -19,6 +19,9 @@ struct Static_rigid_body_create_info {
   math::Vec3f position{math::Vec3f::zero()};
   math::Quatf orientation{math::Quatf::identity()};
   Shape *shape{};
+  float static_friction_coefficient{};
+  float dynamic_friction_coefficient{};
+  float restitution_coefficient{};
 };
 
 constexpr bool operator==(Static_rigid_body_reference lhs,

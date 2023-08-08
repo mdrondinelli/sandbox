@@ -8,6 +8,10 @@
 
 namespace marlon {
 namespace physics {
+struct Space_create_info {
+  math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
+};
+
 struct Space_simulate_info {
   float delta_time;
   int substep_count;
@@ -15,7 +19,7 @@ struct Space_simulate_info {
 
 class Space {
 public:
-  Space();
+  explicit Space(Space_create_info const &create_info);
 
   ~Space();
 

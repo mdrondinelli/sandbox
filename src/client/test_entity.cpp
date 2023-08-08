@@ -47,17 +47,17 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
   auto const collision_masks =
       std::array<std::uint64_t, 3>{0b01u, 0b01u, 0b11u};
   auto const centers = std::array<math::Vec3f, 3>{
-      math::Vec3f{-2.0f, 0.0f, -2.0f}, math::Vec3f{0.0f, 3.5f, 0.0f},
-      math::Vec3f{2.0f, 0.0f, 2.0f}};
-  auto const radii = std::array<float, 3>{0.05f, 0.05f, 0.05f};
+      math::Vec3f{-3.0f, 0.1f, -3.0f}, math::Vec3f{0.0f, 3.5f, 0.0f},
+      math::Vec3f{3.0f, 0.1f, 3.0f}};
+  auto const radii = std::array<float, 3>{0.05f, 0.1f, 0.05f};
   auto const velocities = std::array<math::Vec3f, 3>{
       math::Vec3f{0.0f, 9.0f, 0.0f}, math::Vec3f{0.0f, -3.0f, 0.0f},
-      math::Vec3f{0.0f, 9.0f, 0.0f}};
+      math::Vec3f{-0.0f, 9.0f, -0.0f}};
   auto const velocity_jitter_factors = std::array<float, 3>{0.0f, 0.0f, 0.0f};
   auto const accelerations = std::array<math::Vec3f, 3>{
       math::Vec3f{0.0f, -9.8f, 0.0f}, math::Vec3f{0.0f, -9.8f, 0.0f},
       math::Vec3f{0.0f, -9.8f, 0.0f}};
-  auto const damping_factors = std::array<float, 3>{0.9f, 0.9f, 0.9f};
+  // auto const damping_factors = std::array<float, 3>{0.9f, 0.9f, 0.9f};
   auto const densities = std::array<float, 3>{1000.0f, 1000.0f, 1000.0f};
   std::uniform_int_distribution index_distribution{0, 5};
   auto const index = [](int n) {
@@ -71,8 +71,8 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
       velocity_jitter_factors[index] * sample_ball(_random_number_engine) +
       velocities[index];
   auto const acceleration = accelerations[index];
-  auto const damping_factor = damping_factors[index];
-  std::uniform_real_distribution<float> scale_distribution{0.01f, 0.03f};
+  // auto const damping_factor = damping_factors[index];
+  std::uniform_real_distribution<float> scale_distribution{0.01f, 0.05f};
   auto const density = densities[index];
   auto const scale = scale_distribution(_random_number_engine);
   Entity_reference const reference{_next_entity_reference_value};
@@ -90,10 +90,13 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
        .collision_mask = collision_mask,
        .position = position,
        .velocity = velocity,
-       .acceleration = acceleration,
-       .damping_factor = damping_factor,
+      //  .acceleration = acceleration,
+      //  .damping_factor = damping_factor,
        .mass = density * 4.0f / 3.0f * 3.14f * scale * scale * scale,
-       .radius = scale});
+       .radius = scale,
+       .static_friction_coefficient = 1.1f,
+       .dynamic_friction_coefficient = 0.9f,
+       .restitution_coefficient = 0.5f});
   ++_next_entity_reference_value;
   return reference;
 }
@@ -111,7 +114,7 @@ void Test_entity_manager::destroy_entity(Entity_reference reference) {
 void Test_entity_manager::tick_entities(float delta_time) {
   for (auto &[reference, value] : _entities) {
     value.time_alive += delta_time;
-    if (value.time_alive > 4.0f) {
+    if (value.time_alive > 30.0f) {
       _entity_destruction_queue->push(this, reference);
     }
   }

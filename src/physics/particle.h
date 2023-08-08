@@ -23,10 +23,11 @@ struct Particle_create_info {
   std::uint64_t collision_mask{0};
   math::Vec3f position{math::Vec3f::zero()};
   math::Vec3f velocity{math::Vec3f::zero()};
-  math::Vec3f acceleration{math::Vec3f::zero()};
-  float damping_factor{1.0f};
   float mass{1.0f};
   float radius{0.0f};
+  float static_friction_coefficient{0.0f};
+  float dynamic_friction_coefficient{0.0f};
+  float restitution_coefficient{0.0f};
 };
 
 struct Particle_motion_event {

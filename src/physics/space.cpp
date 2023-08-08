@@ -320,10 +320,11 @@ struct Particle {
   math::Vec3f previous_position;
   math::Vec3f current_position;
   math::Vec3f velocity;
-  math::Vec3f acceleration;
-  float damping_factor;
   float inverse_mass;
   float radius;
+  float static_friction_coefficient;
+  float dynamic_friction_coefficient;
+  float restitution_coefficient;
 };
 
 struct Static_rigid_body {
@@ -334,12 +335,17 @@ struct Static_rigid_body {
   math::Mat3x4f transform;
   math::Mat3x4f transform_inverse;
   Shape *shape;
+  float static_friction_coefficient;
+  float dynamic_friction_coefficient;
+  float restitution_coefficient;
 };
 
 struct Particle_particle_contact {
   std::array<Particle *, 2> particles;
+  math::Vec3f normal;
   float normal_force_lagrange;
   float tangent_force_lagrange;
+  float separating_velocity;
 };
 
 struct Particle_static_rigid_body_contact {
@@ -356,6 +362,9 @@ constexpr auto contact_offset = 0.1f;
 
 class Space::Impl {
 public:
+  explicit Impl(Space_create_info const &create_info)
+      : _gravitational_acceleration{create_info.gravitational_acceleration} {}
+
   Particle_reference create_particle(Particle_create_info const &create_info) {
     auto const bounding_box =
         Bounding_box{create_info.position - math::Vec3f{create_info.radius,
@@ -374,10 +383,12 @@ public:
         .previous_position = create_info.position,
         .current_position = create_info.position,
         .velocity = create_info.velocity,
-        .acceleration = create_info.acceleration,
-        .damping_factor = create_info.damping_factor,
         .inverse_mass = 1.0f / create_info.mass,
-        .radius = create_info.radius};
+        .radius = create_info.radius,
+        .static_friction_coefficient = create_info.static_friction_coefficient,
+        .dynamic_friction_coefficient =
+            create_info.dynamic_friction_coefficient,
+        .restitution_coefficient = create_info.restitution_coefficient};
     try {
       _particles.emplace(reference, value).first;
     } catch (...) {
@@ -410,7 +421,11 @@ public:
         .collision_mask = create_info.collision_mask,
         .transform = transform,
         .transform_inverse = transform_inverse,
-        .shape = create_info.shape};
+        .shape = create_info.shape,
+        .static_friction_coefficient = create_info.static_friction_coefficient,
+        .dynamic_friction_coefficient =
+            create_info.dynamic_friction_coefficient,
+        .restitution_coefficient = create_info.restitution_coefficient};
     try {
       _static_rigid_bodies.emplace(reference, value).first;
     } catch (...) {
@@ -431,23 +446,22 @@ public:
   void simulate(float delta_time, int substep_count) {
     auto const h = delta_time / substep_count;
     auto const h_inv = 1.0f / h;
-    flatten_particles();
-    flatten_static_rigid_bodies();
     find_contacts(delta_time);
-    // find_particle_particle_collisions();
-    // find_particle_static_rigid_body_collisions();
     for (auto i = 0; i < substep_count; ++i) {
-      for (auto const particle : _flattened_particles) {
-        particle->previous_position = particle->current_position;
-        particle->velocity += h * particle->acceleration;
-        particle->current_position += h * particle->velocity;
+      for (auto &element : _particles) {
+        auto &particle = element.second;
+        particle.previous_position = particle.current_position;
+        particle.velocity += h * _gravitational_acceleration;
+        particle.current_position += h * particle.velocity;
       }
       solve_particle_particle_contact_positions();
       solve_particle_static_rigid_body_contact_positions();
-      for (auto const particle : _flattened_particles) {
-        particle->velocity =
-            h_inv * (particle->current_position - particle->previous_position);
+      for (auto &element : _particles) {
+        auto &particle = element.second;
+        particle.velocity =
+            h_inv * (particle.current_position - particle.previous_position);
       }
+      solve_particle_particle_contact_velocities(h);
       solve_particle_static_rigid_body_contact_velocities(h);
     }
     for (auto &[reference, value] : _particles) {
@@ -461,32 +475,16 @@ public:
   }
 
 private:
-  void flatten_particles() {
-    _flattened_particles.clear();
-    _flattened_particles.reserve(_particles.size());
-    for (auto &pair : _particles) {
-      _flattened_particles.emplace_back(&pair.second);
-    }
-  }
-
-  void flatten_static_rigid_bodies() {
-    _flattened_static_rigid_bodies.clear();
-    _flattened_static_rigid_bodies.reserve(_static_rigid_bodies.size());
-    for (auto &pair : _static_rigid_bodies) {
-      _flattened_static_rigid_bodies.emplace_back(&pair.second);
-    }
-  }
-
   void find_contacts(float delta_time) {
     auto const safety_factor = 1.0f;
-    for (auto const particle : _flattened_particles) {
-      auto const radius =
-          particle->radius +
-          safety_factor * delta_time * math::length(particle->velocity);
+    for (auto const &element : _particles) {
+      auto const &particle = element.second;
+      auto const radius = particle.radius + safety_factor * delta_time *
+                                                math::length(particle.velocity);
       auto const half_extents = math::Vec3f{radius, radius, radius};
-      particle->bounding_box_hierarchy_leaf->bounds = {
-          particle->current_position - half_extents,
-          particle->current_position + half_extents};
+      particle.bounding_box_hierarchy_leaf->bounds = {
+          particle.current_position - half_extents,
+          particle.current_position + half_extents};
     }
     _particle_particle_contacts.clear();
     _particle_static_rigid_body_contacts.clear();
@@ -533,7 +531,6 @@ private:
   }
 
   void solve_particle_particle_contact_positions() {
-    auto const static_friction_coefficient = 1.1f;
     for (auto &contact : _particle_particle_contacts) {
       auto const particle_a = contact.particles[0];
       auto const particle_b = contact.particles[1];
@@ -543,7 +540,7 @@ private:
       auto const contact_distance = particle_a->radius + particle_b->radius;
       auto const contact_distance2 = contact_distance * contact_distance;
       if (distance2 < contact_distance2) {
-        auto const [contact_normal, separation] = [&]() {
+        auto const [normal, separation] = [&]() {
           if (distance2 == 0.0f) {
             // particles coincide, pick arbitrary contact normal
             math::Vec3f const contact_normal{1.0f, 0.0f, 0.0f};
@@ -551,9 +548,9 @@ private:
             return std::tuple{contact_normal, separation};
           } else {
             auto const distance = std::sqrt(distance2);
-            auto const contact_normal = displacement / distance;
+            auto const normal = displacement / distance;
             auto const separation = distance - contact_distance;
-            return std::tuple{contact_normal, separation};
+            return std::tuple{normal, separation};
           }
         }();
         auto const delta_normal_force_lagrange =
@@ -562,19 +559,24 @@ private:
             (particle_a->current_position - particle_a->previous_position) -
             (particle_b->current_position - particle_b->previous_position);
         auto const relative_tangential_motion =
-            relative_motion -
-            math::dot(relative_motion, contact_normal) * contact_normal;
+            relative_motion - math::dot(relative_motion, normal) * normal;
         auto const delta_tangent_force_lagrange =
             math::length(relative_tangential_motion) /
             (particle_a->inverse_mass + particle_b->inverse_mass);
-        contact.normal_force_lagrange += delta_normal_force_lagrange;
-        contact.tangent_force_lagrange += delta_tangent_force_lagrange;
+        contact.normal = normal;
+        contact.normal_force_lagrange = delta_normal_force_lagrange;
+        contact.tangent_force_lagrange = delta_tangent_force_lagrange;
+        contact.separating_velocity =
+            math::dot(particle_a->velocity - particle_b->velocity, normal);
         auto const normal_positional_impulse =
-            delta_normal_force_lagrange * contact_normal;
+            delta_normal_force_lagrange * normal;
         particle_a->current_position +=
             normal_positional_impulse * particle_a->inverse_mass;
         particle_b->current_position -=
             normal_positional_impulse * particle_b->inverse_mass;
+        auto const static_friction_coefficient =
+            0.5f * (particle_a->static_friction_coefficient +
+                    particle_b->static_friction_coefficient);
         if (contact.tangent_force_lagrange <
             static_friction_coefficient * contact.normal_force_lagrange) {
           auto const tangent_positional_impulse =
@@ -585,12 +587,14 @@ private:
           particle_b->current_position -=
               tangent_positional_impulse * particle_b->inverse_mass;
         }
+      } else {
+        contact.normal_force_lagrange = 0.0f;
+        contact.tangent_force_lagrange = 0.0f;
       }
     }
   }
 
   void solve_particle_static_rigid_body_contact_positions() {
-    auto const static_friction_coefficient = 1.1f;
     for (auto &contact : _particle_static_rigid_body_contacts) {
       auto const particle = contact.particle;
       auto const static_rigid_body = contact.static_rigid_body;
@@ -609,61 +613,88 @@ private:
         auto const delta_tangent_force_lagrange =
             math::length(relative_tangential_motion) / particle->inverse_mass;
         contact.normal = contact_geometry->normal;
-        contact.normal_force_lagrange += delta_normal_force_lagrange;
-        contact.tangent_force_lagrange += delta_tangent_force_lagrange;
+        contact.normal_force_lagrange = delta_normal_force_lagrange;
+        contact.tangent_force_lagrange = delta_tangent_force_lagrange;
         contact.separating_velocity =
             math::dot(contact.particle->velocity, contact.normal);
         particle->current_position +=
             contact_geometry->depth * contact_geometry->normal;
+        auto const static_friction_coefficient =
+            0.5f * (particle->static_friction_coefficient +
+                    static_rigid_body->static_friction_coefficient);
         if (contact.tangent_force_lagrange <
             static_friction_coefficient * contact.normal_force_lagrange) {
           particle->current_position -= relative_tangential_motion;
         }
       } else {
-        contact.normal = math::Vec3f::zero();
-        contact.separating_velocity = 0.0f;
+        contact.normal_force_lagrange = 0.0f;
+        contact.tangent_force_lagrange = 0.0f;
       }
     }
   }
 
-  // void solve_particle_particle_contact_velocities(float h) {
-  //   auto const restitution_coefficient = 0.0f;
-  //   auto const dynamic_friction_coefficient = 0.6f;
-  //   for (auto &contact : _particle_particle_contacts) {
-  //     if (contact.normal != math::Vec3f::zero()) {
-  //       auto const v = contact.particle->velocity;
-  //       auto const v_n = math::dot(v, contact.normal);
-  //       auto const v_t = v - contact.normal * v_n;
-  //       auto const v_t_length2 = math::length2(v_t);
-  //       if (v_t_length2 != 0.0f) {
-  //         auto const v_t_length = std::sqrt(v_t_length2);
-  //         auto const friction_delta_velocity =
-  //             -v_t / v_t_length *
-  //             std::min(dynamic_friction_coefficient *
-  //                          contact.normal_force_lagrange / h,
-  //                      v_t_length);
-  //         contact.particle->velocity += friction_delta_velocity;
-  //       }
-  //       // auto const restitution_delta_velocity =
-  //       //     contact.normal * (-v_n + std::max(-restitution_coefficient *
-  //       // contact.separating_velocity,
-  //       //                                       0.0f));
-  //       // contact.particle->velocity += restitution_delta_velocity;
-  //     }
-  //   }
-  // }
+  void solve_particle_particle_contact_velocities(float h) {
+    auto const restitution_threshold =
+        2.0f * math::length(_gravitational_acceleration) * h;
+    for (auto &contact : _particle_particle_contacts) {
+      if (contact.normal_force_lagrange != 0.0f) {
+        auto const v =
+            contact.particles[0]->velocity - contact.particles[1]->velocity;
+        auto const v_n = math::dot(v, contact.normal);
+        auto const v_t = v - contact.normal * v_n;
+        auto const v_t_length2 = math::length2(v_t);
+        if (v_t_length2 != 0.0f) {
+          auto const v_t_length = std::sqrt(v_t_length2);
+          auto const dynamic_friction_coefficient =
+              0.5f * (contact.particles[0]->dynamic_friction_coefficient +
+                      contact.particles[1]->dynamic_friction_coefficient);
+          auto const friction_delta_velocity =
+              -v_t / v_t_length *
+              std::min(dynamic_friction_coefficient *
+                           contact.normal_force_lagrange / h,
+                       v_t_length);
+          auto const friction_velocity_impulse =
+              friction_delta_velocity / (contact.particles[0]->inverse_mass +
+                                         contact.particles[1]->inverse_mass);
+          contact.particles[0]->velocity +=
+              friction_velocity_impulse * contact.particles[0]->inverse_mass;
+          contact.particles[1]->velocity -=
+              friction_velocity_impulse * contact.particles[1]->inverse_mass;
+        }
+        auto const restitution_coefficient =
+            std::abs(v_n) > restitution_threshold
+                ? 0.5f * (contact.particles[0]->restitution_coefficient +
+                          contact.particles[1]->restitution_coefficient)
+                : 0.0f;
+        auto const restitution_delta_velocity =
+            contact.normal * (-v_n + std::max(-restitution_coefficient *
+                                                  contact.separating_velocity,
+                                              0.0f));
+        auto const restitution_velocity_impulse =
+            restitution_delta_velocity / (contact.particles[0]->inverse_mass +
+                                          contact.particles[1]->inverse_mass);
+        contact.particles[0]->velocity +=
+            restitution_velocity_impulse * contact.particles[0]->inverse_mass;
+        contact.particles[1]->velocity -=
+            restitution_velocity_impulse * contact.particles[1]->inverse_mass;
+      }
+    }
+  }
 
   void solve_particle_static_rigid_body_contact_velocities(float h) {
-    auto const restitution_coefficient = 0.0f;
-    auto const dynamic_friction_coefficient = 0.6f;
+    auto const restitution_threshold =
+        2.0f * math::length(_gravitational_acceleration) * h;
     for (auto &contact : _particle_static_rigid_body_contacts) {
-      if (contact.normal != math::Vec3f::zero()) {
+      if (contact.normal_force_lagrange != 0.0f) {
         auto const v = contact.particle->velocity;
         auto const v_n = math::dot(v, contact.normal);
         auto const v_t = v - contact.normal * v_n;
         auto const v_t_length2 = math::length2(v_t);
         if (v_t_length2 != 0.0f) {
           auto const v_t_length = std::sqrt(v_t_length2);
+          auto const dynamic_friction_coefficient =
+              0.5f * (contact.particle->dynamic_friction_coefficient +
+                      contact.static_rigid_body->dynamic_friction_coefficient);
           auto const friction_delta_velocity =
               -v_t / v_t_length *
               std::min(dynamic_friction_coefficient *
@@ -671,6 +702,11 @@ private:
                        v_t_length);
           contact.particle->velocity += friction_delta_velocity;
         }
+        auto const restitution_coefficient =
+            std::abs(v_n) > restitution_threshold
+                ? 0.5f * (contact.particle->restitution_coefficient +
+                          contact.static_rigid_body->restitution_coefficient)
+                : 0.0f;
         auto const restitution_delta_velocity =
             contact.normal * (-v_n + std::max(-restitution_coefficient *
                                                   contact.separating_velocity,
@@ -685,16 +721,16 @@ private:
   ankerl::unordered_dense::map<Particle_reference, Particle> _particles;
   ankerl::unordered_dense::map<Static_rigid_body_reference, Static_rigid_body>
       _static_rigid_bodies;
-  std::vector<Particle *> _flattened_particles;
-  std::vector<Static_rigid_body *> _flattened_static_rigid_bodies;
   std::vector<Particle_particle_contact> _particle_particle_contacts;
   std::vector<Particle_static_rigid_body_contact>
       _particle_static_rigid_body_contacts;
   std::uint64_t _next_particle_reference_value{};
   std::uint64_t _next_static_rigid_body_reference_value{};
+  math::Vec3f _gravitational_acceleration;
 };
 
-Space::Space() : _impl{std::make_unique<Impl>()} {}
+Space::Space(Space_create_info const &create_info)
+    : _impl{std::make_unique<Impl>(create_info)} {}
 
 Space::~Space() {}
 

@@ -14,6 +14,9 @@ struct Static_prop_entity_manager_create_info {
   float surface_scale{1.0f};
   physics::Space *space{};
   physics::Shape *shape{};
+  float static_friction_coefficient{0.0f};
+  float dynamic_friction_coefficient{0.0f};
+  float restitution_coefficient{0.0f};
 };
 
 class Static_prop_entity_manager : public Entity_manager {
