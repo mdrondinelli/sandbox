@@ -20,7 +20,7 @@
             "architecture": {
                 "value": "x64"
             }
-        }
+        },
         {
             "name": "UBSan",
             "displayName": "",
