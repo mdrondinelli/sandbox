@@ -441,11 +441,11 @@ public:
     _static_rigid_bodies.erase(it);
   }
 
-  void simulate(float delta_time, int substep_count) {
-    auto const h = delta_time / substep_count;
+  void simulate(Space_simulate_info const &simulate_info) {
+    auto const h = simulate_info.delta_time / simulate_info.substep_count;
     auto const h_inv = 1.0f / h;
-    find_contacts(delta_time);
-    for (auto i = 0; i < substep_count; ++i) {
+    find_contacts(simulate_info.delta_time);
+    for (auto i = 0; i < simulate_info.substep_count; ++i) {
       for (auto &element : _particles) {
         auto &particle = element.second;
         particle.previous_position = particle.current_position;
@@ -463,8 +463,6 @@ public:
       solve_particle_static_rigid_body_contact_velocities(h);
     }
     for (auto &[reference, value] : _particles) {
-      // auto const damping_factor = std::pow(value.damping_factor, delta_time);
-      // value.velocity *= damping_factor;
       if (value.motion_callback != nullptr) {
         value.motion_callback->on_particle_motion(
             {reference, value.current_position, value.velocity});
@@ -751,8 +749,8 @@ void Space::destroy_static_rigid_body(
   _impl->destroy_static_rigid_body(static_rigid_body);
 }
 
-void Space::simulate(float delta_time, int substep_count) {
-  _impl->simulate(delta_time, substep_count);
+void Space::simulate(Space_simulate_info const &simulate_info) {
+  _impl->simulate(simulate_info);
 }
 } // namespace physics
 } // namespace marlon

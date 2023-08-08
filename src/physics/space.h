@@ -32,7 +32,7 @@ public:
 
   void destroy_static_rigid_body(Static_rigid_body_reference static_rigid_body);
 
-  void simulate(float delta_time, int substep_count);
+  void simulate(Space_simulate_info const &simulate_info);
 
 private:
   class Impl;
