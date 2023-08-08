@@ -2,7 +2,27 @@
     "version": 6,
     "configurePresets": [
         {
-            "name": "Release",
+            "name": "msvc-release",
+            "displayName": "",
+            "description": "",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe",
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_TOOLCHAIN_FILE": {
+                    "value": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                    "type": "FILEPATH"
+                }
+            },
+            "architecture": {
+                "value": "x64"
+            }
+        },
+        {
+            "name": "clang-release",
             "displayName": "",
             "description": "",
             "generator": "Ninja",
@@ -22,7 +42,7 @@
             }
         },
         {
-            "name": "UBSan",
+            "name": "clang-ubsan",
             "displayName": "",
             "description": "",
             "generator": "Ninja",

@@ -18,7 +18,9 @@
     Online:
         https://glad.dav1d.de/#profile=core&language=c&specification=gl&loader=on&api=gl%3D4.6
 */
+#ifdef __clang__
 #pragma clang diagnostic ignored "-Wlanguage-extension-token"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>

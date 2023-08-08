@@ -47,7 +47,9 @@ bool Glfw_shared_instance::owns() const noexcept { return _owns; }
 
 void Glfw_shared_instance::swap(Glfw_shared_instance &other) noexcept { std::swap(_owns, other._owns); }
 
+#ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-function"
+#endif
 
 TEST_CASE("Glfw_shared_instance") {
   REQUIRE(instance_count == 0);

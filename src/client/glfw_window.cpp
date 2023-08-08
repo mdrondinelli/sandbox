@@ -26,7 +26,9 @@ Glfw_unique_window_ptr make_glfw_unique_window(int width, int height,
   return Glfw_unique_window_ptr{window};
 }
 
+#ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-function"
+#endif
 
 TEST_CASE("Glfw_unique_window_ptr") {
   REQUIRE_THROWS(make_glfw_unique_window(800, 600, "title"));
