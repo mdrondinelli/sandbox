@@ -14,6 +14,11 @@ public:
     return Mat<T, 2, M>{Vec<T, M>::zero(), Vec<T, M>::zero()};
   }
 
+  static auto identity() {
+    static_assert(M == 2);
+    return Mat<T, 2, 2>{Vec<T, 2>{T(1), T(0)}, Vec<T, 2>{T(0), T(1)}};
+  }
+
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1) noexcept
       : rows{row0, row1} {}
 
@@ -34,6 +39,13 @@ public:
   static auto zero() {
     return Mat<T, 3, M>{Vec<T, M>::zero(), Vec<T, M>::zero(),
                         Vec<T, M>::zero()};
+  }
+
+  static auto identity() {
+    static_assert(M == 3);
+    return Mat<T, 3, 3>{Vec<T, 3>{T(1), T(0), T(0)},
+                        Vec<T, 3>{T(0), T(1), T(0)},
+                        Vec<T, 3>{T(0), T(0), T(1)}};
   }
 
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
@@ -58,6 +70,14 @@ public:
   static auto zero() {
     return Mat<T, 4, M>{Vec<T, M>::zero(), Vec<T, M>::zero(), Vec<T, M>::zero(),
                         Vec<T, M>::zero()};
+  }
+
+  static auto identity() {
+    static_assert(M == 4);
+    return Mat<T, 4, 4>{Vec<T, 4>{T(1), T(0), T(0), T(0)},
+                        Vec<T, 4>{T(0), T(1), T(0), T(0)},
+                        Vec<T, 4>{T(0), T(0), T(1), T(0)},
+                        Vec<T, 4>{T(0), T(0), T(0), T(1)}};
   }
 
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
