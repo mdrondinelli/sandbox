@@ -51,12 +51,8 @@ set(
 add_executable(
   client ${CLIENT_SOURCES} "src/client/main.cpp")
 add_executable(client_tests ${CLIENT_SOURCES})
-set_property(TARGET client PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-set_property(TARGET graphics PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-set_property(TARGET physics PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set_target_properties(client graphics physics PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)
-# target_compile_definitions(graphics PRIVATE)
-# target_compile_definitions(physics PRIVATE)
 target_include_directories(client PRIVATE include)
 target_include_directories(client_tests PRIVATE include)
 target_include_directories(graphics PRIVATE include)
