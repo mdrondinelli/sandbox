@@ -474,11 +474,15 @@ public:
 
 private:
   void find_contacts(float delta_time) {
-    auto const safety_factor = 1.0f;
+    auto const safety_factor = 2.0f;
+    auto const gravity_term =
+        math::length(_gravitational_acceleration) * delta_time * delta_time;
     for (auto const &element : _particles) {
       auto const &particle = element.second;
-      auto const radius = particle.radius + safety_factor * delta_time *
-                                                math::length(particle.velocity);
+      auto const radius =
+          particle.radius +
+          safety_factor * delta_time * math::length(particle.velocity) +
+          gravity_term;
       auto const half_extents = math::Vec3f{radius, radius, radius};
       particle.bounding_box_hierarchy_leaf->bounds = {
           particle.current_position - half_extents,
@@ -596,10 +600,11 @@ private:
     for (auto &contact : _particle_static_rigid_body_contacts) {
       auto const particle = contact.particle;
       auto const static_rigid_body = contact.static_rigid_body;
-      if (auto contact_geometry = static_rigid_body->shape->collide_particle(
-              static_rigid_body->transform,
-              static_rigid_body->transform_inverse, particle->current_position,
-              particle->radius)) {
+      if (auto const contact_geometry =
+              static_rigid_body->shape->collide_particle(
+                  static_rigid_body->transform,
+                  static_rigid_body->transform_inverse,
+                  particle->current_position, particle->radius)) {
         auto const delta_normal_force_lagrange =
             contact_geometry->depth * particle->mass;
         auto const relative_motion =

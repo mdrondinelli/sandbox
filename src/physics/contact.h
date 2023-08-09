@@ -5,8 +5,7 @@
 
 namespace marlon {
 namespace physics {
-struct Contact {
-  math::Vec3f position;
+struct Particle_contact {
   math::Vec3f normal;
   float depth;
 };

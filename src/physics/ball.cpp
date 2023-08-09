@@ -11,7 +11,7 @@ Bounding_box Ball::get_bounds(math::Mat3x4f const &transform) const noexcept {
            transform[2][3] + _radius}};
 }
 
-std::optional<Contact>
+std::optional<Particle_contact>
 Ball::collide_particle(math::Mat3x4f const &shape_transform,
                        math::Mat3x4f const & /*shape_transform_inverse*/,
                        math::Vec3f const &particle_position,
@@ -25,9 +25,8 @@ Ball::collide_particle(math::Mat3x4f const &shape_transform,
   if (distance2 <= contact_distance2) {
     auto const distance = std::sqrt(distance2);
     auto const normal = displacement / distance;
-    return Contact{.position = -particle_radius * normal + particle_position,
-                   .normal = normal,
-                   .depth = contact_distance - distance};
+    return Particle_contact{.normal = normal,
+                            .depth = contact_distance - distance};
   } else {
     return std::nullopt;
   }

@@ -50,7 +50,7 @@ Bounding_box Box::get_bounds(math::Mat3x4f const &transform) const noexcept {
   return bounds;
 }
 
-std::optional<Contact>
+std::optional<Particle_contact>
 Box::collide_particle(math::Mat3x4f const &shape_transform,
                       math::Mat3x4f const &shape_transform_inverse,
                       math::Vec3f const &particle_position,
@@ -102,34 +102,8 @@ Box::collide_particle(math::Mat3x4f const &shape_transform,
         face_distances.begin();
     auto const depth = face_distances[face_index] + particle_radius;
     auto const normal = face_normals[face_index];
-    auto const position = math::Vec3f{
-        shape_transform[0][0] * shape_space_clamped_particle_position[0] +
-            shape_transform[0][1] * shape_space_clamped_particle_position[1] +
-            shape_transform[0][2] * shape_space_clamped_particle_position[2] +
-            shape_transform[0][3],
-        shape_transform[1][0] * shape_space_clamped_particle_position[0] +
-            shape_transform[1][1] * shape_space_clamped_particle_position[1] +
-            shape_transform[1][2] * shape_space_clamped_particle_position[2] +
-            shape_transform[1][3],
-        shape_transform[2][0] * shape_space_clamped_particle_position[0] +
-            shape_transform[2][1] * shape_space_clamped_particle_position[1] +
-            shape_transform[2][2] * shape_space_clamped_particle_position[2] +
-            shape_transform[2][3]};
-    return Contact{.position = position, .normal = normal, .depth = depth};
+    return Particle_contact{.normal = normal, .depth = depth};
   } else if (distance2 <= particle_radius2) {
-    auto const position = math::Vec3f{
-        shape_transform[0][0] * shape_space_clamped_particle_position[0] +
-            shape_transform[0][1] * shape_space_clamped_particle_position[1] +
-            shape_transform[0][2] * shape_space_clamped_particle_position[2] +
-            shape_transform[0][3],
-        shape_transform[1][0] * shape_space_clamped_particle_position[0] +
-            shape_transform[1][1] * shape_space_clamped_particle_position[1] +
-            shape_transform[1][2] * shape_space_clamped_particle_position[2] +
-            shape_transform[1][3],
-        shape_transform[2][0] * shape_space_clamped_particle_position[0] +
-            shape_transform[2][1] * shape_space_clamped_particle_position[1] +
-            shape_transform[2][2] * shape_space_clamped_particle_position[2] +
-            shape_transform[2][3]};
     auto const normal = math::normalize(
         math::Vec3f{shape_transform[0][0] * displacement[0] +
                         shape_transform[0][1] * displacement[1] +
@@ -140,9 +114,8 @@ Box::collide_particle(math::Mat3x4f const &shape_transform,
                     shape_transform[2][0] * displacement[0] +
                         shape_transform[2][1] * displacement[1] +
                         shape_transform[2][2] * displacement[2]});
-    return Contact{.position = position,
-                   .normal = normal,
-                   .depth = particle_radius - std::sqrt(distance2)};
+    return Particle_contact{.normal = normal,
+                            .depth = particle_radius - std::sqrt(distance2)};
   } else {
     return std::nullopt;
   }

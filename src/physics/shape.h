@@ -18,7 +18,7 @@ public:
   virtual Bounding_box
   get_bounds(math::Mat3x4f const &transform) const noexcept = 0;
 
-  virtual std::optional<Contact>
+  virtual std::optional<Particle_contact>
   collide_particle(math::Mat3x4f const &shape_transform,
                    math::Mat3x4f const &shape_transform_inverse,
                    math::Vec3f const &particle_position,

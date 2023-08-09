@@ -3,7 +3,7 @@
 
 #include "ball.h"
 #include "box.h"
-#include "half_space.h"
+#include "bounding_box.h"
 #include "particle.h"
 #include "shape.h"
 #include "space.h"
