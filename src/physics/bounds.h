@@ -1,5 +1,5 @@
-#ifndef MARLON_PHYSICS_BOUNDING_BOX_H
-#define MARLON_PHYSICS_BOUNDING_BOX_H
+#ifndef MARLON_PHYSICS_BOUNDS_H
+#define MARLON_PHYSICS_BOUNDS_H
 
 #include "../math/vec.h"
 
