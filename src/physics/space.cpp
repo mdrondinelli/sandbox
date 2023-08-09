@@ -321,7 +321,7 @@ struct Particle {
   math::Vec3f current_position;
   math::Vec3f velocity;
   float mass;
-  float inverse_mass;
+  float mass_inverse;
   float radius;
   float static_friction_coefficient;
   float dynamic_friction_coefficient;
@@ -383,7 +383,7 @@ public:
         .current_position = create_info.position,
         .velocity = create_info.velocity,
         .mass = create_info.mass,
-        .inverse_mass = 1.0f / create_info.mass,
+        .mass_inverse = 1.0f / create_info.mass,
         .radius = create_info.radius,
         .static_friction_coefficient = create_info.static_friction_coefficient,
         .dynamic_friction_coefficient =
@@ -556,7 +556,7 @@ private:
           }
         }();
         auto const delta_normal_force_lagrange =
-            -separation / (particle_a->inverse_mass + particle_b->inverse_mass);
+            -separation / (particle_a->mass_inverse + particle_b->mass_inverse);
         auto const relative_motion =
             (particle_a->current_position - particle_a->previous_position) -
             (particle_b->current_position - particle_b->previous_position);
@@ -564,7 +564,7 @@ private:
             relative_motion - math::dot(relative_motion, normal) * normal;
         auto const delta_tangent_force_lagrange =
             math::length(relative_tangential_motion) /
-            (particle_a->inverse_mass + particle_b->inverse_mass);
+            (particle_a->mass_inverse + particle_b->mass_inverse);
         contact.normal = normal;
         contact.normal_force_lagrange = delta_normal_force_lagrange;
         contact.tangent_force_lagrange = delta_tangent_force_lagrange;
@@ -573,9 +573,9 @@ private:
         auto const normal_positional_impulse =
             delta_normal_force_lagrange * normal;
         particle_a->current_position +=
-            normal_positional_impulse * particle_a->inverse_mass;
+            normal_positional_impulse * particle_a->mass_inverse;
         particle_b->current_position -=
-            normal_positional_impulse * particle_b->inverse_mass;
+            normal_positional_impulse * particle_b->mass_inverse;
         auto const static_friction_coefficient =
             0.5f * (particle_a->static_friction_coefficient +
                     particle_b->static_friction_coefficient);
@@ -583,11 +583,11 @@ private:
             static_friction_coefficient * contact.normal_force_lagrange) {
           auto const tangent_positional_impulse =
               -relative_tangential_motion /
-              (particle_a->inverse_mass + particle_b->inverse_mass);
+              (particle_a->mass_inverse + particle_b->mass_inverse);
           particle_a->current_position +=
-              tangent_positional_impulse * particle_a->inverse_mass;
+              tangent_positional_impulse * particle_a->mass_inverse;
           particle_b->current_position -=
-              tangent_positional_impulse * particle_b->inverse_mass;
+              tangent_positional_impulse * particle_b->mass_inverse;
         }
       } else {
         contact.normal_force_lagrange = 0.0f;
@@ -606,7 +606,7 @@ private:
                   static_rigid_body->transform_inverse,
                   particle->current_position, particle->radius)) {
         auto const delta_normal_force_lagrange =
-            contact_geometry->depth * particle->mass;
+            -contact_geometry->separation * particle->mass;
         auto const relative_motion =
             particle->current_position - particle->previous_position;
         auto const relative_tangential_motion =
@@ -621,7 +621,7 @@ private:
         contact.separating_velocity =
             math::dot(contact.particle->velocity, contact.normal);
         particle->current_position +=
-            contact_geometry->depth * contact_geometry->normal;
+            -contact_geometry->separation * contact_geometry->normal;
         auto const static_friction_coefficient =
             0.5f * (particle->static_friction_coefficient +
                     static_rigid_body->static_friction_coefficient);
@@ -657,12 +657,12 @@ private:
                            contact.normal_force_lagrange / h,
                        v_t_length);
           auto const friction_velocity_impulse =
-              friction_delta_velocity / (contact.particles[0]->inverse_mass +
-                                         contact.particles[1]->inverse_mass);
+              friction_delta_velocity / (contact.particles[0]->mass_inverse +
+                                         contact.particles[1]->mass_inverse);
           contact.particles[0]->velocity +=
-              friction_velocity_impulse * contact.particles[0]->inverse_mass;
+              friction_velocity_impulse * contact.particles[0]->mass_inverse;
           contact.particles[1]->velocity -=
-              friction_velocity_impulse * contact.particles[1]->inverse_mass;
+              friction_velocity_impulse * contact.particles[1]->mass_inverse;
         }
         auto const restitution_coefficient =
             std::abs(v_n) > restitution_threshold
@@ -674,12 +674,12 @@ private:
                                                   contact.separating_velocity,
                                               0.0f));
         auto const restitution_velocity_impulse =
-            restitution_delta_velocity / (contact.particles[0]->inverse_mass +
-                                          contact.particles[1]->inverse_mass);
+            restitution_delta_velocity / (contact.particles[0]->mass_inverse +
+                                          contact.particles[1]->mass_inverse);
         contact.particles[0]->velocity +=
-            restitution_velocity_impulse * contact.particles[0]->inverse_mass;
+            restitution_velocity_impulse * contact.particles[0]->mass_inverse;
         contact.particles[1]->velocity -=
-            restitution_velocity_impulse * contact.particles[1]->inverse_mass;
+            restitution_velocity_impulse * contact.particles[1]->mass_inverse;
       }
     }
   }

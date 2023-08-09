@@ -26,7 +26,7 @@ Ball::collide_particle(math::Mat3x4f const &shape_transform,
     auto const distance = std::sqrt(distance2);
     auto const normal = displacement / distance;
     return Particle_contact{.normal = normal,
-                            .depth = contact_distance - distance};
+                            .separation = distance - contact_distance};
   } else {
     return std::nullopt;
   }

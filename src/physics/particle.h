@@ -36,6 +36,11 @@ struct Particle_motion_event {
   math::Vec3f velocity;
 };
 
+struct Particle_contact {
+  math::Vec3f normal;
+  float separation;
+};
+
 class Particle_construction_queue {
 public:
   void push(Particle_create_info const &create_info);

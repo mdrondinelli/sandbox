@@ -7,7 +7,7 @@
 #include "../math/quat.h"
 #include "../math/vec.h"
 #include "bounding_box.h"
-#include "contact.h"
+#include "particle.h"
 
 namespace marlon {
 namespace physics {

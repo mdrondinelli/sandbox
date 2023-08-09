@@ -100,9 +100,9 @@ Box::collide_particle(math::Mat3x4f const &shape_transform,
     auto const face_index =
         std::min_element(face_distances.begin(), face_distances.end()) -
         face_distances.begin();
-    auto const depth = face_distances[face_index] + particle_radius;
+    auto const separation = -face_distances[face_index] - particle_radius;
     auto const normal = face_normals[face_index];
-    return Particle_contact{.normal = normal, .depth = depth};
+    return Particle_contact{.normal = normal, .separation = separation};
   } else if (distance2 <= particle_radius2) {
     auto const normal = math::normalize(
         math::Vec3f{shape_transform[0][0] * displacement[0] +
@@ -114,8 +114,9 @@ Box::collide_particle(math::Mat3x4f const &shape_transform,
                     shape_transform[2][0] * displacement[0] +
                         shape_transform[2][1] * displacement[1] +
                         shape_transform[2][2] * displacement[2]});
-    return Particle_contact{.normal = normal,
-                            .depth = particle_radius - std::sqrt(distance2)};
+    auto const distance = std::sqrt(distance2);
+    auto const separation = distance - particle_radius;
+    return Particle_contact{.normal = normal, .separation = separation};
   } else {
     return std::nullopt;
   }
