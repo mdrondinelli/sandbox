@@ -24,8 +24,7 @@ inline Bounds expand(Bounds const &box, float amount) noexcept {
           box.max + math::Vec3f{amount, amount, amount}};
 }
 
-inline Bounds merge(Bounds const &first,
-                          Bounds const &second) noexcept {
+inline Bounds merge(Bounds const &first, Bounds const &second) noexcept {
   return {
       {std::min(first.min.x, second.min.x), std::min(first.min.y, second.min.y),
        std::min(first.min.z, second.min.z)},
@@ -33,8 +32,7 @@ inline Bounds merge(Bounds const &first,
        std::max(first.max.z, second.max.z)}};
 }
 
-inline bool overlaps(Bounds const &first,
-                     Bounds const &second) noexcept {
+inline bool overlaps(Bounds const &first, Bounds const &second) noexcept {
   return first.min.x < second.max.x && first.min.y < second.max.y &&
          first.min.z < second.max.z && second.min.x < first.max.x &&
          second.min.y < first.max.y && second.min.z < first.max.z;
