@@ -22,7 +22,7 @@ struct Dynamic_rigid_body_create_info {
   math::Quatf orientation{math::Quatf::identity()};
   math::Vec3f angular_velocity{math::Vec3f::zero()};
   math::Mat3x3f inertia_tensor{math::Mat3x3f::identity()};
-  Shape *shape{};
+  Shape shape;
   float static_friction_coefficient{};
   float dynamic_friction_coefficient{};
   float restitution_coefficient{};
