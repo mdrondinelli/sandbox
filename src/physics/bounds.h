@@ -10,13 +10,17 @@ struct Bounds {
   math::Vec3f max;
 };
 
-inline float volume(Bounds const &box) noexcept {
-  auto const d = box.max - box.min;
-  return d.x * d.y * d.z;
+inline math::Vec3f center(Bounds const &box) noexcept {
+  return 0.5f * (box.min + box.max);
 }
 
-inline math::Vec3f centroid(Bounds const &box) noexcept {
-  return 0.5f * (box.min + box.max);
+inline math::Vec3f extents(Bounds const &box) noexcept {
+  return box.max - box.min;
+}
+
+inline float volume(Bounds const &box) noexcept {
+  auto const d = extents(box);
+  return d.x * d.y * d.z;
 }
 
 inline Bounds expand(Bounds const &box, float amount) noexcept {

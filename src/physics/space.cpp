@@ -168,12 +168,12 @@ private:
     for (auto it = leaf_nodes.begin() + 1; it != leaf_nodes.end(); ++it) {
       node->bounds = merge(node->bounds, (*it)->bounds);
     }
-    auto const means = 0.5f * (node->bounds.min + node->bounds.max);
-    auto const ranges = node->bounds.max - node->bounds.min;
+    auto const node_center = center(node->bounds);
+    auto const node_extents = extents(node->bounds);
     auto const axis_indices = [&]() {
       auto retval = std::array{0, 1, 2};
       auto const bubble = [&](auto const index) {
-        if (ranges[retval[index]] < ranges[retval[index + 1]]) {
+        if (node_extents[retval[index]] < node_extents[retval[index + 1]]) {
           std::swap(retval[index], retval[index + 1]);
         }
       };
@@ -184,7 +184,7 @@ private:
     }();
     for (auto const axis_index : axis_indices) {
       auto const partition_iterator =
-          partition(leaf_nodes, axis_index, means[axis_index]);
+          partition(leaf_nodes, axis_index, node_center[axis_index]);
       auto const partitions = std::array<std::span<Node *>, 2>{
           std::span{leaf_nodes.begin(), partition_iterator},
           std::span{partition_iterator, leaf_nodes.end()}};
