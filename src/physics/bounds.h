@@ -5,27 +5,27 @@
 
 namespace marlon {
 namespace physics {
-struct Bounding_box {
+struct Bounds {
   math::Vec3f min;
   math::Vec3f max;
 };
 
-inline float volume(Bounding_box const &box) noexcept {
+inline float volume(Bounds const &box) noexcept {
   auto const d = box.max - box.min;
   return d.x * d.y * d.z;
 }
 
-inline math::Vec3f centroid(Bounding_box const &box) noexcept {
+inline math::Vec3f centroid(Bounds const &box) noexcept {
   return 0.5f * (box.min + box.max);
 }
 
-inline Bounding_box expand(Bounding_box const &box, float amount) noexcept {
+inline Bounds expand(Bounds const &box, float amount) noexcept {
   return {box.min - math::Vec3f{amount, amount, amount},
           box.max + math::Vec3f{amount, amount, amount}};
 }
 
-inline Bounding_box merge(Bounding_box const &first,
-                          Bounding_box const &second) noexcept {
+inline Bounds merge(Bounds const &first,
+                          Bounds const &second) noexcept {
   return {
       {std::min(first.min.x, second.min.x), std::min(first.min.y, second.min.y),
        std::min(first.min.z, second.min.z)},
@@ -33,8 +33,8 @@ inline Bounding_box merge(Bounding_box const &first,
        std::max(first.max.z, second.max.z)}};
 }
 
-inline bool overlaps(Bounding_box const &first,
-                     Bounding_box const &second) noexcept {
+inline bool overlaps(Bounds const &first,
+                     Bounds const &second) noexcept {
   return first.min.x < second.max.x && first.min.y < second.max.y &&
          first.min.z < second.max.z && second.min.x < first.max.x &&
          second.min.y < first.max.y && second.min.z < first.max.z;

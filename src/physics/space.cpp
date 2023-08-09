@@ -7,7 +7,7 @@
 
 #include <ankerl/unordered_dense.h>
 
-#include "bounding_box.h"
+#include "bounds.h"
 
 namespace marlon {
 namespace physics {
@@ -17,11 +17,11 @@ template <typename LeafPayload> class Bounding_box_hierarchy {
 public:
   struct Node {
     Node *parent;
-    Bounding_box bounds;
+    Bounds bounds;
     std::variant<std::array<Node *, 2>, LeafPayload> payload;
   };
 
-  Node *create_leaf(Bounding_box const &bounds, LeafPayload const &payload) {
+  Node *create_leaf(Bounds const &bounds, LeafPayload const &payload) {
     auto const node = _node_pool.alloc();
     try {
       _leaf_nodes.emplace(node);
@@ -366,7 +366,7 @@ public:
 
   Particle_reference create_particle(Particle_create_info const &create_info) {
     auto const bounding_box =
-        Bounding_box{create_info.position - math::Vec3f{create_info.radius,
+        Bounds{create_info.position - math::Vec3f{create_info.radius,
                                                         create_info.radius,
                                                         create_info.radius},
                      create_info.position + math::Vec3f{create_info.radius,

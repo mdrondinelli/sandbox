@@ -1,7 +1,7 @@
 #ifndef MARLON_PHYSICS_PHYSICS_H
 #define MARLON_PHYSICS_PHYSICS_H
 
-#include "bounding_box.h"
+#include "bounds.h"
 #include "particle.h"
 #include "shape.h"
 #include "space.h"

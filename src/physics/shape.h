@@ -10,7 +10,7 @@
 #include "../math/vec.h"
 #include "../math/mat.h"
 #include "particle.h"
-#include "bounding_box.h"
+#include "bounds.h"
 
 namespace marlon {
 namespace physics {
@@ -24,12 +24,12 @@ struct Box {
   float half_depth;
 };
 
-inline Bounding_box bounds(Ball const &ball, math::Vec3f const &position) {
+inline Bounds bounds(Ball const &ball, math::Vec3f const &position) {
   return {.min = position - math::Vec3f::all(ball.radius),
           .max = position + math::Vec3f::all(ball.radius)};
 }
 
-inline Bounding_box bounds(Box const &box,
+inline Bounds bounds(Box const &box,
                            math::Mat3x4f const &transform) noexcept {
   auto const shape_space_points = std::array<math::Vec3f, 8>{
       math::Vec3f{-box.half_width, -box.half_height, -box.half_depth},
@@ -57,7 +57,7 @@ inline Bounding_box bounds(Box const &box,
                           transform[2][2] * shape_space_point.z +
                           transform[2][3];
   }
-  auto bounds = Bounding_box{world_space_points[0], world_space_points[0]};
+  auto bounds = Bounds{world_space_points[0], world_space_points[0]};
   for (auto i = 1; i < 8; ++i) {
     auto const &world_space_point = world_space_points[i];
     bounds.min.x = std::min(bounds.min.x, world_space_point.x);
@@ -169,7 +169,7 @@ public:
 
   Shape(Box const &box) noexcept : _v{box} {}
 
-  friend Bounding_box bounds(Shape const &shape,
+  friend Bounds bounds(Shape const &shape,
                              math::Mat3x4f const &shape_transform) noexcept {
     return std::visit(
         [&](auto &&arg) {
