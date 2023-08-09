@@ -7,10 +7,10 @@
 #include <type_traits>
 #include <variant>
 
-#include "../math/vec.h"
 #include "../math/mat.h"
-#include "particle.h"
+#include "../math/vec.h"
 #include "bounds.h"
+#include "particle.h"
 
 namespace marlon {
 namespace physics {
@@ -24,13 +24,31 @@ struct Box {
   float half_depth;
 };
 
+class Shape {
+public:
+  Shape(Ball const &ball) noexcept : _v{ball} {}
+
+  Shape(Box const &box) noexcept : _v{box} {}
+
+  friend Bounds bounds(Shape const &shape,
+                       math::Mat3x4f const &shape_transform) noexcept;
+
+  friend std::optional<Particle_contact>
+  find_particle_contact(math::Vec3f const &particle_position,
+                        float particle_radius, Shape const &shape,
+                        math::Mat3x4f const &shape_transform,
+                        math::Mat3x4f const &shape_transform_inverse) noexcept;
+
+private:
+  std::variant<Ball, Box> _v;
+};
+
 inline Bounds bounds(Ball const &ball, math::Vec3f const &position) {
   return {.min = position - math::Vec3f::all(ball.radius),
           .max = position + math::Vec3f::all(ball.radius)};
 }
 
-inline Bounds bounds(Box const &box,
-                           math::Mat3x4f const &transform) noexcept {
+inline Bounds bounds(Box const &box, math::Mat3x4f const &transform) noexcept {
   auto const shape_space_points = std::array<math::Vec3f, 8>{
       math::Vec3f{-box.half_width, -box.half_height, -box.half_depth},
       math::Vec3f{-box.half_width, -box.half_height, box.half_depth},
@@ -163,55 +181,45 @@ find_particle_contact(math::Vec3f const &particle_position,
   }
 }
 
-class Shape {
-public:
-  Shape(Ball const &ball) noexcept : _v{ball} {}
+inline Bounds bounds(Shape const &shape,
+                     math::Mat3x4f const &shape_transform) noexcept {
+  return std::visit(
+      [&](auto &&arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, Ball>) {
+          return bounds(arg, math::Vec3f{shape_transform[0][3],
+                                         shape_transform[1][3],
+                                         shape_transform[2][3]});
+        } else {
+          static_assert(std::is_same_v<T, Box>);
+          return bounds(arg, shape_transform);
+        }
+      },
+      shape._v);
+}
 
-  Shape(Box const &box) noexcept : _v{box} {}
-
-  friend Bounds bounds(Shape const &shape,
-                             math::Mat3x4f const &shape_transform) noexcept {
-    return std::visit(
-        [&](auto &&arg) {
-          using T = std::decay_t<decltype(arg)>;
-          if constexpr (std::is_same_v<T, Ball>) {
-            return bounds(arg, math::Vec3f{shape_transform[0][3],
-                                           shape_transform[1][3],
-                                           shape_transform[2][3]});
-          } else {
-            static_assert(std::is_same_v<T, Box>);
-            return bounds(arg, shape_transform);
-          }
-        },
-        shape._v);
-  }
-
-  friend std::optional<Particle_contact>
-  find_particle_contact(math::Vec3f const &particle_position,
-                        float particle_radius, Shape const &shape,
-                        math::Mat3x4f const &shape_transform,
-                        math::Mat3x4f const &shape_transform_inverse) noexcept {
-    return std::visit(
-        [&](auto &&arg) {
-          using T = std::decay_t<decltype(arg)>;
-          if constexpr (std::is_same_v<T, Ball>) {
-            return find_particle_contact(
-                particle_position, particle_radius, arg,
-                math::Vec3f{shape_transform[0][3], shape_transform[1][3],
-                            shape_transform[2][3]});
-          } else {
-            static_assert(std::is_same_v<T, Box>);
-            return find_particle_contact(particle_position, particle_radius,
-                                         arg, shape_transform,
-                                         shape_transform_inverse);
-          }
-        },
-        shape._v);
-  }
-
-private:
-  std::variant<Ball, Box> _v;
-};
+inline std::optional<Particle_contact>
+find_particle_contact(math::Vec3f const &particle_position,
+                      float particle_radius, Shape const &shape,
+                      math::Mat3x4f const &shape_transform,
+                      math::Mat3x4f const &shape_transform_inverse) noexcept {
+  return std::visit(
+      [&](auto &&arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, Ball>) {
+          return find_particle_contact(particle_position, particle_radius, arg,
+                                       math::Vec3f{shape_transform[0][3],
+                                                   shape_transform[1][3],
+                                                   shape_transform[2][3]});
+        } else {
+          static_assert(std::is_same_v<T, Box>);
+          return find_particle_contact(particle_position, particle_radius, arg,
+                                       shape_transform,
+                                       shape_transform_inverse);
+        }
+      },
+      shape._v);
+}
 } // namespace physics
 } // namespace marlon
 

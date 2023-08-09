@@ -407,11 +407,11 @@ public:
     auto const transform = math::make_rigid_transform_mat3x4(
         create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
-    auto const bounds = physics::bounds(create_info.shape, transform);
     Static_rigid_body_reference const reference{
         _next_static_rigid_body_reference_value};
     Static_rigid_body const value{
-        .bounds_tree_leaf = _bounds_tree.create_leaf(bounds, reference),
+        .bounds_tree_leaf = _bounds_tree.create_leaf(
+            physics::bounds(create_info.shape, transform), reference),
         .collision_flags = create_info.collision_flags,
         .collision_mask = create_info.collision_mask,
         .transform = transform,
