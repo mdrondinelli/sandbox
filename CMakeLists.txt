@@ -38,7 +38,6 @@ add_library(
   physics
   "src/physics/ball.cpp"
   "src/physics/box.cpp"
-  "src/physics/half_space.cpp"
   "src/physics/particle.cpp"
   "src/physics/space.cpp")
 set(
