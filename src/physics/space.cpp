@@ -13,7 +13,7 @@ namespace marlon {
 namespace physics {
 namespace {
 // LeafPayload must be nothrow copyable
-template <typename LeafPayload> class Bounding_box_hierarchy {
+template <typename LeafPayload> class Bounds_tree {
 public:
   struct Node {
     Node *parent;
@@ -308,12 +308,11 @@ private:
   std::vector<Node *> _flattened_leaf_nodes;
 };
 
-using Bounding_box_hierarchy_leaf_payload =
+using Bounds_tree_leaf_payload =
     std::variant<Particle_reference, Static_rigid_body_reference>;
 
 struct Particle {
-  Bounding_box_hierarchy<Bounding_box_hierarchy_leaf_payload>::Node
-      *bounding_box_hierarchy_leaf;
+  Bounds_tree<Bounds_tree_leaf_payload>::Node *bounds_tree_leaf;
   Particle_motion_callback *motion_callback;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
@@ -329,8 +328,7 @@ struct Particle {
 };
 
 struct Static_rigid_body {
-  Bounding_box_hierarchy<Bounding_box_hierarchy_leaf_payload>::Node
-      *bounding_box_hierarchy_leaf;
+  Bounds_tree<Bounds_tree_leaf_payload>::Node *bounds_tree_leaf;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
   math::Mat3x4f transform;
@@ -365,17 +363,16 @@ public:
       : _gravitational_acceleration{create_info.gravitational_acceleration} {}
 
   Particle_reference create_particle(Particle_create_info const &create_info) {
-    auto const bounding_box =
+    auto const bounds =
         Bounds{create_info.position - math::Vec3f{create_info.radius,
-                                                        create_info.radius,
-                                                        create_info.radius},
-                     create_info.position + math::Vec3f{create_info.radius,
-                                                        create_info.radius,
-                                                        create_info.radius}};
+                                                  create_info.radius,
+                                                  create_info.radius},
+               create_info.position + math::Vec3f{create_info.radius,
+                                                  create_info.radius,
+                                                  create_info.radius}};
     Particle_reference const reference{_next_particle_reference_value};
     Particle const value{
-        .bounding_box_hierarchy_leaf =
-            _bounding_box_hierarchy.create_leaf(bounding_box, reference),
+        .bounds_tree_leaf = _bounds_tree.create_leaf(bounds, reference),
         .motion_callback = create_info.motion_callback,
         .collision_flags = create_info.collision_flags,
         .collision_mask = create_info.collision_mask,
@@ -392,7 +389,7 @@ public:
     try {
       _particles.emplace(reference, value);
     } catch (...) {
-      _bounding_box_hierarchy.destroy_leaf(value.bounding_box_hierarchy_leaf);
+      _bounds_tree.destroy_leaf(value.bounds_tree_leaf);
       throw;
     }
     ++_next_particle_reference_value;
@@ -401,8 +398,7 @@ public:
 
   void destroy_particle(Particle_reference reference) {
     auto const it = _particles.find(reference);
-    _bounding_box_hierarchy.destroy_leaf(
-        it->second.bounding_box_hierarchy_leaf);
+    _bounds_tree.destroy_leaf(it->second.bounds_tree_leaf);
     _particles.erase(it);
   }
 
@@ -411,12 +407,11 @@ public:
     auto const transform = math::make_rigid_transform_mat3x4(
         create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
-    auto const bounding_box = bounds(create_info.shape, transform);
+    auto const bounds = physics::bounds(create_info.shape, transform);
     Static_rigid_body_reference const reference{
         _next_static_rigid_body_reference_value};
     Static_rigid_body const value{
-        .bounding_box_hierarchy_leaf =
-            _bounding_box_hierarchy.create_leaf(bounding_box, reference),
+        .bounds_tree_leaf = _bounds_tree.create_leaf(bounds, reference),
         .collision_flags = create_info.collision_flags,
         .collision_mask = create_info.collision_mask,
         .transform = transform,
@@ -429,7 +424,7 @@ public:
     try {
       _static_rigid_bodies.emplace(reference, value);
     } catch (...) {
-      _bounding_box_hierarchy.destroy_leaf(value.bounding_box_hierarchy_leaf);
+      _bounds_tree.destroy_leaf(value.bounds_tree_leaf);
       throw;
     }
     ++_next_static_rigid_body_reference_value;
@@ -438,8 +433,7 @@ public:
 
   void destroy_static_rigid_body(Static_rigid_body_reference reference) {
     auto const it = _static_rigid_bodies.find(reference);
-    _bounding_box_hierarchy.destroy_leaf(
-        it->second.bounding_box_hierarchy_leaf);
+    _bounds_tree.destroy_leaf(it->second.bounds_tree_leaf);
     _static_rigid_bodies.erase(it);
   }
 
@@ -484,16 +478,16 @@ private:
           safety_factor * delta_time * math::length(particle.velocity) +
           gravity_term;
       auto const half_extents = math::Vec3f{radius, radius, radius};
-      particle.bounding_box_hierarchy_leaf->bounds = {
+      particle.bounds_tree_leaf->bounds = {
           particle.current_position - half_extents,
           particle.current_position + half_extents};
     }
     _particle_particle_contacts.clear();
     _particle_static_rigid_body_contacts.clear();
-    _bounding_box_hierarchy.build();
-    _bounding_box_hierarchy.for_each_overlapping_leaf_pair(
-        [this](Bounding_box_hierarchy_leaf_payload const &first_reference,
-               Bounding_box_hierarchy_leaf_payload const &second_reference) {
+    _bounds_tree.build();
+    _bounds_tree.for_each_overlapping_leaf_pair(
+        [this](Bounds_tree_leaf_payload const &first_reference,
+               Bounds_tree_leaf_payload const &second_reference) {
           if (first_reference.index() == 0) {
             if (second_reference.index() == 0) {
               _particle_particle_contacts.emplace_back(
@@ -718,8 +712,7 @@ private:
     }
   }
 
-  Bounding_box_hierarchy<Bounding_box_hierarchy_leaf_payload>
-      _bounding_box_hierarchy;
+  Bounds_tree<Bounds_tree_leaf_payload> _bounds_tree;
   ankerl::unordered_dense::map<Particle_reference, Particle> _particles;
   ankerl::unordered_dense::map<Static_rigid_body_reference, Static_rigid_body>
       _static_rigid_bodies;
