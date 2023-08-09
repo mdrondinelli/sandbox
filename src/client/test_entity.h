@@ -32,7 +32,7 @@ private:
     Entity_reference reference{};
     graphics::Scene_node *scene_node{};
     graphics::Surface_instance *surface_instance{};
-    physics::Particle_reference particle{};
+    physics::Particle_handle particle{};
     float time_alive{};
 
     void on_particle_motion(physics::Particle_motion_event const &event) final;

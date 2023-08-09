@@ -8,7 +8,7 @@ namespace marlon {
 namespace physics {
 namespace {
 using Bounds_tree_leaf_payload =
-    std::variant<Particle_reference, Static_rigid_body_reference>;
+    std::variant<Particle_handle, Static_rigid_body_handle>;
 
 struct Particle {
   Bounds_tree<Bounds_tree_leaf_payload>::Node *bounds_tree_leaf;
@@ -61,7 +61,7 @@ public:
   explicit Impl(Space_create_info const &create_info)
       : _gravitational_acceleration{create_info.gravitational_acceleration} {}
 
-  Particle_reference create_particle(Particle_create_info const &create_info) {
+  Particle_handle create_particle(Particle_create_info const &create_info) {
     auto const bounds =
         Bounds{create_info.position - math::Vec3f{create_info.radius,
                                                   create_info.radius,
@@ -69,7 +69,7 @@ public:
                create_info.position + math::Vec3f{create_info.radius,
                                                   create_info.radius,
                                                   create_info.radius}};
-    Particle_reference const reference{_next_particle_reference_value};
+    Particle_handle const reference{_next_particle_reference_value};
     Particle const value{
         .bounds_tree_leaf = _bounds_tree.create_leaf(bounds, reference),
         .motion_callback = create_info.motion_callback,
@@ -95,18 +95,18 @@ public:
     return reference;
   }
 
-  void destroy_particle(Particle_reference reference) {
+  void destroy_particle(Particle_handle reference) {
     auto const it = _particles.find(reference);
     _bounds_tree.destroy_leaf(it->second.bounds_tree_leaf);
     _particles.erase(it);
   }
 
-  Static_rigid_body_reference
+  Static_rigid_body_handle
   create_static_rigid_body(Static_rigid_body_create_info const &create_info) {
     auto const transform = math::make_rigid_transform_mat3x4(
         create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
-    Static_rigid_body_reference const reference{
+    Static_rigid_body_handle const reference{
         _next_static_rigid_body_reference_value};
     Static_rigid_body const value{
         .bounds_tree_leaf = _bounds_tree.create_leaf(
@@ -130,7 +130,7 @@ public:
     return reference;
   }
 
-  void destroy_static_rigid_body(Static_rigid_body_reference reference) {
+  void destroy_static_rigid_body(Static_rigid_body_handle reference) {
     auto const it = _static_rigid_bodies.find(reference);
     _bounds_tree.destroy_leaf(it->second.bounds_tree_leaf);
     _static_rigid_bodies.erase(it);
@@ -412,8 +412,8 @@ private:
   }
 
   Bounds_tree<Bounds_tree_leaf_payload> _bounds_tree;
-  ankerl::unordered_dense::map<Particle_reference, Particle> _particles;
-  ankerl::unordered_dense::map<Static_rigid_body_reference, Static_rigid_body>
+  ankerl::unordered_dense::map<Particle_handle, Particle> _particles;
+  ankerl::unordered_dense::map<Static_rigid_body_handle, Static_rigid_body>
       _static_rigid_bodies;
   std::vector<Particle_particle_contact> _particle_particle_contacts;
   std::vector<Particle_static_rigid_body_contact>
@@ -428,22 +428,22 @@ Space::Space(Space_create_info const &create_info)
 
 Space::~Space() {}
 
-Particle_reference
+Particle_handle
 Space::create_particle(Particle_create_info const &create_info) {
   return _impl->create_particle(create_info);
 }
 
-void Space::destroy_particle(Particle_reference particle) {
+void Space::destroy_particle(Particle_handle particle) {
   _impl->destroy_particle(particle);
 }
 
-Static_rigid_body_reference Space::create_static_rigid_body(
+Static_rigid_body_handle Space::create_static_rigid_body(
     Static_rigid_body_create_info const &create_info) {
   return _impl->create_static_rigid_body(create_info);
 }
 
 void Space::destroy_static_rigid_body(
-    Static_rigid_body_reference static_rigid_body) {
+    Static_rigid_body_handle static_rigid_body) {
   _impl->destroy_static_rigid_body(static_rigid_body);
 }
 

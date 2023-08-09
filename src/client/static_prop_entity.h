@@ -34,7 +34,7 @@ private:
   struct Entity {
     graphics::Scene_node *scene_node{};
     graphics::Surface_instance *surface_instance{};
-    std::optional<physics::Static_rigid_body_reference> static_rigid_body{};
+    std::optional<physics::Static_rigid_body_handle> static_rigid_body{};
   };
 
   Scene_diff_provider const *_scene_diff_provider;

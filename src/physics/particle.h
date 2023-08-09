@@ -13,7 +13,7 @@ namespace marlon {
 namespace physics {
 class Particle_motion_callback;
 
-struct Particle_reference {
+struct Particle_handle {
   std::uint64_t value;
 };
 
@@ -31,7 +31,7 @@ struct Particle_create_info {
 };
 
 struct Particle_motion_event {
-  Particle_reference particle;
+  Particle_handle particle;
   math::Vec3f position;
   math::Vec3f velocity;
 };
@@ -57,14 +57,12 @@ private:
 
 class Particle_destruction_queue {
 public:
-  void push(Particle_reference reference) { references.push_back(reference); }
+  void push(Particle_handle reference) { references.push_back(reference); }
 
-  std::span<Particle_reference const> get() const noexcept {
-    return references;
-  }
+  std::span<Particle_handle const> get() const noexcept { return references; }
 
 private:
-  std::vector<Particle_reference> references;
+  std::vector<Particle_handle> references;
 };
 
 class Particle_motion_callback {
@@ -74,17 +72,16 @@ public:
   virtual void on_particle_motion(Particle_motion_event const &event) = 0;
 };
 
-constexpr bool operator==(Particle_reference lhs,
-                          Particle_reference rhs) noexcept {
+constexpr bool operator==(Particle_handle lhs, Particle_handle rhs) noexcept {
   return lhs.value == rhs.value;
 }
 } // namespace physics
 } // namespace marlon
 
 namespace std {
-template <> struct hash<marlon::physics::Particle_reference> {
+template <> struct hash<marlon::physics::Particle_handle> {
   std::size_t operator()(
-      marlon::physics::Particle_reference particle_reference) const noexcept {
+      marlon::physics::Particle_handle particle_reference) const noexcept {
     return hash<std::uint64_t>{}(particle_reference.value);
   }
 };

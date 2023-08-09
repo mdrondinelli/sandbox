@@ -23,14 +23,14 @@ public:
 
   ~Space();
 
-  Particle_reference create_particle(Particle_create_info const &create_info);
+  Particle_handle create_particle(Particle_create_info const &create_info);
 
-  void destroy_particle(Particle_reference particle);
+  void destroy_particle(Particle_handle particle);
 
-  Static_rigid_body_reference
+  Static_rigid_body_handle
   create_static_rigid_body(Static_rigid_body_create_info const &create_info);
 
-  void destroy_static_rigid_body(Static_rigid_body_reference static_rigid_body);
+  void destroy_static_rigid_body(Static_rigid_body_handle static_rigid_body);
 
   void simulate(Space_simulate_info const &simulate_info);
 

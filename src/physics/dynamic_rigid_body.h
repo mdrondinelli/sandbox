@@ -9,7 +9,7 @@
 
 namespace marlon {
 namespace physics {
-struct Dynamic_rigid_body_reference {
+struct Dynamic_rigid_body_handle {
   std::uint64_t value;
 };
 
@@ -28,17 +28,17 @@ struct Dynamic_rigid_body_create_info {
   float restitution_coefficient{};
 };
 
-constexpr bool operator==(Dynamic_rigid_body_reference lhs,
-                          Dynamic_rigid_body_reference rhs) noexcept {
+constexpr bool operator==(Dynamic_rigid_body_handle lhs,
+                          Dynamic_rigid_body_handle rhs) noexcept {
   return lhs.value == rhs.value;
 }
 } // namespace physics
 } // namespace marlon
 
 namespace std {
-template <> struct hash<marlon::physics::Dynamic_rigid_body_reference> {
+template <> struct hash<marlon::physics::Dynamic_rigid_body_handle> {
   std::size_t operator()(
-      marlon::physics::Dynamic_rigid_body_reference reference) const noexcept {
+      marlon::physics::Dynamic_rigid_body_handle reference) const noexcept {
     return hash<std::uint64_t>{}(reference.value);
   }
 };
