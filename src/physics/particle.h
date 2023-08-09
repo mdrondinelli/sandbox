@@ -43,9 +43,13 @@ struct Particle_contact {
 
 class Particle_construction_queue {
 public:
-  void push(Particle_create_info const &create_info);
+  void push(Particle_create_info const &create_info) {
+    create_infos.push_back(create_info);
+  }
 
-  std::span<Particle_create_info const> get() const noexcept;
+  std::span<Particle_create_info const> get() const noexcept {
+    return create_infos;
+  }
 
 private:
   std::vector<Particle_create_info> create_infos;
@@ -53,9 +57,11 @@ private:
 
 class Particle_destruction_queue {
 public:
-  void push(Particle_reference particle);
+  void push(Particle_reference reference) { references.push_back(reference); }
 
-  std::span<Particle_reference const> get() const noexcept;
+  std::span<Particle_reference const> get() const noexcept {
+    return references;
+  }
 
 private:
   std::vector<Particle_reference> references;

@@ -90,7 +90,7 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
        .radius = scale,
        .static_friction_coefficient = 1.1f,
        .dynamic_friction_coefficient = 0.9f,
-       .restitution_coefficient = 0.5f});
+       .restitution_coefficient = 0.0f});
   ++_next_entity_reference_value;
   return reference;
 }
@@ -108,7 +108,7 @@ void Test_entity_manager::destroy_entity(Entity_reference reference) {
 void Test_entity_manager::tick_entities(float delta_time) {
   for (auto &[reference, value] : _entities) {
     value.time_alive += delta_time;
-    if (value.time_alive > 2.0f) {
+    if (value.time_alive > 20.0f) {
       _entity_destruction_queue->push(this, reference);
     }
   }

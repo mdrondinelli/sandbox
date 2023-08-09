@@ -204,13 +204,13 @@ void tick(physics::Space *space,
           client::Entity_destruction_queue *entity_destruction_queue,
           std::span<client::Entity_manager *const> entity_managers,
           client::Test_entity_manager *test_entity_manager, float delta_time) {
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < 8; ++i) {
     entity_construction_queue->push(test_entity_manager, {});
   }
   for (auto const entity_manager : entity_managers) {
     entity_manager->tick_entities(delta_time);
   }
-  space->simulate({.delta_time = delta_time, .substep_count = 1});
+  space->simulate({.delta_time = delta_time, .substep_count = 2});
   entity_construction_queue->consume();
   entity_destruction_queue->consume();
 }
@@ -224,7 +224,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
                    client::Entity_destruction_queue *entity_destruction_queue,
                    std::span<client::Entity_manager *const> entity_managers,
                    client::Test_entity_manager *test_entity_manager) {
-  auto const tick_rate = 60.0;
+  auto const tick_rate = 30.0;
   auto const tick_duration = 1.0 / tick_rate;
   auto previous_time = glfwGetTime();
   auto accumulator = 0.0;
@@ -297,7 +297,7 @@ int main() {
   auto const brick_material = graphics->create_material_unique(
       {.base_color_texture = brick_texture.get()});
   auto const cube_mesh = create_cube_mesh_unique(graphics.get());
-  auto const icosahedron_mesh = create_icosahedron_mesh_unique(graphics.get());
+  auto const icosahedron_mesh = create_icosahedron_mesh_unique(graphics.get(), 1);
   auto const sphere_mesh = create_icosahedron_mesh_unique(graphics.get(), 3);
   auto const particle_surface = graphics->create_surface_unique(
       {.material = particle_material.get(), .mesh = icosahedron_mesh.get()});
@@ -348,8 +348,8 @@ int main() {
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
-                                  .orientation = math::Quatf::identity(),
-                                  .shape = &ground_shape,
+                                  // .orientation = math::Quatf::identity(),
+                                  .shape = ground_shape,
                                   .static_friction_coefficient = 1.1f,
                                   .dynamic_friction_coefficient = 0.6f,
                                   .restitution_coefficient = 0.0f});
@@ -360,7 +360,7 @@ int main() {
        .surface = ball_surface.get(),
        .surface_scale = 0.5f,
        .space = &space,
-       .shape = &ball_shape,
+       .shape = ball_shape,
        .static_friction_coefficient = 1.1f,
        .dynamic_friction_coefficient = 0.75f,
        .restitution_coefficient = 0.0f}};
@@ -369,7 +369,7 @@ int main() {
        .surface = box_surface.get(),
        .surface_scale = 1.0f,
        .space = &space,
-       .shape = &box_shape,
+       .shape = box_shape,
        .static_friction_coefficient = 1.1f,
        .dynamic_friction_coefficient = 0.6f,
        .restitution_coefficient = 0.0f}};

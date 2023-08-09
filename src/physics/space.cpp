@@ -335,7 +335,7 @@ struct Static_rigid_body {
   std::uint64_t collision_mask;
   math::Mat3x4f transform;
   math::Mat3x4f transform_inverse;
-  Shape *shape;
+  Shape shape;
   float static_friction_coefficient;
   float dynamic_friction_coefficient;
   float restitution_coefficient;
@@ -411,7 +411,7 @@ public:
     auto const transform = math::make_rigid_transform_mat3x4(
         create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
-    auto const bounding_box = create_info.shape->get_bounds(transform);
+    auto const bounding_box = bounds(create_info.shape, transform);
     Static_rigid_body_reference const reference{
         _next_static_rigid_body_reference_value};
     Static_rigid_body const value{
@@ -600,11 +600,10 @@ private:
     for (auto &contact : _particle_static_rigid_body_contacts) {
       auto const particle = contact.particle;
       auto const static_rigid_body = contact.static_rigid_body;
-      if (auto const contact_geometry =
-              static_rigid_body->shape->collide_particle(
-                  static_rigid_body->transform,
-                  static_rigid_body->transform_inverse,
-                  particle->current_position, particle->radius)) {
+      if (auto const contact_geometry = find_particle_contact(
+              particle->current_position, particle->radius,
+              static_rigid_body->shape, static_rigid_body->transform,
+              static_rigid_body->transform_inverse)) {
         auto const delta_normal_force_lagrange =
             -contact_geometry->separation * particle->mass;
         auto const relative_motion =

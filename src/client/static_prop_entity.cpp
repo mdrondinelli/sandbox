@@ -29,7 +29,7 @@ Entity_reference Static_prop_entity_manager::create_entity(
                                           .collision_mask = 1,
                                           .position = parameters.position,
                                           .orientation = parameters.orientation,
-                                          .shape = _shape});
+                                          .shape = *_shape});
   }
   return reference;
 }

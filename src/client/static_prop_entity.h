@@ -13,7 +13,7 @@ struct Static_prop_entity_manager_create_info {
   graphics::Surface *surface{};
   float surface_scale{1.0f};
   physics::Space *space{};
-  physics::Shape *shape{};
+  physics::Shape shape;
   float static_friction_coefficient{0.0f};
   float dynamic_friction_coefficient{0.0f};
   float restitution_coefficient{0.0f};
@@ -41,7 +41,7 @@ private:
   graphics::Surface *_surface;
   float _surface_scale;
   physics::Space *_space;
-  physics::Shape *_shape;
+  std::optional<physics::Shape> _shape;
   std::uint64_t _next_entity_reference_value;
   std::unordered_map<Entity_reference, Entity> _entities;
 };
