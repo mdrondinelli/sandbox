@@ -20,8 +20,8 @@ inline math::Vec3f centroid(Bounds const &box) noexcept {
 }
 
 inline Bounds expand(Bounds const &box, float amount) noexcept {
-  return {box.min - math::Vec3f{amount, amount, amount},
-          box.max + math::Vec3f{amount, amount, amount}};
+  return {box.min - math::Vec3f::all(amount),
+          box.max + math::Vec3f::all(amount)};
 }
 
 inline Bounds merge(Bounds const &first, Bounds const &second) noexcept {
