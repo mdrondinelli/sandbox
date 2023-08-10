@@ -19,8 +19,13 @@ public:
     return Mat<T, 2, 2>{Vec<T, 2>{T(1), T(0)}, Vec<T, 2>{T(0), T(1)}};
   }
 
+  Mat() = default;
+
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1) noexcept
       : rows{row0, row1} {}
+
+  template <typename F>
+  constexpr explicit Mat(F &&f) noexcept(noexcept(f(0))) : rows{f(0), f(1)} {}
 
   template <typename U>
   constexpr explicit Mat(Mat<U, 2, M> const &m) noexcept
@@ -48,9 +53,15 @@ public:
                         Vec<T, 3>{T(0), T(0), T(1)}};
   }
 
+  Mat() = default;
+
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
                 Vec<T, M> const &row2) noexcept
       : rows{row0, row1, row2} {}
+
+  template <typename F>
+  constexpr explicit Mat(F &&f) noexcept(noexcept(f(0)))
+      : rows{f(0), f(1), f(2)} {}
 
   template <typename U>
   constexpr explicit Mat(Mat<U, 3, M> const &m) noexcept
@@ -79,9 +90,15 @@ public:
         Vec<T, 4>{T(0), T(0), T(1), T(0)}, Vec<T, 4>{T(0), T(0), T(0), T(1)}};
   }
 
+  Mat() = default;
+
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
                 Vec<T, M> const &row2, Vec<T, M> const &row3) noexcept
       : rows{row0, row1, row2, row3} {}
+
+  template <typename F>
+  constexpr explicit Mat(F &&f) noexcept(noexcept(f(0)))
+      : rows{f(0), f(1), f(2), f(3)} {}
 
   template <typename U>
   constexpr explicit Mat(Mat<U, 4, M> const &m) noexcept
@@ -135,23 +152,115 @@ constexpr bool operator==(Mat<T, N, M> const &a,
   return true;
 }
 
-template <typename T, int N1, int N2, int N3>
-constexpr auto operator*(Mat<T, N1, N2> const &a,
-                         Mat<T, N2, N3> const &b) noexcept {
-  auto ab = Mat<T, N1, N3>::zero();
-  for (auto i = 0; i < N1; ++i) {
-    for (auto j = 0; j < N3; ++j) {
-      for (auto k = 0; k < N2; ++k) {
-        ab[i][j] += a[i][k] * b[k][j];
-      }
-    }
-  }
-  return ab;
+template <typename T, int N, int M>
+constexpr Mat<T, N, M> operator*(T s, Mat<T, N, M> const &m) noexcept {
+  return Mat<T, N, M>{[&](int i) { return s * m[i]; }};
 }
 
 template <typename T, int N, int M>
-constexpr auto &operator*=(Mat<T, N, M> &a, Mat<T, M, M> const &b) noexcept {
+constexpr Mat<T, N, M> operator*(Mat<T, N, M> const &m, T s) noexcept {
+  return Mat<T, N, M>{[&](int i) { return m[i] * s; }};
+}
+
+template <typename T, int N, int M>
+constexpr Mat<T, N, M> operator/(Mat<T, N, M> const &m, T s) noexcept {
+  if constexpr (std::is_floating_point_v<T>) {
+    return m * (1 / s);
+  } else {
+    return Mat<T, N, M>{[&](int i) { return m[i] / s; }};
+  };
+}
+
+template <typename T, int N1, int N2, int N3>
+constexpr Mat<T, N1, N3> operator*(Mat<T, N1, N2> const &a,
+                                   Mat<T, N2, N3> const &b) noexcept {
+  auto retval = Mat<T, N1, N3>::zero();
+  for (auto i = 0; i < N1; ++i) {
+    for (auto j = 0; j < N3; ++j) {
+      for (auto k = 0; k < N2; ++k) {
+        retval[i][j] += a[i][k] * b[k][j];
+      }
+    }
+  }
+  return retval;
+}
+
+template <typename T, int N, int M>
+constexpr Mat<T, N, M> &operator*=(Mat<T, N, M> &a,
+                                   Mat<T, M, M> const &b) noexcept {
   return a = a * b;
+}
+
+template <typename T, int N, int M>
+constexpr Mat<T, N, M> &operator/=(Mat<T, N, M> &m, T s) noexcept {
+  return m = m / s;
+}
+
+template <typename T, int N, int M>
+constexpr Mat<T, M, N> transpose(math::Mat<T, N, M> const &m) noexcept {
+  auto retval = Mat<T, M, N>::zero();
+  for (auto i = 0; i < M; ++i) {
+    for (auto j = 0; j < N; ++j) {
+      retval[i][j] = m[j][i];
+    }
+  }
+  return retval;
+}
+
+template <typename T>
+constexpr T determinant(math::Mat<T, 2, 2> const &m) noexcept {
+  return m[0][0] * m[1][1] - m[0][1] * m[1][0];
+}
+
+template <typename T>
+constexpr T determinant(math::Mat<T, 3, 3> const &m) noexcept {
+  return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+         m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+         m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+}
+
+template <typename T>
+constexpr T determinant(math::Mat<T, 4, 4> const &m) noexcept {
+  return m[0][0] * (m[1][1] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) +
+                    m[1][2] * (m[2][3] * m[3][1] - m[2][1] * m[3][3]) +
+                    m[1][3] * (m[2][1] * m[3][2] - m[2][2] * m[3][1])) -
+         m[0][1] * (m[1][0] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) +
+                    m[1][2] * (m[2][3] * m[3][0] - m[2][0] * m[3][3]) +
+                    m[1][3] * (m[2][0] * m[3][2] - m[2][2] * m[3][0])) +
+         m[0][2] * (m[1][0] * (m[2][1] * m[3][3] - m[2][3] * m[3][1]) +
+                    m[1][1] * (m[2][3] * m[3][0] - m[2][0] * m[3][3]) +
+                    m[1][3] * (m[2][0] * m[3][1] - m[2][1] * m[3][0])) -
+         m[0][3] * (m[1][0] * (m[2][1] * m[3][2] - m[2][2] * m[3][1]) +
+                    m[1][1] * (m[2][2] * m[3][0] - m[2][0] * m[3][2]) +
+                    m[1][2] * (m[2][0] * m[3][1] - m[2][1] * m[3][0]));
+}
+
+template <typename T>
+constexpr Mat<T, 2, 2> cofactors(math::Mat<T, 2, 2> const &m) noexcept {
+  return {{m[1][1], -m[1][0]}, {-m[0][1], m[0][0]}};
+}
+
+template <typename T>
+constexpr Mat<T, 3, 3> cofactors(math::Mat<T, 3, 3> const &m) noexcept {
+  return {{determinant(Mat<T, 2, 2>{{m[1][1], m[1][2]}, {m[2][1], m[2][2]}}),
+           -determinant(Mat<T, 2, 2>{{m[1][0], m[1][2]}, {m[2][0], m[2][2]}}),
+           determinant(Mat<T, 2, 2>{{m[1][0], m[1][1]}, {m[2][0], m[2][1]}})},
+          {-determinant(Mat<T, 2, 2>{{m[0][1], m[0][2]}, {m[2][1], m[2][2]}}),
+           determinant(Mat<T, 2, 2>{{m[0][0], m[0][2]}, {m[2][0], m[2][2]}}),
+           -determinant(Mat<T, 2, 2>{{m[0][0], m[0][1]}, {m[2][0], m[2][1]}})},
+          {determinant(Mat<T, 2, 2>{{m[0][1], m[0][2]}, {m[1][1], m[1][2]}}),
+           -determinant(Mat<T, 2, 2>{{m[0][0], m[0][2]}, {m[1][0], m[1][2]}}),
+           determinant(Mat<T, 2, 2>{{m[0][0], m[0][1]}, {m[1][0], m[1][1]}})}};
+}
+
+template <typename T, int N>
+constexpr Mat<T, N, N> adjoint(math::Mat<T, N, N> const &m) noexcept {
+  return transpose(cofactors(m));
+}
+
+template <typename T, int N>
+constexpr Mat<T, N, N> inverse(math::Mat<T, N, N> const &m) noexcept {
+  return adjoint(m) / determinant(m);
 }
 
 template <typename T>
