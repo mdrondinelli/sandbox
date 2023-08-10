@@ -281,6 +281,10 @@ int factorial(int n) {
 
 int main() {
   std::cout << "testing ubsan: " << (factorial(13)) << std::endl;
+  auto const physics_material =
+      physics::Material{.static_friction_coefficient = 1.1f,
+                        .dynamic_friction_coefficient = 0.6f,
+                        .restitution_coefficient = 0.0f};
   client::Glfw_shared_instance const glfw;
   auto const window = create_window_unique();
   auto const graphics = create_graphics_unique(window.get());
@@ -297,7 +301,8 @@ int main() {
   auto const brick_material = graphics->create_material_unique(
       {.base_color_texture = brick_texture.get()});
   auto const cube_mesh = create_cube_mesh_unique(graphics.get());
-  auto const icosahedron_mesh = create_icosahedron_mesh_unique(graphics.get(), 1);
+  auto const icosahedron_mesh =
+      create_icosahedron_mesh_unique(graphics.get(), 1);
   auto const sphere_mesh = create_icosahedron_mesh_unique(graphics.get(), 3);
   auto const particle_surface = graphics->create_surface_unique(
       {.material = particle_material.get(), .mesh = icosahedron_mesh.get()});
@@ -350,29 +355,25 @@ int main() {
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
                                   // .orientation = math::Quatf::identity(),
                                   .shape = ground_shape,
-                                  .static_friction_coefficient = 1.1f,
-                                  .dynamic_friction_coefficient = 0.6f,
-                                  .restitution_coefficient = 0.0f});
+                                  .material = physics_material});
   client::Entity_construction_queue entity_construction_queue;
   client::Entity_destruction_queue entity_destruction_queue;
   client::Static_prop_entity_manager ball_entity_manager{
-      {.scene_diff_provider = &scene_diff_provider,
-       .surface = ball_surface.get(),
-       .surface_scale = 0.5f,
-       .space = &space,
-       .shape = ball_shape,
-       .static_friction_coefficient = 1.1f,
-       .dynamic_friction_coefficient = 0.75f,
-       .restitution_coefficient = 0.0f}};
+      {.graphics = {.scene_diff_provider = &scene_diff_provider,
+                    .surface = ball_surface.get(),
+                    .surface_scale = 0.5f},
+       .physics = client::Static_prop_physics_info{
+           .space = &space,
+           .shape = ball_shape,
+           .material = {.static_friction_coefficient = 1.1f,
+                        .dynamic_friction_coefficient = 0.75f,
+                        .restitution_coefficient = 0.0f}}}};
   client::Static_prop_entity_manager box_entity_manager{
-      {.scene_diff_provider = &scene_diff_provider,
-       .surface = box_surface.get(),
-       .surface_scale = 1.0f,
-       .space = &space,
-       .shape = box_shape,
-       .static_friction_coefficient = 1.1f,
-       .dynamic_friction_coefficient = 0.6f,
-       .restitution_coefficient = 0.0f}};
+      {.graphics = {.scene_diff_provider = &scene_diff_provider,
+                    .surface = box_surface.get(),
+                    .surface_scale = 1.0f},
+       .physics = client::Static_prop_physics_info{
+           .space = &space, .shape = box_shape, .material = physics_material}}};
   client::Test_entity_manager test_entity_manager{
       &scene_diff_provider, particle_surface.get(), &space,
       &entity_destruction_queue};

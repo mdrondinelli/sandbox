@@ -88,9 +88,9 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
        //  .damping_factor = damping_factor,
        .mass = density * 4.0f / 3.0f * 3.14f * scale * scale * scale,
        .radius = scale,
-       .static_friction_coefficient = 1.1f,
-       .dynamic_friction_coefficient = 0.9f,
-       .restitution_coefficient = 0.0f});
+       .material = {.static_friction_coefficient = 1.1f,
+                    .dynamic_friction_coefficient = 0.9f,
+                    .restitution_coefficient = 0.0f}});
   ++_next_entity_reference_value;
   return reference;
 }

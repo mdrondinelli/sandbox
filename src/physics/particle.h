@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "../math/vec.h"
+#include "material.h"
 
 namespace marlon {
 namespace physics {
@@ -25,9 +26,7 @@ struct Particle_create_info {
   math::Vec3f velocity{math::Vec3f::zero()};
   float mass{1.0f};
   float radius{0.0f};
-  float static_friction_coefficient{0.0f};
-  float dynamic_friction_coefficient{0.0f};
-  float restitution_coefficient{0.0f};
+  Material material;
 };
 
 struct Particle_motion_event {

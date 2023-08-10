@@ -21,9 +21,7 @@ struct Particle {
   float mass;
   float mass_inverse;
   float radius;
-  float static_friction_coefficient;
-  float dynamic_friction_coefficient;
-  float restitution_coefficient;
+  Material material;
 };
 
 struct Static_rigid_body {
@@ -33,9 +31,7 @@ struct Static_rigid_body {
   math::Mat3x4f transform;
   math::Mat3x4f transform_inverse;
   Shape shape;
-  float static_friction_coefficient;
-  float dynamic_friction_coefficient;
-  float restitution_coefficient;
+  Material material;
 };
 
 struct Particle_particle_contact {
@@ -70,21 +66,18 @@ public:
                                                   create_info.radius,
                                                   create_info.radius}};
     Particle_handle const reference{_next_particle_reference_value};
-    Particle const value{
-        .bounds_tree_leaf = _bounds_tree.create_leaf(bounds, reference),
-        .motion_callback = create_info.motion_callback,
-        .collision_flags = create_info.collision_flags,
-        .collision_mask = create_info.collision_mask,
-        .previous_position = create_info.position,
-        .current_position = create_info.position,
-        .velocity = create_info.velocity,
-        .mass = create_info.mass,
-        .mass_inverse = 1.0f / create_info.mass,
-        .radius = create_info.radius,
-        .static_friction_coefficient = create_info.static_friction_coefficient,
-        .dynamic_friction_coefficient =
-            create_info.dynamic_friction_coefficient,
-        .restitution_coefficient = create_info.restitution_coefficient};
+    Particle const value{.bounds_tree_leaf =
+                             _bounds_tree.create_leaf(bounds, reference),
+                         .motion_callback = create_info.motion_callback,
+                         .collision_flags = create_info.collision_flags,
+                         .collision_mask = create_info.collision_mask,
+                         .previous_position = create_info.position,
+                         .current_position = create_info.position,
+                         .velocity = create_info.velocity,
+                         .mass = create_info.mass,
+                         .mass_inverse = 1.0f / create_info.mass,
+                         .radius = create_info.radius,
+                         .material = create_info.material};
     try {
       _particles.emplace(reference, value);
     } catch (...) {
@@ -116,10 +109,7 @@ public:
         .transform = transform,
         .transform_inverse = transform_inverse,
         .shape = create_info.shape,
-        .static_friction_coefficient = create_info.static_friction_coefficient,
-        .dynamic_friction_coefficient =
-            create_info.dynamic_friction_coefficient,
-        .restitution_coefficient = create_info.restitution_coefficient};
+        .material = create_info.material};
     try {
       _static_rigid_bodies.emplace(reference, value);
     } catch (...) {
@@ -270,8 +260,8 @@ private:
         particle_b->current_position -=
             normal_positional_impulse * particle_b->mass_inverse;
         auto const static_friction_coefficient =
-            0.5f * (particle_a->static_friction_coefficient +
-                    particle_b->static_friction_coefficient);
+            0.5f * (particle_a->material.static_friction_coefficient +
+                    particle_b->material.static_friction_coefficient);
         if (contact.tangent_force_lagrange <
             static_friction_coefficient * contact.normal_force_lagrange) {
           auto const tangent_positional_impulse =
@@ -315,8 +305,8 @@ private:
         particle->current_position +=
             -contact_geometry->separation * contact_geometry->normal;
         auto const static_friction_coefficient =
-            0.5f * (particle->static_friction_coefficient +
-                    static_rigid_body->static_friction_coefficient);
+            0.5f * (particle->material.static_friction_coefficient +
+                    static_rigid_body->material.static_friction_coefficient);
         if (contact.tangent_force_lagrange <
             static_friction_coefficient * contact.normal_force_lagrange) {
           particle->current_position -= relative_tangential_motion;
@@ -341,8 +331,9 @@ private:
         if (v_t_length2 != 0.0f) {
           auto const v_t_length = std::sqrt(v_t_length2);
           auto const dynamic_friction_coefficient =
-              0.5f * (contact.particles[0]->dynamic_friction_coefficient +
-                      contact.particles[1]->dynamic_friction_coefficient);
+              0.5f *
+              (contact.particles[0]->material.dynamic_friction_coefficient +
+               contact.particles[1]->material.dynamic_friction_coefficient);
           auto const friction_delta_velocity =
               -v_t / v_t_length *
               std::min(dynamic_friction_coefficient *
@@ -358,8 +349,9 @@ private:
         }
         auto const restitution_coefficient =
             std::abs(v_n) > restitution_threshold
-                ? 0.5f * (contact.particles[0]->restitution_coefficient +
-                          contact.particles[1]->restitution_coefficient)
+                ? 0.5f *
+                      (contact.particles[0]->material.restitution_coefficient +
+                       contact.particles[1]->material.restitution_coefficient)
                 : 0.0f;
         auto const restitution_delta_velocity =
             contact.normal * (-v_n + std::max(-restitution_coefficient *
@@ -388,8 +380,9 @@ private:
         if (v_t_length2 != 0.0f) {
           auto const v_t_length = std::sqrt(v_t_length2);
           auto const dynamic_friction_coefficient =
-              0.5f * (contact.particle->dynamic_friction_coefficient +
-                      contact.static_rigid_body->dynamic_friction_coefficient);
+              0.5f * (contact.particle->material.dynamic_friction_coefficient +
+                      contact.static_rigid_body->material
+                          .dynamic_friction_coefficient);
           auto const friction_delta_velocity =
               -v_t / v_t_length *
               std::min(dynamic_friction_coefficient *
@@ -399,8 +392,9 @@ private:
         }
         auto const restitution_coefficient =
             std::abs(v_n) > restitution_threshold
-                ? 0.5f * (contact.particle->restitution_coefficient +
-                          contact.static_rigid_body->restitution_coefficient)
+                ? 0.5f * (contact.particle->material.restitution_coefficient +
+                          contact.static_rigid_body->material
+                              .restitution_coefficient)
                 : 0.0f;
         auto const restitution_delta_velocity =
             contact.normal * (-v_n + std::max(-restitution_coefficient *
