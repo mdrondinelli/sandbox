@@ -10,16 +10,16 @@
 
 namespace marlon {
 namespace physics {
-// LeafPayload must be nothrow copyable
-template <typename LeafPayload> class Bounds_tree {
+// Payload must be nothrow copyable
+template <typename Payload> class Bounds_tree {
 public:
   struct Node {
     Node *parent;
     Bounds bounds;
-    std::variant<std::array<Node *, 2>, LeafPayload> payload;
+    std::variant<std::array<Node *, 2>, Payload> payload;
   };
 
-  Node *create_leaf(Bounds const &bounds, LeafPayload const &payload) {
+  Node *create_leaf(Bounds const &bounds, Payload const &payload) {
     auto const node = _node_pool.alloc();
     try {
       _leaf_nodes.emplace(node);
@@ -62,7 +62,7 @@ public:
 
   template <typename F>
   void for_each_overlapping_leaf_pair(F &&f) noexcept(
-      noexcept(f(std::declval<LeafPayload>(), std::declval<LeafPayload>()))) {
+      noexcept(f(std::declval<Payload>(), std::declval<Payload>()))) {
     if (_root_node != nullptr) {
       for_each_overlapping_leaf_pair(_root_node, std::forward<F>(f));
     }
@@ -247,7 +247,7 @@ private:
 
   template <typename F>
   void for_each_overlapping_leaf_pair(Node *root, F &&f) noexcept(
-      noexcept(f(std::declval<LeafPayload>(), std::declval<LeafPayload>()))) {
+      noexcept(f(std::declval<Payload>(), std::declval<Payload>()))) {
     assert(root != nullptr);
     if (root->payload.index() == 0) {
       auto const &children = std::get<0>(root->payload);
@@ -260,7 +260,7 @@ private:
 
   template <typename F>
   void for_each_overlapping_leaf_pair(Node *left, Node *right, F &&f) noexcept(
-      noexcept(f(std::declval<LeafPayload>(), std::declval<LeafPayload>()))) {
+      noexcept(f(std::declval<Payload>(), std::declval<Payload>()))) {
     if (overlaps(left->bounds, right->bounds)) {
       if (left->payload.index() == 0) {
         // left is internal

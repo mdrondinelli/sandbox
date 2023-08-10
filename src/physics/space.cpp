@@ -7,11 +7,11 @@
 namespace marlon {
 namespace physics {
 namespace {
-using Bounds_tree_leaf_payload =
+using Bounds_tree_payload =
     std::variant<Particle_handle, Static_rigid_body_handle>;
 
 struct Particle {
-  Bounds_tree<Bounds_tree_leaf_payload>::Node *bounds_tree_leaf;
+  Bounds_tree<Bounds_tree_payload>::Node *bounds_tree_leaf;
   Particle_motion_callback *motion_callback;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
@@ -25,7 +25,7 @@ struct Particle {
 };
 
 struct Static_rigid_body {
-  Bounds_tree<Bounds_tree_leaf_payload>::Node *bounds_tree_leaf;
+  Bounds_tree<Bounds_tree_payload>::Node *bounds_tree_leaf;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
   math::Mat3x4f transform;
@@ -175,8 +175,8 @@ private:
     _particle_static_rigid_body_contacts.clear();
     _bounds_tree.build();
     _bounds_tree.for_each_overlapping_leaf_pair(
-        [this](Bounds_tree_leaf_payload const &first_reference,
-               Bounds_tree_leaf_payload const &second_reference) {
+        [this](Bounds_tree_payload const &first_reference,
+               Bounds_tree_payload const &second_reference) {
           if (first_reference.index() == 0) {
             if (second_reference.index() == 0) {
               _particle_particle_contacts.emplace_back(
@@ -405,7 +405,7 @@ private:
     }
   }
 
-  Bounds_tree<Bounds_tree_leaf_payload> _bounds_tree;
+  Bounds_tree<Bounds_tree_payload> _bounds_tree;
   ankerl::unordered_dense::map<Particle_handle, Particle> _particles;
   ankerl::unordered_dense::map<Static_rigid_body_handle, Static_rigid_body>
       _static_rigid_bodies;
