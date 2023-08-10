@@ -74,10 +74,9 @@ public:
 
   static auto identity() {
     static_assert(M == 4);
-    return Mat<T, 4, 4>{Vec<T, 4>{T(1), T(0), T(0), T(0)},
-                        Vec<T, 4>{T(0), T(1), T(0), T(0)},
-                        Vec<T, 4>{T(0), T(0), T(1), T(0)},
-                        Vec<T, 4>{T(0), T(0), T(0), T(1)}};
+    return Mat<T, 4, 4>{
+        Vec<T, 4>{T(1), T(0), T(0), T(0)}, Vec<T, 4>{T(0), T(1), T(0), T(0)},
+        Vec<T, 4>{T(0), T(0), T(1), T(0)}, Vec<T, 4>{T(0), T(0), T(0), T(1)}};
   }
 
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
@@ -148,6 +147,11 @@ constexpr auto operator*(Mat<T, N1, N2> const &a,
     }
   }
   return ab;
+}
+
+template <typename T, int N, int M>
+constexpr auto &operator*=(Mat<T, N, M> &a, Mat<T, M, M> const &b) noexcept {
+  return a = a * b;
 }
 
 template <typename T>
