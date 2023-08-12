@@ -46,7 +46,7 @@ class Graphics;
 
 class Texture_deleter {
 public:
-  Texture_deleter(Graphics *owner) noexcept : _owner{owner} {}
+  Texture_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
 
   void operator()(Texture *texture) const noexcept;
 
@@ -56,7 +56,7 @@ private:
 
 class Material_deleter {
 public:
-  Material_deleter(Graphics *owner) noexcept : _owner{owner} {}
+  Material_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
 
   void operator()(Material *material) const noexcept;
 
@@ -66,7 +66,7 @@ private:
 
 class Mesh_deleter {
 public:
-  Mesh_deleter(Graphics *owner) noexcept : _owner{owner} {}
+  Mesh_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
 
   void operator()(Mesh *mesh) const noexcept;
 
@@ -76,7 +76,7 @@ private:
 
 class Surface_deleter {
 public:
-  Surface_deleter(Graphics *owner) noexcept : _owner{owner} {}
+  Surface_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
 
   void operator()(Surface *surface) const noexcept;
 
@@ -86,7 +86,7 @@ private:
 
 class Scene_deleter {
 public:
-  Scene_deleter(Graphics *owner) noexcept : _owner{owner} {}
+  Scene_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
 
   void operator()(Scene *scene) const noexcept;
 
@@ -96,7 +96,7 @@ private:
 
 class Scene_diff_deleter {
 public:
-  Scene_diff_deleter(Graphics *owner) noexcept : _owner{owner} {}
+  Scene_diff_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
 
   void operator()(Scene_diff *scene_diff) const noexcept;
 

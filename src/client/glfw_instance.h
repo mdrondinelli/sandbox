@@ -3,18 +3,18 @@
 
 namespace marlon {
 namespace client {
-class Glfw_shared_instance {
+class Shared_glfw_instance {
 public:
-  Glfw_shared_instance();
-  ~Glfw_shared_instance();
+  Shared_glfw_instance();
+  ~Shared_glfw_instance();
 
-  Glfw_shared_instance(Glfw_shared_instance &&other) noexcept;
-  Glfw_shared_instance &operator=(Glfw_shared_instance &&other) noexcept;
+  Shared_glfw_instance(Shared_glfw_instance &&other) noexcept;
+  Shared_glfw_instance &operator=(Shared_glfw_instance &&other) noexcept;
 
   bool owns() const noexcept;
 
 private:
-  void swap(Glfw_shared_instance &other) noexcept;
+  void swap(Shared_glfw_instance &other) noexcept;
 
   bool _owns{false};
 };

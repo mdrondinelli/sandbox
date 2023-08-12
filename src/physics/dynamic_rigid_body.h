@@ -9,11 +9,14 @@
 
 namespace marlon {
 namespace physics {
+class Dynamic_rigid_body_motion_callback;
+
 struct Dynamic_rigid_body_handle {
   std::uint64_t value;
 };
 
 struct Dynamic_rigid_body_create_info {
+  Dynamic_rigid_body_motion_callback *motion_callback;
   std::uint64_t collision_flags{};
   std::uint64_t collision_mask{};
   math::Vec3f position{math::Vec3f::zero()};
@@ -24,6 +27,20 @@ struct Dynamic_rigid_body_create_info {
   math::Mat3x3f inertia_tensor{math::Mat3x3f::identity()};
   Shape shape;
   Material material;
+};
+
+struct Dynamic_rigid_body_motion_event {
+  Dynamic_rigid_body_handle handle;
+  math::Vec3f position;
+  math::Quatf orientation;
+};
+
+class Dynamic_rigid_body_motion_callback {
+public:
+  virtual ~Dynamic_rigid_body_motion_callback() = default;
+
+  virtual void on_dynamic_rigid_body_motion(
+      Dynamic_rigid_body_motion_event const &event) = 0;
 };
 
 constexpr bool operator==(Dynamic_rigid_body_handle lhs,

@@ -8,7 +8,8 @@ namespace marlon {
 namespace physics {
 namespace {
 using Bounds_tree_payload =
-    std::variant<Particle_handle, Static_rigid_body_handle>;
+    std::variant<Particle_handle, Static_rigid_body_handle,
+                 Dynamic_rigid_body_handle>;
 
 struct Particle {
   Bounds_tree<Bounds_tree_payload>::Node *bounds_tree_leaf;
@@ -30,6 +31,25 @@ struct Static_rigid_body {
   std::uint64_t collision_mask;
   math::Mat3x4f transform;
   math::Mat3x4f transform_inverse;
+  Shape shape;
+  Material material;
+};
+
+struct Dynamic_rigid_body {
+  Bounds_tree<Bounds_tree_payload>::Node *bounds_tree_leaf;
+  Dynamic_rigid_body_motion_callback *motion_callback;
+  std::uint64_t collision_flags;
+  std::uint64_t collision_mask;
+  math::Vec3f previous_position;
+  math::Vec3f current_position;
+  math::Vec3f velocity;
+  math::Quatf previous_orientation;
+  math::Quatf current_orientation;
+  math::Vec3f angular_velocity;
+  float mass;
+  float mass_inverse;
+  math::Mat3x3f inertia_tensor;
+  math::Mat3x3f inertia_tensor_inverse;
   Shape shape;
   Material material;
 };
@@ -65,7 +85,7 @@ public:
                create_info.position + math::Vec3f{create_info.radius,
                                                   create_info.radius,
                                                   create_info.radius}};
-    Particle_handle const reference{_next_particle_reference_value};
+    Particle_handle const reference{_next_particle_handle_value};
     Particle const value{.bounds_tree_leaf =
                              _bounds_tree.create_leaf(bounds, reference),
                          .motion_callback = create_info.motion_callback,
@@ -84,7 +104,7 @@ public:
       _bounds_tree.destroy_leaf(value.bounds_tree_leaf);
       throw;
     }
-    ++_next_particle_reference_value;
+    ++_next_particle_handle_value;
     return reference;
   }
 
@@ -100,7 +120,7 @@ public:
         create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
     Static_rigid_body_handle const reference{
-        _next_static_rigid_body_reference_value};
+        _next_static_rigid_body_handle_value};
     Static_rigid_body const value{
         .bounds_tree_leaf = _bounds_tree.create_leaf(
             physics::bounds(create_info.shape, transform), reference),
@@ -116,7 +136,7 @@ public:
       _bounds_tree.destroy_leaf(value.bounds_tree_leaf);
       throw;
     }
-    ++_next_static_rigid_body_reference_value;
+    ++_next_static_rigid_body_handle_value;
     return reference;
   }
 
@@ -124,6 +144,46 @@ public:
     auto const it = _static_rigid_bodies.find(reference);
     _bounds_tree.destroy_leaf(it->second.bounds_tree_leaf);
     _static_rigid_bodies.erase(it);
+  }
+
+  Dynamic_rigid_body_handle
+  create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info) {
+    auto const transform = math::make_rigid_transform_mat3x4(
+        create_info.position, create_info.orientation);
+    Dynamic_rigid_body_handle const handle{
+        _next_dynamic_rigid_body_handle_value};
+    Dynamic_rigid_body const value{
+        .bounds_tree_leaf = _bounds_tree.create_leaf(
+            physics::bounds(create_info.shape, transform), handle),
+        .motion_callback = create_info.motion_callback,
+        .collision_flags = create_info.collision_flags,
+        .collision_mask = create_info.collision_mask,
+        .previous_position = create_info.position,
+        .current_position = create_info.position,
+        .velocity = create_info.velocity,
+        .previous_orientation = create_info.orientation,
+        .current_orientation = create_info.orientation,
+        .angular_velocity = create_info.angular_velocity,
+        .mass = create_info.mass,
+        .mass_inverse = 1.0f / create_info.mass,
+        .inertia_tensor = create_info.inertia_tensor,
+        .inertia_tensor_inverse = inverse(create_info.inertia_tensor),
+        .shape = create_info.shape,
+        .material = create_info.material};
+    try {
+      _dynamic_rigid_bodies.emplace(handle, value);
+    } catch (...) {
+      _bounds_tree.destroy_leaf(value.bounds_tree_leaf);
+      throw;
+    }
+    ++_next_dynamic_rigid_body_handle_value;
+    return handle;
+  }
+
+  void destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle) {
+    auto const it = _dynamic_rigid_bodies.find(handle);
+    _bounds_tree.destroy_leaf(it->second.bounds_tree_leaf);
+    _dynamic_rigid_bodies.erase(it);
   }
 
   void simulate(Space_simulate_info const &simulate_info) {
@@ -137,6 +197,17 @@ public:
         particle.velocity += h * _gravitational_acceleration;
         particle.current_position += h * particle.velocity;
       }
+      for (auto &element : _dynamic_rigid_bodies) {
+        auto &body = element.second;
+        body.previous_position = body.current_position;
+        body.velocity += h * _gravitational_acceleration;
+        body.current_position += h * body.velocity;
+        body.previous_orientation = body.current_orientation;
+        body.current_orientation += 0.5f * h *
+                                    math::Quatf{0.0f, body.angular_velocity} *
+                                    body.current_orientation;
+        body.current_orientation = math::normalize(body.current_orientation);
+      }
       solve_particle_particle_contact_positions();
       solve_particle_static_rigid_body_contact_positions();
       for (auto &element : _particles) {
@@ -147,10 +218,16 @@ public:
       solve_particle_particle_contact_velocities(h);
       solve_particle_static_rigid_body_contact_velocities(h);
     }
-    for (auto &[reference, value] : _particles) {
+    for (auto &[handle, value] : _particles) {
       if (value.motion_callback != nullptr) {
         value.motion_callback->on_particle_motion(
-            {reference, value.current_position, value.velocity});
+            {handle, value.current_position});
+      }
+    }
+    for (auto &[handle, value] : _dynamic_rigid_bodies) {
+      if (value.motion_callback != nullptr) {
+        value.motion_callback->on_dynamic_rigid_body_motion(
+            {handle, value.current_position, value.current_orientation});
       }
     }
   }
@@ -409,11 +486,14 @@ private:
   ankerl::unordered_dense::map<Particle_handle, Particle> _particles;
   ankerl::unordered_dense::map<Static_rigid_body_handle, Static_rigid_body>
       _static_rigid_bodies;
+  ankerl::unordered_dense::map<Dynamic_rigid_body_handle, Dynamic_rigid_body>
+      _dynamic_rigid_bodies;
   std::vector<Particle_particle_contact> _particle_particle_contacts;
   std::vector<Particle_static_rigid_body_contact>
       _particle_static_rigid_body_contacts;
-  std::uint64_t _next_particle_reference_value{};
-  std::uint64_t _next_static_rigid_body_reference_value{};
+  std::uint64_t _next_particle_handle_value{};
+  std::uint64_t _next_static_rigid_body_handle_value{};
+  std::uint64_t _next_dynamic_rigid_body_handle_value{};
   math::Vec3f _gravitational_acceleration;
 };
 
@@ -439,6 +519,15 @@ Static_rigid_body_handle Space::create_static_rigid_body(
 void Space::destroy_static_rigid_body(
     Static_rigid_body_handle static_rigid_body) {
   _impl->destroy_static_rigid_body(static_rigid_body);
+}
+
+Dynamic_rigid_body_handle Space::create_dynamic_rigid_body(
+    Dynamic_rigid_body_create_info const &create_info) {
+  return _impl->create_dynamic_rigid_body(create_info);
+}
+
+void Space::destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle) {
+  _impl->destroy_dynamic_rigid_body(handle);
 }
 
 void Space::simulate(Space_simulate_info const &simulate_info) {

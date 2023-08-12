@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "dynamic_rigid_body.h"
 #include "particle.h"
 #include "static_rigid_body.h"
 
@@ -25,12 +26,17 @@ public:
 
   Particle_handle create_particle(Particle_create_info const &create_info);
 
-  void destroy_particle(Particle_handle particle);
+  void destroy_particle(Particle_handle handle);
 
   Static_rigid_body_handle
   create_static_rigid_body(Static_rigid_body_create_info const &create_info);
 
-  void destroy_static_rigid_body(Static_rigid_body_handle static_rigid_body);
+  void destroy_static_rigid_body(Static_rigid_body_handle handle);
+
+  Dynamic_rigid_body_handle
+  create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info);
+
+  void destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle);
 
   void simulate(Space_simulate_info const &simulate_info);
 

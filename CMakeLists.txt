@@ -39,10 +39,10 @@ add_library(
   "src/physics/space.cpp")
 set(
   CLIENT_SOURCES
-  "src/client/entity.cpp"
+  "src/client/dynamic_prop.cpp"
   "src/client/glfw_instance.cpp"
   "src/client/glfw_window.cpp"
-  "src/client/static_prop_entity.cpp"
+  "src/client/static_prop.cpp"
   "src/client/test_entity.cpp")
 add_executable(
   client ${CLIENT_SOURCES} "src/client/main.cpp")

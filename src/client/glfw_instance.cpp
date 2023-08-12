@@ -12,7 +12,7 @@ namespace {
 int instance_count{0};
 }
 
-Glfw_shared_instance::Glfw_shared_instance() {
+Shared_glfw_instance::Shared_glfw_instance() {
   if (instance_count != 0) {
     throw std::runtime_error{
         "attempted to construct more than once simultaneous glfw instance"};
@@ -26,7 +26,7 @@ Glfw_shared_instance::Glfw_shared_instance() {
   ++instance_count;
 }
 
-Glfw_shared_instance::~Glfw_shared_instance() {
+Shared_glfw_instance::~Shared_glfw_instance() {
   if (_owns) {
     glfwTerminate();
     _owns = false;
@@ -34,18 +34,18 @@ Glfw_shared_instance::~Glfw_shared_instance() {
   }
 }
 
-Glfw_shared_instance::Glfw_shared_instance(Glfw_shared_instance &&other) noexcept
+Shared_glfw_instance::Shared_glfw_instance(Shared_glfw_instance &&other) noexcept
     : _owns{std::exchange(other._owns, false)} {}
 
-Glfw_shared_instance &Glfw_shared_instance::operator=(Glfw_shared_instance &&other) noexcept {
+Shared_glfw_instance &Shared_glfw_instance::operator=(Shared_glfw_instance &&other) noexcept {
   auto temp{std::move(other)};
   swap(temp);
   return *this;
 }
 
-bool Glfw_shared_instance::owns() const noexcept { return _owns; }
+bool Shared_glfw_instance::owns() const noexcept { return _owns; }
 
-void Glfw_shared_instance::swap(Glfw_shared_instance &other) noexcept { std::swap(_owns, other._owns); }
+void Shared_glfw_instance::swap(Shared_glfw_instance &other) noexcept { std::swap(_owns, other._owns); }
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-function"
@@ -54,14 +54,14 @@ void Glfw_shared_instance::swap(Glfw_shared_instance &other) noexcept { std::swa
 TEST_CASE("Glfw_shared_instance") {
   REQUIRE(instance_count == 0);
   {
-    Glfw_shared_instance instance;
+    Shared_glfw_instance instance;
     REQUIRE(instance_count == 1);
     REQUIRE(instance.owns());
-    Glfw_shared_instance other_instance{std::move(instance)};
+    Shared_glfw_instance other_instance{std::move(instance)};
     REQUIRE(instance_count == 1);
     REQUIRE(!instance.owns());
     REQUIRE(other_instance.owns());
-    REQUIRE_THROWS(Glfw_shared_instance{});
+    REQUIRE_THROWS(Shared_glfw_instance{});
   }
   REQUIRE(instance_count == 0);
 }

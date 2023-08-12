@@ -13,7 +13,7 @@ void Glfw_window_deleter::operator()(GLFWwindow *ptr) const {
   glfwDestroyWindow(ptr);
 }
 
-Glfw_unique_window_ptr make_glfw_unique_window(int width, int height,
+Unique_glfw_window_ptr make_unique_glfw_window(int width, int height,
                                            const char *title,
                                            GLFWmonitor *monitor,
                                            GLFWwindow *share) {
@@ -23,19 +23,19 @@ Glfw_unique_window_ptr make_glfw_unique_window(int width, int height,
     glfwGetError(&error_description);
     throw std::runtime_error{error_description};
   }
-  return Glfw_unique_window_ptr{window};
+  return Unique_glfw_window_ptr{window};
 }
 
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Wunused-function"
 #endif
 
-TEST_CASE("Glfw_unique_window_ptr") {
-  REQUIRE_THROWS(make_glfw_unique_window(800, 600, "title"));
-  const Glfw_shared_instance instance;
-  const auto window = make_glfw_unique_window(800, 600, "title");
+TEST_CASE("Unique_glfw_window_ptr") {
+  REQUIRE_THROWS(make_unique_glfw_window(800, 600, "title"));
+  const Shared_glfw_instance instance;
+  const auto window = make_unique_glfw_window(800, 600, "title");
   {
-    auto a = make_glfw_unique_window(100, 100, "a");
+    auto a = make_unique_glfw_window(100, 100, "a");
     auto b = std::move(a);
     a = std::move(b);
   }

@@ -6,10 +6,9 @@ namespace marlon {
 namespace client {
 Test_entity_manager::Test_entity_manager(
     Scene_diff_provider const *scene_diff_provider, graphics::Surface *surface,
-    physics::Space *space, Entity_destruction_queue *entity_destruction_queue)
+    physics::Space *space)
     : _scene_diff_provider{scene_diff_provider}, _surface{surface},
-      _space{space}, _entity_destruction_queue{entity_destruction_queue},
-      _random_number_engine{std::random_device{}()},
+      _space{space}, _random_number_engine{std::random_device{}()},
       _next_entity_reference_value{} {}
 
 Test_entity_manager::~Test_entity_manager() {}
@@ -38,8 +37,8 @@ math::Vec3f sample_ball(Random_number_engine &random_number_engine) {
 }
 } // namespace
 
-Entity_reference
-Test_entity_manager::create_entity(Entity_create_info const &) {
+Test_entity_handle
+Test_entity_manager::create_entity(Test_entity_create_info const &) {
   auto const collision_flags_array =
       std::array<std::uint64_t, 3>{0b01u, 0b01u, 0b01u};
   auto const collision_masks =
@@ -69,10 +68,8 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
   std::uniform_real_distribution<float> scale_distribution{0.01f, 0.05f};
   auto const density = densities[index];
   auto const scale = scale_distribution(_random_number_engine);
-  Entity_reference const reference{_next_entity_reference_value};
-  auto &value = _entities[reference];
+  auto &value = _entities[_next_entity_reference_value];
   value.manager = this;
-  value.reference = reference;
   auto const scene_diff = _scene_diff_provider->get_scene_diff();
   value.scene_node = scene_diff->record_scene_node_creation(
       {.translation = position, .scale = scale});
@@ -84,19 +81,16 @@ Test_entity_manager::create_entity(Entity_create_info const &) {
        .collision_mask = collision_mask,
        .position = position,
        .velocity = velocity,
-       //  .acceleration = acceleration,
-       //  .damping_factor = damping_factor,
        .mass = density * 4.0f / 3.0f * 3.14f * scale * scale * scale,
        .radius = scale,
        .material = {.static_friction_coefficient = 1.1f,
                     .dynamic_friction_coefficient = 0.9f,
                     .restitution_coefficient = 0.0f}});
-  ++_next_entity_reference_value;
-  return reference;
+  return {_next_entity_reference_value++};
 }
 
-void Test_entity_manager::destroy_entity(Entity_reference reference) {
-  auto const it = _entities.find(reference);
+void Test_entity_manager::destroy_entity(Test_entity_handle handle) {
+  auto const it = _entities.find(handle.value);
   auto &value = it->second;
   auto const scene_diff = _scene_diff_provider->get_scene_diff();
   scene_diff->record_surface_instance_destruction(value.surface_instance);
@@ -105,16 +99,20 @@ void Test_entity_manager::destroy_entity(Entity_reference reference) {
   _entities.erase(it);
 }
 
-void Test_entity_manager::tick_entities(float delta_time) {
-  for (auto &[reference, value] : _entities) {
+void Test_entity_manager::tick(float delta_time) {
+  auto entities_to_destroy = std::vector<Test_entity_handle>{};
+  for (auto &[handle, value] : _entities) {
     value.time_alive += delta_time;
     if (value.time_alive > 20.0f) {
-      _entity_destruction_queue->push(this, reference);
+      entities_to_destroy.push_back({handle});
     }
+  }
+  for (auto const handle : entities_to_destroy) {
+    destroy_entity(handle);
   }
 }
 
-void Test_entity_manager::Test_entity::on_particle_motion(
+void Test_entity_manager::Entity::on_particle_motion(
     physics::Particle_motion_event const &event) {
   manager->_scene_diff_provider->get_scene_diff()
       ->record_scene_node_translation_continuous(scene_node, event.position);

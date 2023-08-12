@@ -30,9 +30,8 @@ struct Particle_create_info {
 };
 
 struct Particle_motion_event {
-  Particle_handle particle;
+  Particle_handle handle;
   math::Vec3f position;
-  math::Vec3f velocity;
 };
 
 struct Particle_contact {
