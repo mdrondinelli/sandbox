@@ -16,7 +16,7 @@ struct Dynamic_prop_handle {
 
 struct Dynamic_prop_manager_create_info {
   Scene_diff_provider const *scene_diff_provider;
-  graphics::Surface *surface;
+  graphics::Surface surface;
   float surface_scale;
   physics::Space *space;
   float mass;
@@ -57,7 +57,7 @@ private:
   };
 
   Scene_diff_provider const *_scene_diff_provider;
-  graphics::Surface *_surface;
+  graphics::Surface _surface;
   float _surface_scale;
   physics::Space *_space;
   float _mass;

@@ -35,19 +35,19 @@ struct Vertex {
 struct Resources {
   graphics::Unique_texture_ptr brick_base_color_texture;
   graphics::Unique_texture_ptr striped_cotton_base_color_texture;
-  graphics::Unique_material_ptr brick_material;
-  graphics::Unique_material_ptr striped_cotton_material;
-  graphics::Unique_material_ptr red_material;
-  graphics::Unique_material_ptr blue_material;
-  graphics::Unique_material_ptr particle_material;
+  graphics::Material brick_material;
+  graphics::Material striped_cotton_material;
+  graphics::Material red_material;
+  graphics::Material blue_material;
+  graphics::Material particle_material;
   graphics::Unique_mesh_ptr cube_mesh;
   graphics::Unique_mesh_ptr low_quality_sphere_mesh;
   graphics::Unique_mesh_ptr high_quality_sphere_mesh;
-  graphics::Unique_surface_ptr brick_box_surface;
-  graphics::Unique_surface_ptr striped_cotton_box_surface;
-  graphics::Unique_surface_ptr red_ball_surface;
-  graphics::Unique_surface_ptr blue_box_surface;
-  graphics::Unique_surface_ptr particle_surface;
+  graphics::Surface brick_box_surface;
+  graphics::Surface striped_cotton_box_surface;
+  graphics::Surface red_ball_surface;
+  graphics::Surface blue_box_surface;
+  graphics::Surface particle_surface;
 };
 
 client::Unique_glfw_window_ptr create_window() {
@@ -84,33 +84,27 @@ Resources create_resources(graphics::Graphics *graphics) {
   retval.striped_cotton_base_color_texture = create_texture(
       graphics,
       "C:/Users/marlo/rendering-engine/res/StripedCotton01_2K_BaseColor.ktx");
-  retval.brick_material = graphics->create_material_unique(
-      {.base_color_texture = retval.brick_base_color_texture.get()});
-  retval.striped_cotton_material = graphics->create_material_unique(
-      {.base_color_texture = retval.striped_cotton_base_color_texture.get()});
-  retval.red_material =
-      graphics->create_material_unique({.base_color_tint = {0.1f, 0.0f, 0.0f}});
-  retval.blue_material = graphics->create_material_unique(
-      {.base_color_tint = {0.00f, 0.005f, 0.02f}});
-  retval.particle_material = graphics->create_material_unique(
-      {.base_color_tint = {0.25f, 0.5f, 1.0f}});
+  retval.brick_material = {.base_color_texture =
+                               retval.brick_base_color_texture.get()};
+  retval.striped_cotton_material = {
+      .base_color_texture = retval.striped_cotton_base_color_texture.get()};
+  retval.red_material = {.base_color_tint = {0.1f, 0.0f, 0.0f}};
+  retval.blue_material = {.base_color_tint = {0.00f, 0.005f, 0.02f}};
+  retval.particle_material = {.base_color_tint = {0.25f, 0.5f, 1.0f}};
   retval.cube_mesh = create_cuboid_mesh(graphics);
   retval.low_quality_sphere_mesh = create_icosphere_mesh(graphics, 1);
   retval.high_quality_sphere_mesh = create_icosphere_mesh(graphics, 3);
-  retval.brick_box_surface =
-      graphics->create_surface_unique({.material = retval.brick_material.get(),
-                                       .mesh = retval.cube_mesh.get()});
-  retval.striped_cotton_box_surface = graphics->create_surface_unique(
-      {.material = retval.striped_cotton_material.get(),
-       .mesh = retval.cube_mesh.get()});
-  retval.red_ball_surface = graphics->create_surface_unique(
-      {.material = retval.red_material.get(),
-       .mesh = retval.high_quality_sphere_mesh.get()});
-  retval.blue_box_surface = graphics->create_surface_unique(
-      {.material = retval.blue_material.get(), .mesh = retval.cube_mesh.get()});
-  retval.particle_surface = graphics->create_surface_unique(
-      {.material = retval.particle_material.get(),
-       .mesh = retval.low_quality_sphere_mesh.get()});
+  retval.brick_box_surface = {.material = retval.brick_material,
+                              .mesh = retval.cube_mesh.get()};
+  retval.striped_cotton_box_surface = {.material =
+                                           retval.striped_cotton_material,
+                                       .mesh = retval.cube_mesh.get()};
+  retval.red_ball_surface = {.material = retval.red_material,
+                             .mesh = retval.high_quality_sphere_mesh.get()};
+  retval.blue_box_surface = {.material = retval.blue_material,
+                             .mesh = retval.cube_mesh.get()};
+  retval.particle_surface = {.material = retval.particle_material,
+                             .mesh = retval.low_quality_sphere_mesh.get()};
   return retval;
 }
 
@@ -362,7 +356,7 @@ int main() {
   auto const ground_scene_node = scene_diff->record_scene_node_creation(
       {.translation = {0.0f, -100.0f, 0.0f}, .scale = 100.0f});
   scene_diff->record_surface_instance_creation(
-      {.surface = resources.blue_box_surface.get(),
+      {.surface = resources.blue_box_surface,
        .scene_node = ground_scene_node});
   physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
   physics::Material const physics_material{.static_friction_coefficient = 1.1f,
@@ -380,7 +374,7 @@ int main() {
                                   .material = physics_material});
   client::Static_prop_manager red_ball_manager{
       {.scene_diff_provider = &scene_diff_provider,
-       .surface = resources.red_ball_surface.get(),
+       .surface = resources.red_ball_surface,
        .surface_scale = 0.5f,
        .space = &space,
        .shape = ball_shape,
@@ -389,14 +383,14 @@ int main() {
                     .restitution_coefficient = 0.0f}}};
   client::Static_prop_manager brick_box_manager{
       {.scene_diff_provider = &scene_diff_provider,
-       .surface = resources.brick_box_surface.get(),
+       .surface = resources.brick_box_surface,
        .surface_scale = 1.0f,
        .space = &space,
        .shape = brick_box_shape,
        .material = physics_material}};
   client::Dynamic_prop_manager cotton_box_manager{
       {.scene_diff_provider = &scene_diff_provider,
-       .surface = resources.striped_cotton_box_surface.get(),
+       .surface = resources.striped_cotton_box_surface,
        .surface_scale = 0.5f,
        .space = &space,
        .mass = 1.0f,
@@ -404,7 +398,7 @@ int main() {
        .shape = cotton_box_shape,
        .material = physics_material}};
   client::Test_entity_manager test_entity_manager{
-      &scene_diff_provider, resources.particle_surface.get(), &space};
+      &scene_diff_provider, resources.particle_surface, &space};
   red_ball_manager.create({.position = {-1.5f, 0.5f, -1.5f}});
   red_ball_manager.create({.position = {1.5f, 0.5f, 1.5f}});
   brick_box_manager.create(

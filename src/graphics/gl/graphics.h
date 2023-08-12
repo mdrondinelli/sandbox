@@ -29,13 +29,13 @@ public:
 
   void destroy_mesh(Mesh *mesh) noexcept final;
 
-  Gl_material *create_material(Material_create_info const &create_info) final;
+  // Gl_material *create_material(Material_create_info const &create_info) final;
 
-  void destroy_material(Material *material) noexcept final;
+  // void destroy_material(Material *material) noexcept final;
 
-  Gl_surface *create_surface(Surface_create_info const &create_info) final;
+  // Gl_surface *create_surface(Surface_create_info const &create_info) final;
 
-  void destroy_surface(Surface *surface) noexcept final;
+  // void destroy_surface(Surface *surface) noexcept final;
 
   Gl_scene *create_scene(Scene_create_info const &create_info) final;
 

@@ -5,7 +5,7 @@
 namespace marlon {
 namespace client {
 Test_entity_manager::Test_entity_manager(
-    Scene_diff_provider const *scene_diff_provider, graphics::Surface *surface,
+    Scene_diff_provider const *scene_diff_provider, graphics::Surface surface,
     physics::Space *space)
     : _scene_diff_provider{scene_diff_provider}, _surface{surface},
       _space{space}, _random_number_engine{std::random_device{}()},

@@ -1,13 +1,14 @@
 #ifndef MARLON_GRAPHICS_SURFACE_INSTANCE_H
 #define MARLON_GRAPHICS_SURFACE_INSTANCE_H
 
+#include "surface.h"
+
 namespace marlon {
 namespace graphics {
 class Scene_node;
-class Surface;
 
 struct Surface_instance_create_info {
-  Surface *surface;
+  Surface surface;
   Scene_node *scene_node;
 };
 

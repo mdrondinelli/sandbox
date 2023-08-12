@@ -9,6 +9,9 @@
 #include <glad/glad.h>
 #endif
 
+#include "mesh.h"
+#include "texture.h"
+
 namespace marlon {
 namespace graphics {
 Gl_scene::Impl::Impl(Scene_create_info const &) noexcept {}
@@ -87,18 +90,19 @@ void Gl_scene::Impl::draw_surface_instances(
                               GL_TRUE, &model_view_matrix[0][0]);
     glProgramUniformMatrix4fv(shader_program, model_view_clip_matrix_location,
                               1, GL_TRUE, &model_view_clip_matrix[0][0]);
-    auto const surface = surface_instance->_impl.get_surface();
-    auto const material = surface->_impl.get_material();
-    auto const base_color_texture = material->_impl.get_base_color_texture();
-    if (base_color_texture != nullptr) {
-      glBindTextureUnit(0, base_color_texture->_handle.get());
+    auto const &surface = surface_instance->_impl.get_surface();
+    auto const &material = surface.material;
+    if (material.base_color_texture != nullptr) {
+      glBindTextureUnit(0,
+                        static_cast<Gl_texture *>(material.base_color_texture)
+                            ->_handle.get());
     } else {
       glBindTextureUnit(0, default_base_color_texture);
     }
-    auto const base_color_tint = material->_impl.get_base_color_tint();
-    glProgramUniform3f(shader_program, albedo_location, base_color_tint.r,
-                       base_color_tint.g, base_color_tint.b);
-    auto const mesh = surface->_impl.get_mesh();
+    glProgramUniform3f(shader_program, albedo_location,
+                       material.base_color_tint.r, material.base_color_tint.g,
+                       material.base_color_tint.b);
+    auto const mesh = static_cast<Gl_mesh *>(surface.mesh);
     mesh->_impl.bind_vertex_array();
     mesh->_impl.draw();
   }

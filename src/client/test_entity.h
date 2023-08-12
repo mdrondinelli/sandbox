@@ -19,7 +19,7 @@ struct Test_entity_create_info {};
 class Test_entity_manager {
 public:
   explicit Test_entity_manager(Scene_diff_provider const *scene_diff_provider,
-                               graphics::Surface *surface,
+                               graphics::Surface surface,
                                physics::Space *space);
 
   ~Test_entity_manager();
@@ -42,7 +42,7 @@ private:
   };
 
   Scene_diff_provider const *_scene_diff_provider;
-  graphics::Surface *_surface;
+  graphics::Surface _surface;
   physics::Space *_space;
   std::mt19937 _random_number_engine;
   std::unordered_map<std::uint64_t, Entity> _entities;

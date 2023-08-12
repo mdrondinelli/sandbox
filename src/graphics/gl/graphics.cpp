@@ -126,14 +126,14 @@ void Gl_graphics::destroy_texture(Texture *texture) noexcept {
   delete static_cast<Gl_texture *>(texture);
 }
 
-Gl_material *
-Gl_graphics::create_material(Material_create_info const &create_info) {
-  return new Gl_material{create_info};
-}
+// Gl_material *
+// Gl_graphics::create_material(Material_create_info const &create_info) {
+//   return new Gl_material{create_info};
+// }
 
-void Gl_graphics::destroy_material(Material *material) noexcept {
-  delete static_cast<Gl_material *>(material);
-}
+// void Gl_graphics::destroy_material(Material *material) noexcept {
+//   delete static_cast<Gl_material *>(material);
+// }
 
 Gl_mesh *Gl_graphics::create_mesh(Mesh_create_info const &create_info) {
   return new Gl_mesh{create_info};
@@ -143,14 +143,14 @@ void Gl_graphics::destroy_mesh(Mesh *mesh) noexcept {
   delete static_cast<Gl_mesh *>(mesh);
 }
 
-Gl_surface *
-Gl_graphics::create_surface(Surface_create_info const &create_info) {
-  return new Gl_surface{create_info};
-}
+// Gl_surface *
+// Gl_graphics::create_surface(Surface_create_info const &create_info) {
+//   return new Gl_surface{create_info};
+// }
 
-void Gl_graphics::destroy_surface(Surface *surface) noexcept {
-  delete static_cast<Gl_surface *>(surface);
-}
+// void Gl_graphics::destroy_surface(Surface *surface) noexcept {
+//   delete static_cast<Gl_surface *>(surface);
+// }
 
 Gl_scene *Gl_graphics::create_scene(Scene_create_info const &create_info) {
   return new Gl_scene{create_info};

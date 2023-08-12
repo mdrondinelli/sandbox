@@ -24,10 +24,6 @@ class Camera;
 struct Camera_create_info;
 class Camera_instance;
 struct Camera_instance_create_info;
-class Material;
-struct Material_create_info;
-class Mesh;
-struct Mesh_create_info;
 class Render_target;
 class Render_stream;
 struct Render_stream_create_info;
@@ -37,8 +33,6 @@ class Scene_diff;
 struct Scene_diff_create_info;
 class Scene_node;
 struct Scene_node_create_info;
-class Surface;
-struct Surface_create_info;
 class Surface_instance;
 struct Surface_instance_create_info;
 
@@ -54,15 +48,15 @@ private:
   Graphics *_owner;
 };
 
-class Material_deleter {
-public:
-  Material_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
+// class Material_deleter {
+// public:
+//   Material_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
 
-  void operator()(Material *material) const noexcept;
+//   void operator()(Material *material) const noexcept;
 
-private:
-  Graphics *_owner;
-};
+// private:
+//   Graphics *_owner;
+// };
 
 class Mesh_deleter {
 public:
@@ -74,15 +68,15 @@ private:
   Graphics *_owner;
 };
 
-class Surface_deleter {
-public:
-  Surface_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
+// class Surface_deleter {
+// public:
+//   Surface_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
 
-  void operator()(Surface *surface) const noexcept;
+//   void operator()(Surface *surface) const noexcept;
 
-private:
-  Graphics *_owner;
-};
+// private:
+//   Graphics *_owner;
+// };
 
 class Scene_deleter {
 public:
@@ -105,9 +99,9 @@ private:
 };
 
 using Unique_texture_ptr = std::unique_ptr<Texture, Texture_deleter>;
-using Unique_material_ptr = std::unique_ptr<Material, Material_deleter>;
+// using Unique_material_ptr = std::unique_ptr<Material, Material_deleter>;
 using Unique_mesh_ptr = std::unique_ptr<Mesh, Mesh_deleter>;
-using Unique_surface_ptr = std::unique_ptr<Surface, Surface_deleter>;
+// using Unique_surface_ptr = std::unique_ptr<Surface, Surface_deleter>;
 using Unique_scene_ptr = std::unique_ptr<Scene, Scene_deleter>;
 using Unique_scene_diff_ptr = std::unique_ptr<Scene_diff, Scene_diff_deleter>;
 
@@ -124,15 +118,15 @@ public:
     return Unique_texture_ptr{create_texture(create_info), this};
   }
 
-  virtual Material *
-  create_material(Material_create_info const &create_info) = 0;
+  // virtual Material *
+  // create_material(Material_create_info const &create_info) = 0;
 
-  virtual void destroy_material(Material *material) noexcept = 0;
+  // virtual void destroy_material(Material *material) noexcept = 0;
 
-  Unique_material_ptr
-  create_material_unique(Material_create_info const &create_info) {
-    return Unique_material_ptr{create_material(create_info), this};
-  }
+  // Unique_material_ptr
+  // create_material_unique(Material_create_info const &create_info) {
+  //   return Unique_material_ptr{create_material(create_info), this};
+  // }
 
   virtual Mesh *create_mesh(Mesh_create_info const &create_info) = 0;
 
@@ -142,14 +136,14 @@ public:
     return Unique_mesh_ptr{create_mesh(create_info), this};
   }
 
-  virtual Surface *create_surface(Surface_create_info const &create_info) = 0;
+  // virtual Surface *create_surface(Surface_create_info const &create_info) = 0;
 
-  virtual void destroy_surface(Surface *surface) noexcept = 0;
+  // virtual void destroy_surface(Surface *surface) noexcept = 0;
 
-  Unique_surface_ptr
-  create_surface_unique(Surface_create_info const &create_info) {
-    return Unique_surface_ptr{create_surface(create_info), this};
-  }
+  // Unique_surface_ptr
+  // create_surface_unique(Surface_create_info const &create_info) {
+  //   return Unique_surface_ptr{create_surface(create_info), this};
+  // }
 
   virtual Scene *create_scene(Scene_create_info const &create_info) = 0;
 
@@ -189,17 +183,17 @@ inline void Texture_deleter::operator()(Texture *texture) const noexcept {
   _owner->destroy_texture(texture);
 }
 
-inline void Material_deleter::operator()(Material *material) const noexcept {
-  _owner->destroy_material(material);
-}
+// inline void Material_deleter::operator()(Material *material) const noexcept {
+//   _owner->destroy_material(material);
+// }
 
 inline void Mesh_deleter::operator()(Mesh *mesh) const noexcept {
   _owner->destroy_mesh(mesh);
 }
 
-inline void Surface_deleter::operator()(Surface *surface) const noexcept {
-  _owner->destroy_surface(surface);
-}
+// inline void Surface_deleter::operator()(Surface *surface) const noexcept {
+//   _owner->destroy_surface(surface);
+// }
 
 inline void Scene_deleter::operator()(Scene *scene) const noexcept {
   _owner->destroy_scene(scene);

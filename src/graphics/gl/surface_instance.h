@@ -15,7 +15,7 @@ public:
   public:
     explicit Impl(Surface_instance_create_info const &create_info) noexcept;
   
-    Gl_surface *get_surface() const noexcept {
+    Surface const &get_surface() const noexcept {
       return _surface;
     }
     
@@ -24,7 +24,7 @@ public:
     }
 
   private:
-    Gl_surface *_surface;
+    Surface _surface;
     Gl_scene_node *_scene_node;
   };
 
