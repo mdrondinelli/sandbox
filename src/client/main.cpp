@@ -332,11 +332,6 @@ int main() {
                                   {0.0f, 100.0f, 0.0f, -100.0f},
                                   {0.0f, 0.0f, 100.0f, 0.0f}}});
   scene->add_surface(ground_surface.get());
-  // auto const ground_scene_node = scene_diff->record_scene_node_creation(
-  //     {.translation = {0.0f, -100.0f, 0.0f}, .scale = 100.0f});
-  // scene_diff->record_surface_instance_creation(
-  //     {.surface = resources.blue_box_surface, .scene_node =
-  //     ground_scene_node});
   physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
   physics::Material const physics_material{.static_friction_coefficient = 1.1f,
                                            .dynamic_friction_coefficient = 0.6f,
