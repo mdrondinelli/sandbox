@@ -1,14 +1,18 @@
 #ifndef MARLON_GRAPHICS_SCENE_H
 #define MARLON_GRAPHICS_SCENE_H
 
+#include "surface.h"
+
 namespace marlon {
 namespace graphics {
-class Scene_diff;
-struct Scene_diff_create_info;
-
 struct Scene_create_info {};
 
-class Scene {};
+class Scene {
+public:
+  virtual void add_surface(Surface *surface) = 0;
+  
+  virtual void remove_surface(Surface *surface) = 0;
+};
 } // namespace graphics
 } // namespace marlon
 

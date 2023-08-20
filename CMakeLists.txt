@@ -16,17 +16,11 @@ add_executable(
   "src/math/vec.cpp")
 add_library(
   graphics
-  "src/graphics/gl/camera.cpp"
-  "src/graphics/gl/camera_instance.cpp"
   "src/graphics/gl/default_render_target.cpp"
   "src/graphics/gl/graphics.cpp"
   "src/graphics/gl/material.cpp"
   "src/graphics/gl/mesh.cpp"
   "src/graphics/gl/scene.cpp"
-  "src/graphics/gl/scene_diff.cpp"
-  "src/graphics/gl/scene_node.cpp"
-  "src/graphics/gl/surface.cpp"
-  "src/graphics/gl/surface_instance.cpp"
   "src/graphics/gl/texture.cpp"
   "src/graphics/gl/unique_buffer_handle.cpp"
   "src/graphics/gl/unique_shader_handle.cpp"

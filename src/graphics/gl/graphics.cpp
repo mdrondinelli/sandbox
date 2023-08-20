@@ -4,6 +4,7 @@
 
 #include <array>
 #include <stdexcept>
+#include <vector>
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -14,6 +15,12 @@
 #include <glad/glad.h>
 #endif
 
+#include "camera.h"
+#include "material.h"
+#include "mesh.h"
+#include "scene.h"
+#include "surface.h"
+#include "texture.h"
 #include "unique_shader_handle.h"
 
 namespace marlon {
@@ -117,25 +124,7 @@ Gl_graphics::Gl_graphics()
                       default_base_color_texture_pixels.data());
 }
 
-Gl_texture *
-Gl_graphics::create_texture(Texture_create_info const &create_info) {
-  return new Gl_texture{create_info};
-}
-
-void Gl_graphics::destroy_texture(Texture *texture) noexcept {
-  delete static_cast<Gl_texture *>(texture);
-}
-
-// Gl_material *
-// Gl_graphics::create_material(Material_create_info const &create_info) {
-//   return new Gl_material{create_info};
-// }
-
-// void Gl_graphics::destroy_material(Material *material) noexcept {
-//   delete static_cast<Gl_material *>(material);
-// }
-
-Gl_mesh *Gl_graphics::create_mesh(Mesh_create_info const &create_info) {
+Mesh *Gl_graphics::create_mesh(Mesh_create_info const &create_info) {
   return new Gl_mesh{create_info};
 }
 
@@ -143,16 +132,24 @@ void Gl_graphics::destroy_mesh(Mesh *mesh) noexcept {
   delete static_cast<Gl_mesh *>(mesh);
 }
 
-// Gl_surface *
-// Gl_graphics::create_surface(Surface_create_info const &create_info) {
-//   return new Gl_surface{create_info};
-// }
+Texture *Gl_graphics::create_texture(Texture_create_info const &create_info) {
+  return new Gl_texture{create_info};
+}
 
-// void Gl_graphics::destroy_surface(Surface *surface) noexcept {
-//   delete static_cast<Gl_surface *>(surface);
-// }
+void Gl_graphics::destroy_texture(Texture *texture) noexcept {
+  delete static_cast<Gl_texture *>(texture);
+}
 
-Gl_scene *Gl_graphics::create_scene(Scene_create_info const &create_info) {
+Material *
+Gl_graphics::create_material(Material_create_info const &create_info) {
+  return new Gl_material{create_info};
+}
+
+void Gl_graphics::destroy_material(Material *material) noexcept {
+  delete static_cast<Gl_material *>(material);
+}
+
+Scene *Gl_graphics::create_scene(Scene_create_info const &create_info) {
   return new Gl_scene{create_info};
 }
 
@@ -160,24 +157,24 @@ void Gl_graphics::destroy_scene(Scene *scene) noexcept {
   delete static_cast<Gl_scene *>(scene);
 }
 
-Gl_scene_diff *
-Gl_graphics::create_scene_diff(Scene_diff_create_info const &create_info) {
-  return new Gl_scene_diff{create_info};
+Surface *
+Gl_graphics::create_surface(Surface_create_info const &create_info) {
+  return new Gl_surface{create_info};
 }
 
-void Gl_graphics::destroy_scene_diff(Scene_diff *scene_diff) noexcept {
-  delete static_cast<Gl_scene_diff *>(scene_diff);
+void Gl_graphics::destroy_surface(Surface *surface) noexcept {
+  delete static_cast<Gl_surface *>(surface);
 }
 
-void Gl_graphics::apply_scene_diff(Scene_diff *scene_diff) {
-  static_cast<Gl_scene_diff *>(scene_diff)->_impl.apply();
+Camera *Gl_graphics::create_camera(Camera_create_info const &create_info) {
+  return new Gl_camera{create_info};
 }
 
-void Gl_graphics::apply_scene_diff(Scene_diff *scene_diff, float factor) {
-  static_cast<Gl_scene_diff *>(scene_diff)->_impl.apply(factor);
+void Gl_graphics::destroy_camera(Camera *camera) noexcept {
+  delete static_cast<Gl_camera *>(camera);
 }
 
-Gl_default_render_target *Gl_graphics::get_default_render_target() noexcept {
+Render_target *Gl_graphics::get_default_render_target() noexcept {
   return _default_render_target.get();
 }
 
@@ -185,31 +182,27 @@ void Gl_graphics::destroy_render_target(Render_target *) noexcept {
   // delete static_cast<Gl_render_target *>(target);
 }
 
-void Gl_graphics::render(Scene *source_scene,
-                         Camera_instance *source_camera_instance,
+void Gl_graphics::render(Scene *source_scene, Camera *source_camera_instance,
                          Render_target *target) {
   auto const gl_source_scene = static_cast<Gl_scene *>(source_scene);
   auto const gl_source_camera_instance =
-      static_cast<Gl_camera_instance *>(source_camera_instance);
+      static_cast<Gl_camera *>(source_camera_instance);
   auto const gl_target = static_cast<Gl_render_target *>(target);
-  auto const view_matrix_3x4 =
-      gl_source_camera_instance->_impl.get_scene_node()
-          ->_impl.calculate_model_matrix_inv();
-  auto const view_matrix = math::Mat4x4f{view_matrix_3x4[0],
-                                         view_matrix_3x4[1],
-                                         view_matrix_3x4[2],
-                                         {0.0f, 0.0f, 0.0f, 1.0f}};
-  auto const clip_matrix = gl_source_camera_instance->_impl.get_camera()
-                               ->_impl.calculate_clip_matrix();
+  auto const view_matrix_3x4 = gl_source_camera_instance->get_view_matrix();
+  auto const view_matrix_4x4 = math::Mat4x4f{view_matrix_3x4[0],
+                                             view_matrix_3x4[1],
+                                             view_matrix_3x4[2],
+                                             {0.0f, 0.0f, 0.0f, 1.0f}};
+  auto const clip_matrix = gl_source_camera_instance->get_clip_matrix();
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_FRAMEBUFFER_SRGB);
   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glUseProgram(_shader_program.get());
-  gl_source_scene->_impl.draw_surface_instances(
+  gl_source_scene->draw_surfaces(
       _shader_program.get(), _default_base_color_texture.get(), 0, 1, 2,
-      view_matrix, clip_matrix * view_matrix);
+      view_matrix_4x4, clip_matrix * view_matrix_4x4);
 }
 } // namespace graphics
 } // namespace marlon

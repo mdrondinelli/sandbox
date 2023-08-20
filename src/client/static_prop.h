@@ -3,7 +3,6 @@
 
 #include "../graphics/graphics.h"
 #include "../physics/physics.h"
-#include "scene_diff_provider.h"
 
 namespace marlon {
 namespace client {
@@ -12,12 +11,14 @@ struct Static_prop_handle {
 };
 
 struct Static_prop_manager_create_info {
-  Scene_diff_provider const *scene_diff_provider{};
-  graphics::Surface surface{};
-  float surface_scale{1.0f};
+  graphics::Graphics *graphics{};
+  graphics::Scene *scene{};
+  graphics::Mesh *surface_mesh{};
+  graphics::Material *surface_material{};
+  math::Mat3x4f surface_pretransform{math::Mat3x4f::identity()};
   physics::Space *space;
-  physics::Shape shape;
-  physics::Material material;
+  physics::Shape body_shape;
+  physics::Material body_material;
 };
 
 struct Static_prop_create_info {
@@ -36,17 +37,18 @@ public:
 
 private:
   struct Entity {
-    graphics::Scene_node *scene_node{};
-    graphics::Surface_instance *surface_instance{};
-    physics::Static_rigid_body_handle static_rigid_body{};
+    graphics::Surface *surface{};
+    physics::Static_rigid_body_handle body{};
   };
 
-  Scene_diff_provider const *_scene_diff_provider;
-  graphics::Surface _surface;
-  float _surface_scale;
+  graphics::Graphics *_graphics;
+  graphics::Scene *_scene;
+  graphics::Mesh *_surface_mesh;
+  graphics::Material *_surface_material;
+  math::Mat3x4f _surface_pretransform_3x4;
   physics::Space *_space;
-  physics::Shape _shape;
-  physics::Material _material;
+  physics::Shape _body_shape;
+  physics::Material _body_material;
   std::unordered_map<std::uint64_t, Entity> _entities;
   std::uint64_t _next_entity_handle_value{};
 };

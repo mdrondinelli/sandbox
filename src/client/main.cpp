@@ -35,19 +35,14 @@ struct Vertex {
 struct Resources {
   graphics::Unique_texture_ptr brick_base_color_texture;
   graphics::Unique_texture_ptr striped_cotton_base_color_texture;
-  graphics::Material brick_material;
-  graphics::Material striped_cotton_material;
-  graphics::Material red_material;
-  graphics::Material blue_material;
-  graphics::Material particle_material;
+  graphics::Unique_material_ptr brick_material;
+  graphics::Unique_material_ptr striped_cotton_material;
+  graphics::Unique_material_ptr red_material;
+  graphics::Unique_material_ptr blue_material;
+  graphics::Unique_material_ptr particle_material;
   graphics::Unique_mesh_ptr cube_mesh;
   graphics::Unique_mesh_ptr low_quality_sphere_mesh;
   graphics::Unique_mesh_ptr high_quality_sphere_mesh;
-  graphics::Surface brick_box_surface;
-  graphics::Surface striped_cotton_box_surface;
-  graphics::Surface red_ball_surface;
-  graphics::Surface blue_box_surface;
-  graphics::Surface particle_surface;
 };
 
 client::Unique_glfw_window_ptr create_window() {
@@ -84,27 +79,19 @@ Resources create_resources(graphics::Graphics *graphics) {
   retval.striped_cotton_base_color_texture = create_texture(
       graphics,
       "C:/Users/marlo/rendering-engine/res/StripedCotton01_2K_BaseColor.ktx");
-  retval.brick_material = {.base_color_texture =
-                               retval.brick_base_color_texture.get()};
-  retval.striped_cotton_material = {
-      .base_color_texture = retval.striped_cotton_base_color_texture.get()};
-  retval.red_material = {.base_color_tint = {0.1f, 0.0f, 0.0f}};
-  retval.blue_material = {.base_color_tint = {0.00f, 0.005f, 0.02f}};
-  retval.particle_material = {.base_color_tint = {0.25f, 0.5f, 1.0f}};
+  retval.brick_material = graphics->create_material_unique(
+      {.base_color_texture = retval.brick_base_color_texture.get()});
+  retval.striped_cotton_material = graphics->create_material_unique(
+      {.base_color_texture = retval.striped_cotton_base_color_texture.get()});
+  retval.red_material =
+      graphics->create_material_unique({.base_color_tint = {0.1f, 0.0f, 0.0f}});
+  retval.blue_material = graphics->create_material_unique(
+      {.base_color_tint = {0.00f, 0.005f, 0.02f}});
+  retval.particle_material = graphics->create_material_unique(
+      {.base_color_tint = {0.25f, 0.5f, 1.0f}});
   retval.cube_mesh = create_cuboid_mesh(graphics);
   retval.low_quality_sphere_mesh = create_icosphere_mesh(graphics, 1);
   retval.high_quality_sphere_mesh = create_icosphere_mesh(graphics, 3);
-  retval.brick_box_surface = {.material = retval.brick_material,
-                              .mesh = retval.cube_mesh.get()};
-  retval.striped_cotton_box_surface = {.material =
-                                           retval.striped_cotton_material,
-                                       .mesh = retval.cube_mesh.get()};
-  retval.red_ball_surface = {.material = retval.red_material,
-                             .mesh = retval.high_quality_sphere_mesh.get()};
-  retval.blue_box_surface = {.material = retval.blue_material,
-                             .mesh = retval.cube_mesh.get()};
-  retval.particle_surface = {.material = retval.particle_material,
-                             .mesh = retval.low_quality_sphere_mesh.get()};
   return retval;
 }
 
@@ -260,11 +247,10 @@ void tick(physics::Space *space,
 
 void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
                    graphics::Render_target *render_target,
-                   graphics::Scene *scene, graphics::Scene_diff *scene_diff,
-                   graphics::Camera_instance *camera_instance,
+                   graphics::Scene *scene, graphics::Camera *camera,
                    physics::Space *space,
                    client::Test_entity_manager *test_entity_manager) {
-  auto const tick_rate = 30.0;
+  auto const tick_rate = 60.0;
   auto const tick_duration = 1.0 / tick_rate;
   auto previous_time = glfwGetTime();
   auto accumulated_time = 0.0;
@@ -283,15 +269,16 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
     if (accumulated_time >= tick_duration) {
       do {
         accumulated_time -= tick_duration;
-        graphics->apply_scene_diff(scene_diff);
+        // graphics->apply_scene_diff(scene_diff);
         tick(space, test_entity_manager, static_cast<float>(tick_duration));
       } while (accumulated_time >= tick_duration);
     }
-    graphics->apply_scene_diff(
-        scene_diff,
-        static_cast<float>(elapsed_time /
-                           (elapsed_time + tick_duration - accumulated_time)));
-    graphics->render(scene, camera_instance, render_target);
+    // graphics->apply_scene_diff(
+    //     scene_diff,
+    //     static_cast<float>(elapsed_time /
+    //                        (elapsed_time + tick_duration -
+    //                        accumulated_time)));
+    graphics->render(scene, camera, render_target);
     glfwSwapBuffers(window);
     fps_time_accumulator += elapsed_time;
     ++fps_frame_accumulator;
@@ -312,7 +299,7 @@ void tick(physics::Space *space,
           client::Test_entity_manager *test_entity_manager, float delta_time) {
   space->simulate({.delta_time = delta_time, .substep_count = 2});
   test_entity_manager->tick(delta_time);
-  for (auto i = 0; i < 8; ++i) {
+  for (auto i = 0; i < 4; ++i) {
     test_entity_manager->create_entity({});
   }
 }
@@ -324,40 +311,32 @@ int main() {
   glfwSwapInterval(0);
   auto const resources = create_resources(graphics.get());
   auto const scene = graphics->create_scene_unique({});
-  auto const scene_diff =
-      graphics->create_scene_diff_unique({.scene = scene.get()});
-  class Scene_diff_provider : public client::Scene_diff_provider {
-  public:
-    explicit Scene_diff_provider(graphics::Scene_diff *scene_diff) noexcept
-        : _scene_diff{scene_diff} {}
-
-    graphics::Scene_diff *get_scene_diff() const noexcept final {
-      return _scene_diff;
-    };
-
-  private:
-    graphics::Scene_diff *_scene_diff;
-  };
-  auto const scene_diff_provider = Scene_diff_provider{scene_diff.get()};
-  auto const camera = scene_diff->record_camera_creation({
-      .near_plane_distance = 0.001f,
-      .far_plane_distance = 1000.0f,
-      .zoom_x = 9.0f / 16.0f,
-      .zoom_y = 1.0f,
-  });
-  auto const camera_scene_node = scene_diff->record_scene_node_creation(
-      {.translation = {-3.0f, 3.5f, 3.0f},
-       .rotation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                           math::deg_to_rad(-45.0f)) *
-                   math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
-                                           math::deg_to_rad(-30.0f))});
-  auto const camera_instance = scene_diff->record_camera_instance_creation(
-      {.camera = camera, .scene_node = camera_scene_node});
-  auto const ground_scene_node = scene_diff->record_scene_node_creation(
-      {.translation = {0.0f, -100.0f, 0.0f}, .scale = 100.0f});
-  scene_diff->record_surface_instance_creation(
-      {.surface = resources.blue_box_surface,
-       .scene_node = ground_scene_node});
+  auto const camera = graphics->create_camera_unique(
+      {.zoom = {9.0f / 16.0f, 1.0f},
+       .near_plane_distance = 0.001f,
+       .far_plane_distance = 1000.0f,
+       .position = {-3.0f, 3.5f, 3.0f},
+       .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                              math::deg_to_rad(-45.0f)) *
+                      math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
+                                              math::deg_to_rad(-30.0f))});
+  auto const ground_surface = graphics->create_surface_unique(
+      {.mesh = resources.cube_mesh.get(),
+       .material = resources.blue_material.get(),
+       .transform = math::Mat3x4f{{
+                                      100.0f,
+                                      0.0f,
+                                      0.0f,
+                                      0.0f,
+                                  },
+                                  {0.0f, 100.0f, 0.0f, -100.0f},
+                                  {0.0f, 0.0f, 100.0f, 0.0f}}});
+  scene->add_surface(ground_surface.get());
+  // auto const ground_scene_node = scene_diff->record_scene_node_creation(
+  //     {.translation = {0.0f, -100.0f, 0.0f}, .scale = 100.0f});
+  // scene_diff->record_surface_instance_creation(
+  //     {.surface = resources.blue_box_surface, .scene_node =
+  //     ground_scene_node});
   physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
   physics::Material const physics_material{.static_friction_coefficient = 1.1f,
                                            .dynamic_friction_coefficient = 0.6f,
@@ -373,32 +352,45 @@ int main() {
                                   .shape = ground_shape,
                                   .material = physics_material});
   client::Static_prop_manager red_ball_manager{
-      {.scene_diff_provider = &scene_diff_provider,
-       .surface = resources.red_ball_surface,
-       .surface_scale = 0.5f,
+      {.graphics = graphics.get(),
+       .scene = scene.get(),
+       .surface_mesh = resources.high_quality_sphere_mesh.get(),
+       .surface_material = resources.red_material.get(),
+       .surface_pretransform = math::Mat3x4f{{0.5f, 0.0f, 0.0f, 0.0f},
+                                             {0.0f, 0.5f, 0.0f, 0.0f},
+                                             {0.0f, 0.0f, 0.5f, 0.0f}},
        .space = &space,
-       .shape = ball_shape,
-       .material = {.static_friction_coefficient = 1.1f,
-                    .dynamic_friction_coefficient = 0.75f,
-                    .restitution_coefficient = 0.0f}}};
+       .body_shape = ball_shape,
+       .body_material = {.static_friction_coefficient = 1.1f,
+                         .dynamic_friction_coefficient = 0.75f,
+                         .restitution_coefficient = 0.0f}}};
   client::Static_prop_manager brick_box_manager{
-      {.scene_diff_provider = &scene_diff_provider,
-       .surface = resources.brick_box_surface,
-       .surface_scale = 1.0f,
+      {.graphics = graphics.get(),
+       .scene = scene.get(),
+       .surface_mesh = resources.cube_mesh.get(),
+       .surface_material = resources.brick_material.get(),
        .space = &space,
-       .shape = brick_box_shape,
-       .material = physics_material}};
+       .body_shape = brick_box_shape,
+       .body_material = physics_material}};
   client::Dynamic_prop_manager cotton_box_manager{
-      {.scene_diff_provider = &scene_diff_provider,
-       .surface = resources.striped_cotton_box_surface,
-       .surface_scale = 0.5f,
+      {.graphics = graphics.get(),
+       .scene = scene.get(),
+       .surface_mesh = resources.cube_mesh.get(),
+       .surface_material = resources.striped_cotton_material.get(),
+       .surface_pretransform = math::Mat3x4f{{0.5f, 0.0f, 0.0f, 0.0f},
+                                             {0.0f, 0.5f, 0.0f, 0.0f},
+                                             {0.0f, 0.0f, 0.5f, 0.0f}},
        .space = &space,
-       .mass = 1.0f,
-       .inertia_tensor = math::Mat3x3f::identity(),
-       .shape = cotton_box_shape,
-       .material = physics_material}};
+       .body_mass = 1.0f,
+       .body_inertia_tensor = math::Mat3x3f::identity(),
+       .body_shape = cotton_box_shape,
+       .body_material = physics_material}};
   client::Test_entity_manager test_entity_manager{
-      &scene_diff_provider, resources.particle_surface, &space};
+      {.graphics = graphics.get(),
+       .scene = scene.get(),
+       .surface_mesh = resources.low_quality_sphere_mesh.get(),
+       .surface_material = resources.particle_material.get(),
+       .space = &space}};
   red_ball_manager.create({.position = {-1.5f, 0.5f, -1.5f}});
   red_ball_manager.create({.position = {1.5f, 0.5f, 1.5f}});
   brick_box_manager.create(
@@ -410,10 +402,9 @@ int main() {
   cotton_box_manager.create(
       {.position = math::Vec3f{0.0f, 5.0f, 0.0f},
        .angular_velocity = math::Vec3f{0.0f, 1.0f, 0.0f}});
-  graphics->apply_scene_diff(scene_diff.get());
+  // graphics->apply_scene_diff(scene_diff.get());
   auto const render_target = graphics->get_default_render_target();
   run_game_loop(window.get(), graphics.get(), render_target, scene.get(),
-                scene_diff.get(), camera_instance, &space,
-                &test_entity_manager);
+                camera.get(), &space, &test_entity_manager);
   return 0;
 }

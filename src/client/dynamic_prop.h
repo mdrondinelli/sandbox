@@ -6,7 +6,6 @@
 
 #include "../graphics/graphics.h"
 #include "../physics/physics.h"
-#include "scene_diff_provider.h"
 
 namespace marlon {
 namespace client {
@@ -15,14 +14,16 @@ struct Dynamic_prop_handle {
 };
 
 struct Dynamic_prop_manager_create_info {
-  Scene_diff_provider const *scene_diff_provider;
-  graphics::Surface surface;
-  float surface_scale;
+  graphics::Graphics *graphics{};
+  graphics::Scene *scene{};
+  graphics::Mesh *surface_mesh{};
+  graphics::Material *surface_material{};
+  math::Mat3x4f surface_pretransform{math::Mat3x4f::identity()};
   physics::Space *space;
-  float mass;
-  math::Mat3x3f inertia_tensor;
-  physics::Shape shape;
-  physics::Material material;
+  float body_mass{1.0f};
+  math::Mat3x3f body_inertia_tensor{math::Mat3x3f::identity()};
+  physics::Shape body_shape;
+  physics::Material body_material;
 };
 
 struct Dynamic_prop_create_info {
@@ -48,22 +49,23 @@ public:
 private:
   struct Entity : public physics::Dynamic_rigid_body_motion_callback {
     Dynamic_prop_manager *manager;
-    graphics::Scene_node *scene_node;
-    graphics::Surface_instance *surface_instance;
-    physics::Dynamic_rigid_body_handle rigid_body;
+    graphics::Surface *surface;
+    physics::Dynamic_rigid_body_handle body;
 
     void on_dynamic_rigid_body_motion(
         physics::Dynamic_rigid_body_motion_event const &event) final;
   };
 
-  Scene_diff_provider const *_scene_diff_provider;
-  graphics::Surface _surface;
-  float _surface_scale;
+  graphics::Graphics *_graphics;
+  graphics::Scene *_scene;
+  graphics::Mesh *_surface_mesh;
+  graphics::Material *_surface_material;
+  math::Mat3x4f _surface_pretransform_3x4;
   physics::Space *_space;
-  float _mass;
-  math::Mat3x3f _inertia_tensor;
-  physics::Shape _shape;
-  physics::Material _material;
+  float _body_mass;
+  math::Mat3x3f _body_inertia_tensor;
+  physics::Shape _body_shape;
+  physics::Material _body_material;
   std::unordered_map<std::uint64_t, Entity> _entities;
   std::uint64_t _next_entity_handle_value{};
 };

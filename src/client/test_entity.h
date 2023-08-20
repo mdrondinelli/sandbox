@@ -6,7 +6,6 @@
 
 #include "../graphics/graphics.h"
 #include "../physics/physics.h"
-#include "scene_diff_provider.h"
 
 namespace marlon {
 namespace client {
@@ -14,13 +13,20 @@ struct Test_entity_handle {
   std::uint64_t value;
 };
 
+struct Test_entity_manager_create_info {
+  graphics::Graphics *graphics;
+  graphics::Scene *scene;
+  graphics::Mesh *surface_mesh;
+  graphics::Material *surface_material;
+  physics::Space *space;
+};
+
 struct Test_entity_create_info {};
 
 class Test_entity_manager {
 public:
-  explicit Test_entity_manager(Scene_diff_provider const *scene_diff_provider,
-                               graphics::Surface surface,
-                               physics::Space *space);
+  explicit Test_entity_manager(
+      Test_entity_manager_create_info const &create_info);
 
   ~Test_entity_manager();
 
@@ -33,16 +39,17 @@ public:
 private:
   struct Entity : public physics::Particle_motion_callback {
     Test_entity_manager *manager{};
-    graphics::Scene_node *scene_node{};
-    graphics::Surface_instance *surface_instance{};
+    graphics::Surface *surface{};
     physics::Particle_handle particle{};
     float time_alive{};
 
     void on_particle_motion(physics::Particle_motion_event const &event) final;
   };
 
-  Scene_diff_provider const *_scene_diff_provider;
-  graphics::Surface _surface;
+  graphics::Graphics *_graphics;
+  graphics::Scene *_scene;
+  graphics::Mesh *_surface_mesh;
+  graphics::Material *_surface_material;
   physics::Space *_space;
   std::mt19937 _random_number_engine;
   std::unordered_map<std::uint64_t, Entity> _entities;

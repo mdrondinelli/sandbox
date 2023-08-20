@@ -47,10 +47,16 @@ public:
   }
 
   static auto identity() {
-    static_assert(M == 3);
-    return Mat<T, 3, 3>{Vec<T, 3>{T(1), T(0), T(0)},
-                        Vec<T, 3>{T(0), T(1), T(0)},
-                        Vec<T, 3>{T(0), T(0), T(1)}};
+    static_assert(M == 3 || M == 4);
+    if constexpr (M == 3) {
+      return Mat<T, 3, 3>{Vec<T, 3>{T(1), T(0), T(0)},
+                          Vec<T, 3>{T(0), T(1), T(0)},
+                          Vec<T, 3>{T(0), T(0), T(1)}};
+    } else {
+      return Mat<T, 3, 4>{Vec<T, 4>{T(1), T(0), T(0), T(0)},
+                          Vec<T, 4>{T(0), T(1), T(0), T(0)},
+                          Vec<T, 4>{T(0), T(0), T(1), T(0)}};
+    }
   }
 
   Mat() = default;
