@@ -39,30 +39,6 @@ struct Particle_contact {
   float separation;
 };
 
-class Particle_construction_queue {
-public:
-  void push(Particle_create_info const &create_info) {
-    create_infos.push_back(create_info);
-  }
-
-  std::span<Particle_create_info const> get() const noexcept {
-    return create_infos;
-  }
-
-private:
-  std::vector<Particle_create_info> create_infos;
-};
-
-class Particle_destruction_queue {
-public:
-  void push(Particle_handle reference) { references.push_back(reference); }
-
-  std::span<Particle_handle const> get() const noexcept { return references; }
-
-private:
-  std::vector<Particle_handle> references;
-};
-
 class Particle_motion_callback {
 public:
   virtual ~Particle_motion_callback() = default;
