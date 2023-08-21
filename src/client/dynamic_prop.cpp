@@ -19,11 +19,10 @@ Dynamic_prop_handle
 Dynamic_prop_manager::create(Dynamic_prop_create_info const &create_info) {
   auto &value = _entities[_next_entity_handle_value];
   value.manager = this;
-  auto const prop_transform = math::make_rigid_transform_mat4x4(
-      create_info.position, create_info.orientation);
+  auto const prop_transform =
+      math::Mat4x4f::rigid(create_info.position, create_info.orientation);
   auto const surface_pretransform_4x4 = math::Mat4x4f{
-      _surface_pretransform_3x4[0], _surface_pretransform_3x4[1],
-      _surface_pretransform_3x4[2], math::Vec4f{0.0f, 0.0f, 0.0f, 1.0}};
+      _surface_pretransform_3x4, math::Vec4f{0.0f, 0.0f, 0.0f, 1.0}};
   auto const surface_transform_4x4 = prop_transform * surface_pretransform_4x4;
   auto const surface_transform_3x4 =
       math::Mat3x4f{surface_transform_4x4[0], surface_transform_4x4[1],
@@ -71,11 +70,10 @@ void Dynamic_prop_manager::destroy(Dynamic_prop_handle handle) {
 void Dynamic_prop_manager::Entity::on_dynamic_rigid_body_motion(
     physics::Dynamic_rigid_body_motion_event const &event) {
   auto const prop_transform =
-      math::make_rigid_transform_mat4x4(event.position, event.orientation);
+      math::Mat4x4f::rigid(event.position, event.orientation);
   auto const &surface_pretransform_3x4 = manager->_surface_pretransform_3x4;
   auto const surface_pretransform_4x4 = math::Mat4x4f{
-      surface_pretransform_3x4[0], surface_pretransform_3x4[1],
-      surface_pretransform_3x4[2], math::Vec4f{0.0f, 0.0f, 0.0f, 1.0}};
+      surface_pretransform_3x4, math::Vec4f{0.0f, 0.0f, 0.0f, 1.0}};
   auto const surface_transform_4x4 = prop_transform * surface_pretransform_4x4;
   auto const surface_transform_3x4 =
       math::Mat3x4f{surface_transform_4x4[0], surface_transform_4x4[1],

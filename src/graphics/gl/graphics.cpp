@@ -157,8 +157,7 @@ void Gl_graphics::destroy_scene(Scene *scene) noexcept {
   delete static_cast<Gl_scene *>(scene);
 }
 
-Surface *
-Gl_graphics::create_surface(Surface_create_info const &create_info) {
+Surface *Gl_graphics::create_surface(Surface_create_info const &create_info) {
   return new Gl_surface{create_info};
 }
 
@@ -189,10 +188,8 @@ void Gl_graphics::render(Scene *source_scene, Camera *source_camera_instance,
       static_cast<Gl_camera *>(source_camera_instance);
   auto const gl_target = static_cast<Gl_render_target *>(target);
   auto const view_matrix_3x4 = gl_source_camera_instance->get_view_matrix();
-  auto const view_matrix_4x4 = math::Mat4x4f{view_matrix_3x4[0],
-                                             view_matrix_3x4[1],
-                                             view_matrix_3x4[2],
-                                             {0.0f, 0.0f, 0.0f, 1.0f}};
+  auto const view_matrix_4x4 =
+      math::Mat4x4f{view_matrix_3x4, {0.0f, 0.0f, 0.0f, 1.0f}};
   auto const clip_matrix = gl_source_camera_instance->get_clip_matrix();
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_FRAMEBUFFER_SRGB);

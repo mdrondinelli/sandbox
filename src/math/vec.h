@@ -167,15 +167,18 @@ template <typename T> struct Vec<T, 4> {
   }
 };
 
-using Vec2i = Vec<std::int32_t, 2>;
-using Vec3i = Vec<std::int32_t, 3>;
-using Vec4i = Vec<std::int32_t, 4>;
-using Vec2f = Vec<float, 2>;
-using Vec3f = Vec<float, 3>;
-using Vec4f = Vec<float, 4>;
-using Vec2d = Vec<double, 2>;
-using Vec3d = Vec<double, 3>;
-using Vec4d = Vec<double, 4>;
+template <typename T> using Vec2 = Vec<T, 2>;
+template <typename T> using Vec3 = Vec<T, 3>;
+template <typename T> using Vec4 = Vec<T, 4>;
+using Vec2i = Vec2<std::int32_t>;
+using Vec3i = Vec3<std::int32_t>;
+using Vec4i = Vec4<std::int32_t>;
+using Vec2f = Vec2<float>;
+using Vec3f = Vec3<float>;
+using Vec4f = Vec4<float>;
+using Vec2d = Vec2<double>;
+using Vec3d = Vec3<double>;
+using Vec4d = Vec4<double>;
 
 template <typename T, int N>
 constexpr bool operator==(Vec<T, N> const &u, Vec<T, N> const &v) noexcept {

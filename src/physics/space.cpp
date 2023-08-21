@@ -116,8 +116,8 @@ public:
 
   Static_rigid_body_handle
   create_static_rigid_body(Static_rigid_body_create_info const &create_info) {
-    auto const transform = math::make_rigid_transform_mat3x4(
-        create_info.position, create_info.orientation);
+    auto const transform =
+        math::Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
     Static_rigid_body_handle const reference{
         _next_static_rigid_body_handle_value};
@@ -148,8 +148,8 @@ public:
 
   Dynamic_rigid_body_handle
   create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info) {
-    auto const transform = math::make_rigid_transform_mat3x4(
-        create_info.position, create_info.orientation);
+    auto const transform =
+        math::Mat3x4f::rigid(create_info.position, create_info.orientation);
     Dynamic_rigid_body_handle const handle{
         _next_dynamic_rigid_body_handle_value};
     Dynamic_rigid_body const value{

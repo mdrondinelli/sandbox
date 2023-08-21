@@ -41,12 +41,12 @@ private:
 
 template <typename T, int M> class Mat<T, 3, M> {
 public:
-  static auto zero() {
+  static constexpr auto zero() noexcept {
     return Mat<T, 3, M>{Vec<T, M>::zero(), Vec<T, M>::zero(),
                         Vec<T, M>::zero()};
   }
 
-  static auto identity() {
+  static constexpr auto identity() noexcept {
     static_assert(M == 3 || M == 4);
     if constexpr (M == 3) {
       return Mat<T, 3, 3>{Vec<T, 3>{T(1), T(0), T(0)},
@@ -59,11 +59,64 @@ public:
     }
   }
 
+  static constexpr auto translation(math::Vec3<T> const &v) noexcept {
+    static_assert(M == 4);
+    return Mat<T, 3, 4>{{T(1), T(0), T(0), v.x},
+                        {T(0), T(1), T(0), v.y},
+                        {T(0), T(0), T(1), v.z}};
+  }
+
+  static constexpr auto rotation(Quat<T> const &q) noexcept {
+    static_assert(M == 3 || M == 4);
+    if constexpr (M == 3) {
+      return Mat<T, 3, 3>{{T(1) - T(2) * q.v.y * q.v.y - T(2) * q.v.z * q.v.z,
+                           T(2) * q.v.x * q.v.y - T(2) * q.w * q.v.z,
+                           T(2) * q.v.x * q.v.z + T(2) * q.w * q.v.y},
+                          {T(2) * q.v.x * q.v.y + T(2) * q.w * q.v.z,
+                           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.z * q.v.z,
+                           T(2) * q.v.y * q.v.z - T(2) * q.w * q.v.x},
+                          {T(2) * q.v.x * q.v.z - T(2) * q.w * q.v.y,
+                           T(2) * q.v.y * q.v.z + T(2) * q.w * q.v.x,
+                           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.y * q.v.y}};
+    } else {
+      return Mat<T, 3, 4>{{T(1) - T(2) * q.v.y * q.v.y - T(2) * q.v.z * q.v.z,
+                           T(2) * q.v.x * q.v.y - T(2) * q.w * q.v.z,
+                           T(2) * q.v.x * q.v.z + T(2) * q.w * q.v.y, T(0)},
+                          {T(2) * q.v.x * q.v.y + T(2) * q.w * q.v.z,
+                           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.z * q.v.z,
+                           T(2) * q.v.y * q.v.z - T(2) * q.w * q.v.x, T(0)},
+                          {T(2) * q.v.x * q.v.z - T(2) * q.w * q.v.y,
+                           T(2) * q.v.y * q.v.z + T(2) * q.w * q.v.x,
+                           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.y * q.v.y,
+                           T(0)}};
+    }
+  }
+
+  static constexpr auto rigid(Vec3f const &t, Quatf const &r) noexcept {
+    static_assert(M == 4);
+    return Mat<T, 3, 4>{{T(1) - T(2) * r.v.y * r.v.y - T(2) * r.v.z * r.v.z,
+                         T(2) * r.v.x * r.v.y - T(2) * r.w * r.v.z,
+                         T(2) * r.v.x * r.v.z + T(2) * r.w * r.v.y, t.x},
+                        {T(2) * r.v.x * r.v.y + T(2) * r.w * r.v.z,
+                         T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.z * r.v.z,
+                         T(2) * r.v.y * r.v.z - T(2) * r.w * r.v.x, t.y},
+                        {T(2) * r.v.x * r.v.z - T(2) * r.w * r.v.y,
+                         T(2) * r.v.y * r.v.z + T(2) * r.w * r.v.x,
+                         T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.y * r.v.y,
+                         t.z}};
+  }
+
   Mat() = default;
 
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
                 Vec<T, M> const &row2) noexcept
       : rows{row0, row1, row2} {}
+
+  constexpr Mat(Mat<T, 2, M> const &row0, Vec<T, M> const &row2) noexcept
+      : rows{row0[0], row0[1], row2} {}
+
+  constexpr Mat(Vec<T, M> const &row0, Mat<T, 2, M> const &row1) noexcept
+      : rows{row0, row1[0], row1[1]} {}
 
   template <typename F>
   constexpr explicit Mat(F &&f) noexcept(noexcept(f(0)))
@@ -84,16 +137,54 @@ private:
 
 template <typename T, int M> class Mat<T, 4, M> {
 public:
-  static auto zero() {
+  static constexpr auto zero() {
     return Mat<T, 4, M>{Vec<T, M>::zero(), Vec<T, M>::zero(), Vec<T, M>::zero(),
                         Vec<T, M>::zero()};
   }
 
-  static auto identity() {
+  static constexpr auto identity() {
     static_assert(M == 4);
     return Mat<T, 4, 4>{
         Vec<T, 4>{T(1), T(0), T(0), T(0)}, Vec<T, 4>{T(0), T(1), T(0), T(0)},
         Vec<T, 4>{T(0), T(0), T(1), T(0)}, Vec<T, 4>{T(0), T(0), T(0), T(1)}};
+  }
+
+  static constexpr auto translation(math::Vec3<T> const &v) noexcept {
+    static_assert(M == 4);
+    return Mat<T, 4, 4>{{T(1), T(0), T(0), v.x},
+                        {T(0), T(1), T(0), v.y},
+                        {T(0), T(0), T(1), v.z},
+                        {T(0), T(0), T(0), T(1)}};
+  }
+
+  static constexpr auto rotation(Quat<T> const &q) noexcept {
+    static_assert(M == 4);
+    return Mat<T, 4, 4>{{T(1) - T(2) * q.v.y * q.v.y - T(2) * q.v.z * q.v.z,
+                         T(2) * q.v.x * q.v.y - T(2) * q.w * q.v.z,
+                         T(2) * q.v.x * q.v.z + T(2) * q.w * q.v.y, T(0)},
+                        {T(2) * q.v.x * q.v.y + T(2) * q.w * q.v.z,
+                         T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.z * q.v.z,
+                         T(2) * q.v.y * q.v.z - T(2) * q.w * q.v.x, T(0)},
+                        {T(2) * q.v.x * q.v.z - T(2) * q.w * q.v.y,
+                         T(2) * q.v.y * q.v.z + T(2) * q.w * q.v.x,
+                         T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.y * q.v.y,
+                         T(0)},
+                        {T(0), T(0), T(0), T(1)}};
+  }
+
+  static constexpr auto rigid(Vec3f const &t, Quatf const &r) noexcept {
+    static_assert(M == 4);
+    return Mat<T, 4, 4>{{T(1) - T(2) * r.v.y * r.v.y - T(2) * r.v.z * r.v.z,
+                         T(2) * r.v.x * r.v.y - T(2) * r.w * r.v.z,
+                         T(2) * r.v.x * r.v.z + T(2) * r.w * r.v.y, t.x},
+                        {T(2) * r.v.x * r.v.y + T(2) * r.w * r.v.z,
+                         T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.z * r.v.z,
+                         T(2) * r.v.y * r.v.z - T(2) * r.w * r.v.x, t.y},
+                        {T(2) * r.v.x * r.v.z - T(2) * r.w * r.v.y,
+                         T(2) * r.v.y * r.v.z + T(2) * r.w * r.v.x,
+                         T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.y * r.v.y,
+                         t.z},
+                        {T(0), T(0), T(0), T(1)}};
   }
 
   Mat() = default;
@@ -101,6 +192,24 @@ public:
   constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
                 Vec<T, M> const &row2, Vec<T, M> const &row3) noexcept
       : rows{row0, row1, row2, row3} {}
+
+  constexpr Mat(Mat<T, 2, M> const &row0, Vec<T, M> const &row2,
+                Vec<T, M> const &row3) noexcept
+      : rows{row0[0], row0[1], row2, row3} {}
+
+  constexpr Mat(Vec<T, M> const &row0, Mat<T, 2, M> const &row1,
+                Vec<T, M> const &row3) noexcept
+      : rows{row0, row1[0], row1[1], row3} {}
+
+  constexpr Mat(Vec<T, M> const &row0, Vec<T, M> const &row1,
+                Mat<T, 2, M> const &row2) noexcept
+      : rows{row0, row1, row2[0], row2[1]} {}
+
+  constexpr Mat(Mat<T, 3, M> const &row0, Vec<T, M> const &row3) noexcept
+      : rows{row0[0], row0[1], row0[2], row3} {}
+
+  constexpr Mat(Vec<T, M> const &row0, Mat<T, 3, M> const &row1) noexcept
+      : rows{row0, row1[0], row1[1], row1[2]} {}
 
   template <typename F>
   constexpr explicit Mat(F &&f) noexcept(noexcept(f(0)))
@@ -119,6 +228,15 @@ private:
   Vec<T, M> rows[4];
 };
 
+template <typename T> using Mat2x2 = Mat<T, 2, 2>;
+template <typename T> using Mat2x3 = Mat<T, 2, 3>;
+template <typename T> using Mat2x4 = Mat<T, 2, 4>;
+template <typename T> using Mat3x2 = Mat<T, 3, 2>;
+template <typename T> using Mat3x3 = Mat<T, 3, 3>;
+template <typename T> using Mat3x4 = Mat<T, 3, 4>;
+template <typename T> using Mat4x2 = Mat<T, 4, 2>;
+template <typename T> using Mat4x3 = Mat<T, 4, 3>;
+template <typename T> using Mat4x4 = Mat<T, 4, 4>;
 using Mat2x2i = Mat<std::int32_t, 2, 2>;
 using Mat2x3i = Mat<std::int32_t, 2, 3>;
 using Mat2x4i = Mat<std::int32_t, 2, 4>;
@@ -296,83 +414,6 @@ constexpr Mat<T, 4, 4> rigid_inverse(math::Mat<T, 4, 4> const &m) noexcept {
           {retval_upper_left[2][0], retval_upper_left[2][1],
            retval_upper_left[2][2], -dot(retval_upper_left[2], translation)},
           {T(0), T(0), T(0), T(1)}};
-}
-
-template <typename T>
-constexpr Mat<T, 3, 4> make_translation_mat3x4(math::Vec3f const &v) noexcept {
-  return {{T(1), T(0), T(0), v.x},
-          {T(0), T(1), T(0), v.y},
-          {T(0), T(0), T(1), v.z}};
-}
-
-template <typename T>
-constexpr Mat<T, 3, 4> make_translation_mat4x4(math::Vec3f const &v) noexcept {
-  return {{T(1), T(0), T(0), v.x},
-          {T(0), T(1), T(0), v.y},
-          {T(0), T(0), T(1), v.z},
-          {T(0), T(0), T(0), T(1)}};
-}
-
-template <typename T>
-constexpr Mat<T, 3, 3> make_rotation_mat3x3(Quat<T> const &q) noexcept {
-  return {{T(1) - T(2) * q.v.y * q.v.y - T(2) * q.v.z * q.v.z,
-           T(2) * q.v.x * q.v.y - T(2) * q.w * q.v.z,
-           T(2) * q.v.x * q.v.z + T(2) * q.w * q.v.y},
-          {T(2) * q.v.x * q.v.y + T(2) * q.w * q.v.z,
-           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.z * q.v.z,
-           T(2) * q.v.y * q.v.z - T(2) * q.w * q.v.x},
-          {T(2) * q.v.x * q.v.z - T(2) * q.w * q.v.y,
-           T(2) * q.v.y * q.v.z + T(2) * q.w * q.v.x,
-           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.y * q.v.y}};
-}
-
-template <typename T>
-constexpr Mat<T, 3, 4> make_rotation_mat3x4(Quat<T> const &q) noexcept {
-  return {{T(1) - T(2) * q.v.y * q.v.y - T(2) * q.v.z * q.v.z,
-           T(2) * q.v.x * q.v.y - T(2) * q.w * q.v.z,
-           T(2) * q.v.x * q.v.z + T(2) * q.w * q.v.y, T(0)},
-          {T(2) * q.v.x * q.v.y + T(2) * q.w * q.v.z,
-           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.z * q.v.z,
-           T(2) * q.v.y * q.v.z - T(2) * q.w * q.v.x, T(0)},
-          {T(2) * q.v.x * q.v.z - T(2) * q.w * q.v.y,
-           T(2) * q.v.y * q.v.z + T(2) * q.w * q.v.x,
-           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.y * q.v.y, T(0)}};
-}
-
-template <typename T>
-constexpr Mat<T, 4, 4> make_rotation_mat4x4(Quat<T> const &q) noexcept {
-  return {{T(1) - T(2) * q.v.y * q.v.y - T(2) * q.v.z * q.v.z,
-           T(2) * q.v.x * q.v.y - T(2) * q.w * q.v.z,
-           T(2) * q.v.x * q.v.z + T(2) * q.w * q.v.y, T(0)},
-          {T(2) * q.v.x * q.v.y + T(2) * q.w * q.v.z,
-           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.z * q.v.z,
-           T(2) * q.v.y * q.v.z - T(2) * q.w * q.v.x, T(0)},
-          {T(2) * q.v.x * q.v.z - T(2) * q.w * q.v.y,
-           T(2) * q.v.y * q.v.z + T(2) * q.w * q.v.x,
-           T(1) - T(2) * q.v.x * q.v.x - T(2) * q.v.y * q.v.y, T(0)},
-          {T(0), T(0), T(0), T(1)}};
-}
-
-template <typename T>
-constexpr Mat<T, 3, 4>
-make_rigid_transform_mat3x4(math::Vec3f const &translation,
-                            Quat<T> const &rotation) noexcept {
-  auto retval = make_rotation_mat3x4(rotation);
-  retval[0][3] = translation.x;
-  retval[1][3] = translation.y;
-  retval[2][3] = translation.z;
-  return retval;
-}
-
-template <typename T>
-constexpr Mat<T, 4, 4>
-make_rigid_transform_mat4x4(math::Vec3f const &translation,
-                            Quat<T> const &rotation) noexcept {
-  auto retval = make_rotation_mat4x4(rotation);
-  retval[0][3] = translation.x;
-  retval[1][3] = translation.y;
-  retval[2][3] = translation.z;
-  return retval;
 }
 } // namespace math
 } // namespace marlon

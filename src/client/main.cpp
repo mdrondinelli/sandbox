@@ -16,6 +16,7 @@
 
 #include "../graphics/gl/graphics.h"
 #include "../physics/physics.h"
+#include "application_loop.h"
 #include "dynamic_prop.h"
 #include "glfw_instance.h"
 #include "glfw_window.h"
@@ -242,18 +243,14 @@ graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
        .vertex_data = vertices.data()});
 }
 
-void tick(physics::Space *space,
-          client::Test_entity_manager *test_entity_manager, float delta_time);
-
 void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
                    graphics::Render_target *render_target,
                    graphics::Scene *scene, graphics::Camera *camera,
-                   physics::Space *space,
-                   client::Test_entity_manager *test_entity_manager) {
-  auto const tick_rate = 60.0;
-  auto const tick_duration = 1.0 / tick_rate;
+                   physics::Space *space, client::Test_entity_manager *) {
+  auto loop = client::Application_loop{{.space = space,
+                                        .tick_duration = 1.0f / 30.0f,
+                                        .physics_substep_count = 4}};
   auto previous_time = glfwGetTime();
-  auto accumulated_time = 0.0;
   auto fps_time_accumulator = 0.0;
   auto fps_frame_accumulator = 0;
   auto worst_frame_time = 0.0;
@@ -265,19 +262,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
     auto const current_time = glfwGetTime();
     auto const elapsed_time = current_time - previous_time;
     previous_time = current_time;
-    accumulated_time += elapsed_time;
-    if (accumulated_time >= tick_duration) {
-      do {
-        accumulated_time -= tick_duration;
-        // graphics->apply_scene_diff(scene_diff);
-        tick(space, test_entity_manager, static_cast<float>(tick_duration));
-      } while (accumulated_time >= tick_duration);
-    }
-    // graphics->apply_scene_diff(
-    //     scene_diff,
-    //     static_cast<float>(elapsed_time /
-    //                        (elapsed_time + tick_duration -
-    //                        accumulated_time)));
+    loop.run_once(elapsed_time);
     graphics->render(scene, camera, render_target);
     glfwSwapBuffers(window);
     fps_time_accumulator += elapsed_time;
@@ -295,14 +280,15 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   }
 }
 
-void tick(physics::Space *space,
-          client::Test_entity_manager *test_entity_manager, float delta_time) {
-  space->simulate({.delta_time = delta_time, .substep_count = 2});
-  test_entity_manager->tick(delta_time);
-  for (auto i = 0; i < 4; ++i) {
-    test_entity_manager->create_entity({});
-  }
-}
+// void tick(physics::Space *space,
+//           client::Test_entity_manager *test_entity_manager, float delta_time)
+//           {
+//   space->simulate({.delta_time = delta_time, .substep_count = 4});
+//   test_entity_manager->tick(delta_time);
+//   for (auto i = 0; i < 8; ++i) {
+//     test_entity_manager->create_entity({});
+//   }
+// }
 
 int main() {
   client::Shared_glfw_instance const glfw;

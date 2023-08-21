@@ -37,10 +37,8 @@ struct Gl_scene::Impl {
                      math::Mat4x4f const &view_clip_matrix) {
     for (auto const surface_instance : surfaces) {
       auto const &model_matrix_3x4 = surface_instance->get_transform();
-      auto const model_matrix_4x4 = math::Mat4x4f{model_matrix_3x4[0],
-                                                  model_matrix_3x4[1],
-                                                  model_matrix_3x4[2],
-                                                  {0.0f, 0.0f, 0.0f, 1.0f}};
+      auto const model_matrix_4x4 =
+          math::Mat4x4f{model_matrix_3x4, {0.0f, 0.0f, 0.0f, 1.0f}};
       auto const model_view_matrix = view_matrix * model_matrix_4x4;
       auto const model_view_clip_matrix = view_clip_matrix * model_matrix_4x4;
       glProgramUniformMatrix4fv(shader_program, model_view_matrix_location, 1,
@@ -72,9 +70,7 @@ Gl_scene::Gl_scene(Scene_create_info const &) noexcept
 
 Gl_scene::~Gl_scene() {}
 
-void Gl_scene::add_surface(Surface *surface) {
-  _impl->add_surface(surface);
-}
+void Gl_scene::add_surface(Surface *surface) { _impl->add_surface(surface); }
 
 void Gl_scene::remove_surface(Surface *surface) {
   _impl->remove_surface(surface);

@@ -33,6 +33,7 @@ add_library(
   "src/physics/space.cpp")
 set(
   CLIENT_SOURCES
+  "src/client/application_loop.cpp"
   "src/client/dynamic_prop.cpp"
   "src/client/glfw_instance.cpp"
   "src/client/glfw_window.cpp"
