@@ -11,9 +11,11 @@ struct Particle_data;
 
 struct Static_rigid_body_data;
 
+struct Dynamic_rigid_body_data;
+
 using Aabb_tree_payload_t =
     std::variant<Particle_data *, Static_rigid_body_data *,
-                 Dynamic_rigid_body_handle>;
+                 Dynamic_rigid_body_data *>;
 
 struct Particle_data {
   Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node;
@@ -65,7 +67,7 @@ public:
     auto k = std::ptrdiff_t{};
     for (auto i = std::ptrdiff_t{}; i != n; ++i) {
       if (_occupancy_bits[i]) {
-        f(Particle_handle{i}, data(Particle_handle{i}));
+        f(Particle_handle{i}, data({i}));
         if (++k == m) {
           return;
         }
@@ -93,7 +95,7 @@ class Static_rigid_body_storage {
 public:
   explicit Static_rigid_body_storage(std::ptrdiff_t size) noexcept
       : _data{std::make_unique<std::byte[]>(size *
-                                            sizeof(Static_rigid_body_storage))},
+                                            sizeof(Static_rigid_body_data))},
         _free_indices(size), _occupancy_bits(size) {
     for (auto i = std::ptrdiff_t{}; i != size; ++i) {
       _free_indices[i] = size - i - 1;
@@ -122,13 +124,13 @@ public:
   }
 
   template <typename F> void for_each(F &&f) {
-    auto const n = static_cast<std::ptrdiff_t>(_data.size());
-    auto const m =
-        static_cast<std::ptrdiff_t>(_data.size() - _free_indices.size());
+    auto const n = static_cast<std::ptrdiff_t>(_occupancy_bits.size());
+    auto const m = static_cast<std::ptrdiff_t>(_occupancy_bits.size() -
+                                               _free_indices.size());
     auto k = std::ptrdiff_t{};
     for (auto i = std::ptrdiff_t{}; i != n; ++i) {
       if (_occupancy_bits[i]) {
-        f(Static_rigid_body_handle{i}, _data.data() + i);
+        f(Static_rigid_body_handle{i}, data({i}));
         if (++k == m) {
           return;
         }
@@ -142,7 +144,7 @@ private:
   std::vector<bool> _occupancy_bits;
 };
 
-struct Dynamic_rigid_body {
+struct Dynamic_rigid_body_data {
   Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node;
   Dynamic_rigid_body_motion_callback *motion_callback;
   std::uint64_t collision_flags;
@@ -159,6 +161,59 @@ struct Dynamic_rigid_body {
   math::Mat3x3f inertia_tensor_inverse;
   Shape shape;
   Material material;
+};
+
+class Dynamic_rigid_body_storage {
+public:
+  explicit Dynamic_rigid_body_storage(std::ptrdiff_t size)
+      : _data{std::make_unique<std::byte[]>(size *
+                                            sizeof(Dynamic_rigid_body_data))},
+        _free_indices(size), _occupancy_bits(size) {
+    for (auto i = std::ptrdiff_t{}; i != size; ++i) {
+      _free_indices[i] = size - i - 1;
+    }
+  }
+
+  Dynamic_rigid_body_handle alloc() {
+    if (_free_indices.empty()) {
+      throw std::runtime_error{"Out of space for static rigid bodies"};
+    }
+    auto const index = _free_indices.back();
+    auto const handle = Dynamic_rigid_body_handle{index};
+    _free_indices.pop_back();
+    _occupancy_bits[index] = true;
+    return handle;
+  }
+
+  void free(Dynamic_rigid_body_handle handle) {
+    _free_indices.emplace_back(handle.value);
+    _occupancy_bits[handle.value] = false;
+  }
+
+  Dynamic_rigid_body_data *data(Dynamic_rigid_body_handle handle) {
+    return reinterpret_cast<Dynamic_rigid_body_data *>(_data.get()) +
+           handle.value;
+  }
+
+  template <typename F> void for_each(F &&f) {
+    auto const n = static_cast<std::ptrdiff_t>(_occupancy_bits.size());
+    auto const m = static_cast<std::ptrdiff_t>(_occupancy_bits.size() -
+                                               _free_indices.size());
+    auto k = std::ptrdiff_t{};
+    for (auto i = std::ptrdiff_t{}; i != n; ++i) {
+      if (_occupancy_bits[i]) {
+        f(Dynamic_rigid_body_handle{i}, data({i}));
+        if (++k == m) {
+          return;
+        }
+      }
+    }
+  }
+
+private:
+  std::unique_ptr<std::byte[]> _data;
+  std::vector<std::ptrdiff_t> _free_indices;
+  std::vector<bool> _occupancy_bits;
 };
 
 struct Particle_particle_contact {
@@ -184,6 +239,7 @@ public:
   explicit Impl(Space_create_info const &create_info)
       : _particles{create_info.max_particles},
         _static_rigid_bodies{create_info.max_static_rigid_bodies},
+        _dynamic_rigid_bodies{create_info.max_dynamic_rigid_bodies},
         _gravitational_acceleration{create_info.gravitational_acceleration} {}
 
   Particle_handle create_particle(Particle_create_info const &create_info) {
@@ -234,8 +290,7 @@ public:
   }
 
   void destroy_static_rigid_body(Static_rigid_body_handle handle) {
-    _aabb_tree.destroy_leaf(
-        _static_rigid_bodies.data(handle)->aabb_tree_node);
+    _aabb_tree.destroy_leaf(_static_rigid_bodies.data(handle)->aabb_tree_node);
     _static_rigid_bodies.free(handle);
   }
 
@@ -243,11 +298,11 @@ public:
   create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info) {
     auto const transform =
         math::Mat3x4f::rigid(create_info.position, create_info.orientation);
-    Dynamic_rigid_body_handle const handle{
-        _next_dynamic_rigid_body_handle_value};
-    Dynamic_rigid_body const value{
+    auto const handle = _dynamic_rigid_bodies.alloc();
+    auto const data = _dynamic_rigid_bodies.data(handle);
+    new (data) Dynamic_rigid_body_data{
         .aabb_tree_node = _aabb_tree.create_leaf(
-            physics::bounds(create_info.shape, transform), handle),
+            physics::bounds(create_info.shape, transform), data),
         .motion_callback = create_info.motion_callback,
         .collision_flags = create_info.collision_flags,
         .collision_mask = create_info.collision_mask,
@@ -263,20 +318,15 @@ public:
         .inertia_tensor_inverse = inverse(create_info.inertia_tensor),
         .shape = create_info.shape,
         .material = create_info.material};
-    try {
-      _dynamic_rigid_bodies.emplace(handle, value);
-    } catch (...) {
-      _aabb_tree.destroy_leaf(value.aabb_tree_node);
-      throw;
-    }
-    ++_next_dynamic_rigid_body_handle_value;
     return handle;
   }
 
   void destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle) {
-    auto const it = _dynamic_rigid_bodies.find(handle);
-    _aabb_tree.destroy_leaf(it->second.aabb_tree_node);
-    _dynamic_rigid_bodies.erase(it);
+    // auto const it = _dynamic_rigid_bodies.find(handle);
+    // _aabb_tree.destroy_leaf(it->second.aabb_tree_node);
+    // _dynamic_rigid_bodies.erase(it);
+    _aabb_tree.destroy_leaf(_dynamic_rigid_bodies.data(handle)->aabb_tree_node);
+    _dynamic_rigid_bodies.free(handle);
   }
 
   void simulate(Space_simulate_info const &simulate_info) {
@@ -290,17 +340,17 @@ public:
         data->velocity += h * _gravitational_acceleration;
         data->current_position += h * data->velocity;
       });
-      for (auto &element : _dynamic_rigid_bodies) {
-        auto &body = element.second;
-        body.previous_position = body.current_position;
-        body.velocity += h * _gravitational_acceleration;
-        body.current_position += h * body.velocity;
-        body.previous_orientation = body.current_orientation;
-        body.current_orientation += 0.5f * h *
-                                    math::Quatf{0.0f, body.angular_velocity} *
-                                    body.current_orientation;
-        body.current_orientation = math::normalize(body.current_orientation);
-      }
+      _dynamic_rigid_bodies.for_each([&](Dynamic_rigid_body_handle,
+                                         Dynamic_rigid_body_data *data) {
+        data->previous_position = data->current_position;
+        data->velocity += h * _gravitational_acceleration;
+        data->current_position += h * data->velocity;
+        data->previous_orientation = data->current_orientation;
+        data->current_orientation += 0.5f * h *
+                                     math::Quatf{0.0f, data->angular_velocity} *
+                                     data->current_orientation;
+        data->current_orientation = math::normalize(data->current_orientation);
+      });
       solve_particle_particle_contact_positions();
       solve_particle_static_rigid_body_contact_positions();
       _particles.for_each([&](Particle_handle, Particle_data *data) {
@@ -318,12 +368,13 @@ public:
       data->velocity =
           h_inv * (data->current_position - data->previous_position);
     });
-    for (auto &[handle, value] : _dynamic_rigid_bodies) {
-      if (value.motion_callback != nullptr) {
-        value.motion_callback->on_dynamic_rigid_body_motion(
-            {handle, value.current_position, value.current_orientation});
-      }
-    }
+    _dynamic_rigid_bodies.for_each(
+        [&](Dynamic_rigid_body_handle handle, Dynamic_rigid_body_data *data) {
+          if (data->motion_callback != nullptr) {
+            data->motion_callback->on_dynamic_rigid_body_motion(
+                {handle, data->current_position, data->current_orientation});
+          }
+        });
   }
 
 private:
@@ -338,7 +389,7 @@ private:
           gravity_term;
       auto const half_extents = math::Vec3f::all(radius);
       data->aabb_tree_node->bounds = {data->current_position - half_extents,
-                                        data->current_position + half_extents};
+                                      data->current_position + half_extents};
     });
     _aabb_tree.build();
   }
@@ -581,12 +632,10 @@ private:
   Aabb_tree<Aabb_tree_payload_t> _aabb_tree;
   Particle_storage _particles;
   Static_rigid_body_storage _static_rigid_bodies;
-  ankerl::unordered_dense::map<Dynamic_rigid_body_handle, Dynamic_rigid_body>
-      _dynamic_rigid_bodies;
+  Dynamic_rigid_body_storage _dynamic_rigid_bodies;
   std::vector<Particle_particle_contact> _particle_particle_broadphase_pairs;
   std::vector<Particle_static_rigid_body_contact>
       _particle_static_rigid_body_broadphase_pairs;
-  std::uint64_t _next_dynamic_rigid_body_handle_value{};
   math::Vec3f _gravitational_acceleration;
 };
 
