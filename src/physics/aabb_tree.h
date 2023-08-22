@@ -26,6 +26,7 @@ public:
       _leaf_nodes.emplace(node);
     } catch (...) {
       _leaf_node_pool.free(node);
+      throw;
     }
     node->parent = nullptr;
     node->bounds = bounds;
