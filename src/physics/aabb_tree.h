@@ -11,6 +11,7 @@
 namespace marlon {
 namespace physics {
 // Payload must be nothrow copyable
+// Payload destructor doesn't get called when node is destroyed
 template <typename Payload> class Aabb_tree {
 public:
   struct Node {
@@ -20,11 +21,11 @@ public:
   };
 
   Node *create_leaf(Aabb const &bounds, Payload const &payload) {
-    auto const node = _node_pool.alloc();
+    auto const node = _leaf_node_pool.alloc();
     try {
       _leaf_nodes.emplace(node);
     } catch (...) {
-      _node_pool.free(node);
+      _leaf_node_pool.free(node);
     }
     node->parent = nullptr;
     node->bounds = bounds;
@@ -38,12 +39,13 @@ public:
       parents_children[parents_children[0] == node ? 0 : 1] = nullptr;
     }
     _leaf_nodes.erase(node);
-    _node_pool.free(node);
+    _leaf_node_pool.free(node);
   }
 
   void build() {
     if (_root_node != nullptr) {
-      free_internal_nodes(_root_node);
+      // free_internal_nodes(_root_node);
+      _internal_node_pool.free_all();
       _root_node = nullptr;
     }
     if (_leaf_nodes.size() > 1) {
@@ -69,99 +71,63 @@ public:
   }
 
 private:
-  class Node_pool {
-    static constexpr auto initial_segment_size = std::size_t{2048};
-
+  class Leaf_node_pool {
   public:
-    Node_pool()
-        : _segments{Segment{initial_segment_size}},
-          _capacity{initial_segment_size} {}
+    Leaf_node_pool() {
+      // approximately 4MB of leaf nodes
+      auto const capacity = 4 * 1024 * 1024 / sizeof(Node);
+      _nodes.resize(capacity);
+      _free_indices.resize(capacity);
+      for (auto i = std::ptrdiff_t{}; i != capacity; ++i) {
+        _free_indices[i] = i;
+      }
+    }
 
-    Node_pool(const Node_pool &other) = delete;
+    Leaf_node_pool(const Leaf_node_pool &other) = delete;
 
-    Node_pool &operator=(const Node_pool &other) = delete;
+    Leaf_node_pool &operator=(const Leaf_node_pool &other) = delete;
 
     Node *alloc() {
-      for (auto &segment : _segments) {
-        auto const node = segment.alloc();
-        if (node != nullptr) {
-          return node;
-        }
+      if (_free_indices.empty()) {
+        throw std::runtime_error{"Out of space for leaf aabb tree nodes"};
       }
-      auto const growth_factor = 2;
-      _segments.emplace_back(Segment{(growth_factor - 1) * _capacity});
-      _capacity *= growth_factor;
-      return _segments.back().alloc();
+      auto const index = _free_indices.back();
+      _free_indices.pop_back();
+      return _nodes.data() + index;
     }
 
     void free(Node *node) noexcept {
-      for (auto &segment : _segments) {
-        if (segment.owns(node)) {
-          segment.free(node);
-          return;
-        }
-      }
-      assert(false);
+      _free_indices.emplace_back(node - _nodes.data());
     }
 
   private:
-    class Segment {
-    public:
-      explicit Segment(std::size_t size) {
-        nodes.resize(size);
-        free_indices.reserve(size);
-        for (auto i = std::size_t{}; i < size; ++i) {
-          free_indices.emplace_back(static_cast<std::ptrdiff_t>(i));
-        }
-      }
-
-      Node *alloc() {
-        if (!free_indices.empty()) {
-          auto const index = free_indices.back();
-          free_indices.pop_back();
-          return &nodes[index];
-        } else {
-          return nullptr;
-        }
-      }
-
-      void free(Node *node) noexcept {
-        auto const index = node - nodes.data();
-        free_indices.emplace_back(index);
-      }
-
-      bool owns(Node *node) const noexcept {
-        return node >= nodes.data() && node < nodes.data() + nodes.size();
-      }
-
-      std::size_t size() const noexcept { return nodes.size(); }
-
-    private:
-      std::vector<Node> nodes;
-      std::vector<std::ptrdiff_t> free_indices;
-    };
-
-    std::vector<Segment> _segments;
-    std::size_t _capacity;
+    std::vector<Node> _nodes;
+    std::vector<std::ptrdiff_t> _free_indices;
   };
 
-  void free_internal_nodes(Node *root) noexcept {
-    if (root->payload.index() == 0) {
-      auto const children = std::get<0>(root->payload);
-      _node_pool.free(root);
-      for (auto const child : children) {
-        if (child != nullptr) {
-          free_internal_nodes(child);
-        }
+  class Internal_node_pool {
+  public:
+    Internal_node_pool() : _nodes(4 * 1024 * 1024 / sizeof(Node)), _index{} {}
+
+    Node *alloc() {
+      if (static_cast<std::size_t>(_index) == _nodes.size()) {
+        throw std::runtime_error{"Out of space for internal aabb tree nodes"};
       }
+      return _nodes.data() + _index++;
     }
-  }
+
+    void free_all() noexcept { _index = 0; }
+
+  private:
+    std::vector<Node> _nodes;
+    std::ptrdiff_t _index;
+  };
 
   // TODO: handle exceptions here. for now just marking as noexcept so that
   // exceptions instantly kill the app
   Node *build_internal_node(std::span<Node *> leaf_nodes) noexcept {
     assert(leaf_nodes.size() > 1);
-    auto const node = _node_pool.alloc();
+    auto const node = _internal_node_pool.alloc();
     node->bounds = leaf_nodes[0]->bounds;
     for (auto it = leaf_nodes.begin() + 1; it != leaf_nodes.end(); ++it) {
       node->bounds = merge(node->bounds, (*it)->bounds);
@@ -211,7 +177,7 @@ private:
         node->payload = std::array<Node *, 2>{left_node, right_node};
         return node;
       } else {
-        auto const parent_node = _node_pool.alloc();
+        auto const parent_node = _internal_node_pool.alloc();
         parent_node->bounds = merge(left_node->bounds, right_node->bounds);
         parent_node->payload = std::array<Node *, 2>{left_node, right_node};
         left_node = parent_node;
@@ -220,29 +186,23 @@ private:
   }
 
   auto partition(std::span<Node *> leaf_nodes, int axis_index,
-                 float separating_position) noexcept {
+                 float split_position) noexcept {
     assert(!leaf_nodes.empty());
-    auto position = [=](Node *node) {
-      return 0.5f *
-             (node->bounds.min[axis_index] + node->bounds.max[axis_index]);
+    auto const double_split_position = 2.0f * split_position;
+    auto double_position = [=](Node *node) {
+      return (node->bounds.min[axis_index] + node->bounds.max[axis_index]);
     };
     auto unpartitioned_begin = leaf_nodes.begin();
     auto unpartitioned_end = leaf_nodes.end();
     do {
       auto &unpartitioned_leaf_node = *unpartitioned_begin;
-      if (position(unpartitioned_leaf_node) < separating_position) {
+      if (double_position(unpartitioned_leaf_node) < double_split_position) {
         ++unpartitioned_begin;
       } else {
         --unpartitioned_end;
         std::swap(unpartitioned_leaf_node, *unpartitioned_end);
       }
     } while (unpartitioned_begin != unpartitioned_end);
-    for (auto it = leaf_nodes.begin(); it != unpartitioned_begin; ++it) {
-      assert(position(*it) < separating_position);
-    }
-    for (auto it = unpartitioned_begin; it != leaf_nodes.end(); ++it) {
-      assert(position(*it) >= separating_position);
-    }
     return unpartitioned_begin;
   }
 
@@ -265,18 +225,18 @@ private:
     if (overlaps(left->bounds, right->bounds)) {
       if (left->payload.index() == 0) {
         // left is internal
-        // check left's children for overlap
         auto const &left_children = std::get<0>(left->payload);
         if (right->payload.index() == 0) {
           // right is internal
-          // check right's children for overlap
           auto const &right_children = std::get<0>(right->payload);
-          for (auto const left_child : left_children) {
-            for (auto const right_child : right_children) {
-              for_each_overlapping_leaf_pair(left_child, right_child,
-                                             std::forward<F>(f));
-            }
-          }
+          for_each_overlapping_leaf_pair(left_children[0], right_children[0],
+                                         std::forward<F>(f));
+          for_each_overlapping_leaf_pair(left_children[0], right_children[1],
+                                         std::forward<F>(f));
+          for_each_overlapping_leaf_pair(left_children[1], right_children[0],
+                                         std::forward<F>(f));
+          for_each_overlapping_leaf_pair(left_children[1], right_children[1],
+                                         std::forward<F>(f));
         } else {
           // right is leaf
           for (auto const left_child : left_children) {
@@ -301,7 +261,8 @@ private:
     }
   }
 
-  Node_pool _node_pool;
+  Leaf_node_pool _leaf_node_pool;
+  Internal_node_pool _internal_node_pool;
   Node *_root_node{};
   ankerl::unordered_dense::set<Node *> _leaf_nodes;
   std::vector<Node *> _flattened_leaf_nodes;
