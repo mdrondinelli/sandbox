@@ -131,12 +131,8 @@ public:
 
   Particle_handle create_particle(Particle_create_info const &create_info) {
     auto const bounds =
-        Aabb{create_info.position - math::Vec3f{create_info.radius,
-                                                create_info.radius,
-                                                create_info.radius},
-             create_info.position + math::Vec3f{create_info.radius,
-                                                create_info.radius,
-                                                create_info.radius}};
+        Aabb{create_info.position - math::Vec3f::all(create_info.radius),
+             create_info.position + math::Vec3f::all(create_info.radius)};
     auto const handle = _particles.alloc();
     auto const data = _particles.data(handle);
     // TODO: consider what happens if create_leaf fails
