@@ -7,11 +7,13 @@
 namespace marlon {
 namespace physics {
 namespace {
+struct Particle_data;
+
 using Aabb_tree_payload_t =
-    std::variant<Particle_handle, Static_rigid_body_handle,
+    std::variant<Particle_data *, Static_rigid_body_handle,
                  Dynamic_rigid_body_handle>;
 
-struct Particle {
+struct Particle_data {
   Aabb_tree<Aabb_tree_payload_t>::Node *bounds_tree_leaf;
   Particle_motion_callback *motion_callback;
   std::uint64_t collision_flags;
@@ -23,6 +25,55 @@ struct Particle {
   float mass_inverse;
   float radius;
   Material material;
+};
+
+class Particle_storage {
+public:
+  explicit Particle_storage(std::ptrdiff_t size) noexcept
+      : _data(size), _free_indices(size), _occupancy_bits(size) {
+    for (auto i = std::ptrdiff_t{}; i != size; ++i) {
+      _free_indices[i] = size - i - 1;
+    }
+  }
+
+  Particle_handle alloc() {
+    if (_free_indices.empty()) {
+      throw std::runtime_error{"Out of space for particles"};
+    }
+    auto const index = _free_indices.back();
+    _free_indices.pop_back();
+    _occupancy_bits[index] = true;
+    return Particle_handle{index};
+  }
+
+  void free(Particle_handle handle) {
+    _free_indices.emplace_back(handle.value);
+    _occupancy_bits[handle.value] = false;
+  }
+
+  Particle_data *data(Particle_handle handle) {
+    return _data.data() + handle.value;
+  }
+
+  template <typename F> void for_each(F &&f) {
+    auto const n = static_cast<std::ptrdiff_t>(_data.size());
+    auto const m =
+        static_cast<std::ptrdiff_t>(_data.size() - _free_indices.size());
+    auto k = std::ptrdiff_t{};
+    for (auto i = std::ptrdiff_t{}; i != n; ++i) {
+      if (_occupancy_bits[i]) {
+        f(Particle_handle{i}, _data.data() + i);
+        if (++k == m) {
+          return;
+        }
+      }
+    }
+  }
+
+private:
+  std::vector<Particle_data> _data;
+  std::vector<std::ptrdiff_t> _free_indices;
+  std::vector<bool> _occupancy_bits;
 };
 
 struct Static_rigid_body {
@@ -55,7 +106,7 @@ struct Dynamic_rigid_body {
 };
 
 struct Particle_particle_contact {
-  std::array<Particle *, 2> particles;
+  std::array<Particle_data *, 2> particles;
   math::Vec3f normal;
   float normal_force_lagrange;
   float tangent_force_lagrange;
@@ -63,27 +114,20 @@ struct Particle_particle_contact {
 };
 
 struct Particle_static_rigid_body_contact {
-  Particle *particle;
+  Particle_data *particle;
   Static_rigid_body *static_rigid_body;
   math::Vec3f normal;
   float normal_force_lagrange;
   float tangent_force_lagrange;
   float separating_velocity;
 };
-
-template <typename F, typename... Args> double timed(F &&f) {
-  auto const start = std::chrono::high_resolution_clock::now();
-  f();
-  auto const end = std::chrono::high_resolution_clock::now();
-  return std::chrono::duration_cast<std::chrono::duration<double>>(end - start)
-      .count();
-}
 } // namespace
 
 class Space::Impl {
 public:
   explicit Impl(Space_create_info const &create_info)
-      : _gravitational_acceleration{create_info.gravitational_acceleration} {}
+      : _particles{create_info.max_particles},
+        _gravitational_acceleration{create_info.gravitational_acceleration} {}
 
   Particle_handle create_particle(Particle_create_info const &create_info) {
     auto const bounds =
@@ -93,33 +137,26 @@ public:
              create_info.position + math::Vec3f{create_info.radius,
                                                 create_info.radius,
                                                 create_info.radius}};
-    Particle_handle const reference{_next_particle_handle_value};
-    Particle const value{.bounds_tree_leaf =
-                             _aabb_tree.create_leaf(bounds, reference),
-                         .motion_callback = create_info.motion_callback,
-                         .collision_flags = create_info.collision_flags,
-                         .collision_mask = create_info.collision_mask,
-                         .previous_position = create_info.position,
-                         .current_position = create_info.position,
-                         .velocity = create_info.velocity,
-                         .mass = create_info.mass,
-                         .mass_inverse = 1.0f / create_info.mass,
-                         .radius = create_info.radius,
-                         .material = create_info.material};
-    try {
-      _particles.emplace(reference, value);
-    } catch (...) {
-      _aabb_tree.destroy_leaf(value.bounds_tree_leaf);
-      throw;
-    }
-    ++_next_particle_handle_value;
-    return reference;
+    auto const handle = _particles.alloc();
+    auto const data = _particles.data(handle);
+    // TODO: consider what happens if create_leaf fails
+    *data = {.bounds_tree_leaf = _aabb_tree.create_leaf(bounds, data),
+             .motion_callback = create_info.motion_callback,
+             .collision_flags = create_info.collision_flags,
+             .collision_mask = create_info.collision_mask,
+             .previous_position = create_info.position,
+             .current_position = create_info.position,
+             .velocity = create_info.velocity,
+             .mass = create_info.mass,
+             .mass_inverse = 1.0f / create_info.mass,
+             .radius = create_info.radius,
+             .material = create_info.material};
+    return handle;
   }
 
-  void destroy_particle(Particle_handle reference) {
-    auto const it = _particles.find(reference);
-    _aabb_tree.destroy_leaf(it->second.bounds_tree_leaf);
-    _particles.erase(it);
+  void destroy_particle(Particle_handle handle) {
+    _aabb_tree.destroy_leaf(_particles.data(handle)->bounds_tree_leaf);
+    _particles.free(handle);
   }
 
   Static_rigid_body_handle
@@ -198,14 +235,13 @@ public:
     auto const h = simulate_info.delta_time / simulate_info.substep_count;
     auto const h_inv = 1.0f / h;
     build_aabb_tree(simulate_info.delta_time);
-    find_contacts();
+    find_broadphase_pairs();
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
-      for (auto &element : _particles) {
-        auto &particle = element.second;
-        particle.previous_position = particle.current_position;
-        particle.velocity += h * _gravitational_acceleration;
-        particle.current_position += h * particle.velocity;
-      }
+      _particles.for_each([&](Particle_handle, Particle_data *data) {
+        data->previous_position = data->current_position;
+        data->velocity += h * _gravitational_acceleration;
+        data->current_position += h * data->velocity;
+      });
       for (auto &element : _dynamic_rigid_bodies) {
         auto &body = element.second;
         body.previous_position = body.current_position;
@@ -219,20 +255,21 @@ public:
       }
       solve_particle_particle_contact_positions();
       solve_particle_static_rigid_body_contact_positions();
-      for (auto &element : _particles) {
-        auto &particle = element.second;
-        particle.velocity =
-            h_inv * (particle.current_position - particle.previous_position);
-      }
+      _particles.for_each([&](Particle_handle, Particle_data *data) {
+        data->velocity =
+            h_inv * (data->current_position - data->previous_position);
+      });
       solve_particle_particle_contact_velocities(h);
       solve_particle_static_rigid_body_contact_velocities(h);
     }
-    for (auto &[handle, value] : _particles) {
-      if (value.motion_callback != nullptr) {
-        value.motion_callback->on_particle_motion(
-            {handle, value.current_position});
+    _particles.for_each([&](Particle_handle handle, Particle_data *data) {
+      if (data->motion_callback != nullptr) {
+        data->motion_callback->on_particle_motion(
+            {handle, data->current_position});
       }
-    }
+      data->velocity =
+          h_inv * (data->current_position - data->previous_position);
+    });
     for (auto &[handle, value] : _dynamic_rigid_bodies) {
       if (value.motion_callback != nullptr) {
         value.motion_callback->on_dynamic_rigid_body_motion(
@@ -246,80 +283,67 @@ private:
     auto const safety_factor = 2.0f;
     auto const gravity_term =
         math::length(_gravitational_acceleration) * delta_time * delta_time;
-    for (auto const &element : _particles) {
-      auto const &particle = element.second;
+    _particles.for_each([&](Particle_handle, Particle_data *data) {
       auto const radius =
-          particle.radius +
-          safety_factor * delta_time * math::length(particle.velocity) +
+          data->radius +
+          safety_factor * delta_time * math::length(data->velocity) +
           gravity_term;
-      auto const half_extents = math::Vec3f{radius, radius, radius};
-      particle.bounds_tree_leaf->bounds = {
-          particle.current_position - half_extents,
-          particle.current_position + half_extents};
-    }
+      auto const half_extents = math::Vec3f::all(radius);
+      data->bounds_tree_leaf->bounds = {data->current_position - half_extents,
+                                        data->current_position + half_extents};
+    });
     _aabb_tree.build();
   }
 
-  void find_contacts() {
-    _particle_particle_contacts.clear();
-    _particle_static_rigid_body_contacts.clear();
-    _aabb_tree.for_each_overlapping_leaf_pair(
-        [this](Aabb_tree_payload_t const &first_payload,
-               Aabb_tree_payload_t const &second_payload) {
-          std::visit(
-              [this, &second_payload](auto &&first_handle) {
-                using T = std::decay_t<decltype(first_handle)>;
-                if constexpr (std::is_same_v<T, Particle_handle>) {
-                  std::visit(
-                      [this, first_handle](auto &&second_handle) {
-                        using U = std::decay_t<decltype(second_handle)>;
-                        if constexpr (std::is_same_v<U, Particle_handle>) {
-                          _particle_particle_contacts.emplace_back(
-                              Particle_particle_contact{
-                                  .particles = {&_particles.at(first_handle),
-                                                &_particles.at(second_handle)},
-                                  .normal_force_lagrange = 0.0f,
-                                  .tangent_force_lagrange = 0.0f});
-                        } else if constexpr (std::is_same_v<
-                                                 U, Static_rigid_body_handle>) {
-                          _particle_static_rigid_body_contacts.emplace_back(
-                              Particle_static_rigid_body_contact{
-                                  .particle = &_particles.at(first_handle),
-                                  .static_rigid_body =
-                                      &_static_rigid_bodies.at(second_handle),
-                                  .normal = math::Vec3f::zero(),
-                                  .normal_force_lagrange = 0.0f,
-                                  .tangent_force_lagrange = 0.0f,
-                                  .separating_velocity = 0.0f});
-                        }
-                      },
-                      second_payload);
-                } else if constexpr (std::is_same_v<T,
-                                                    Static_rigid_body_handle>) {
-                  std::visit(
-                      [this, first_handle](auto &&second_handle) {
-                        using U = std::decay_t<decltype(second_handle)>;
-                        if constexpr (std::is_same_v<U, Particle_handle>) {
-                          _particle_static_rigid_body_contacts.emplace_back(
-                              Particle_static_rigid_body_contact{
-                                  .particle = &_particles.at(second_handle),
-                                  .static_rigid_body =
-                                      &_static_rigid_bodies.at(first_handle),
-                                  .normal = math::Vec3f::zero(),
-                                  .normal_force_lagrange = 0.0f,
-                                  .tangent_force_lagrange = 0.0f,
-                                  .separating_velocity = 0.0f});
-                        }
-                      },
-                      second_payload);
-                }
-              },
-              first_payload);
-        });
+  void find_broadphase_pairs() {
+    _particle_particle_broadphase_pairs.clear();
+    _particle_static_rigid_body_broadphase_pairs.clear();
+    _aabb_tree.for_each_overlapping_leaf_pair([this](Aabb_tree_payload_t const
+                                                         &first_payload,
+                                                     Aabb_tree_payload_t const
+                                                         &second_payload) {
+      std::visit(
+          [this, &second_payload](auto &&first_handle) {
+            using T = std::decay_t<decltype(first_handle)>;
+            if constexpr (std::is_same_v<T, Particle_data *>) {
+              std::visit(
+                  [this, first_handle](auto &&second_handle) {
+                    using U = std::decay_t<decltype(second_handle)>;
+                    if constexpr (std::is_same_v<U, Particle_data *>) {
+                      _particle_particle_broadphase_pairs.emplace_back(
+                          Particle_particle_contact{
+                              .particles = {first_handle, second_handle}});
+                    } else if constexpr (std::is_same_v<
+                                             U, Static_rigid_body_handle>) {
+                      _particle_static_rigid_body_broadphase_pairs.emplace_back(
+                          Particle_static_rigid_body_contact{
+                              .particle = first_handle,
+                              .static_rigid_body =
+                                  &_static_rigid_bodies.at(second_handle)});
+                    }
+                  },
+                  second_payload);
+            } else if constexpr (std::is_same_v<T, Static_rigid_body_handle>) {
+              std::visit(
+                  [this, first_handle](auto &&second_handle) {
+                    using U = std::decay_t<decltype(second_handle)>;
+                    if constexpr (std::is_same_v<U, Particle_data *>) {
+                      _particle_static_rigid_body_broadphase_pairs.emplace_back(
+                          Particle_static_rigid_body_contact{
+                              .particle = second_handle,
+                              .static_rigid_body =
+                                  &_static_rigid_bodies.at(first_handle)});
+                    }
+                  },
+                  second_payload);
+            }
+          },
+          first_payload);
+    });
   }
 
   void solve_particle_particle_contact_positions() {
-    for (auto &contact : _particle_particle_contacts) {
+    for (auto &contact : _particle_particle_broadphase_pairs) {
       auto const particle_a = contact.particles[0];
       auto const particle_b = contact.particles[1];
       auto const displacement =
@@ -383,7 +407,7 @@ private:
   }
 
   void solve_particle_static_rigid_body_contact_positions() {
-    for (auto &contact : _particle_static_rigid_body_contacts) {
+    for (auto &contact : _particle_static_rigid_body_broadphase_pairs) {
       auto const particle = contact.particle;
       auto const static_rigid_body = contact.static_rigid_body;
       if (auto const contact_geometry = find_particle_contact(
@@ -424,7 +448,7 @@ private:
   void solve_particle_particle_contact_velocities(float h) {
     auto const restitution_threshold =
         2.0f * math::length(_gravitational_acceleration) * h;
-    for (auto &contact : _particle_particle_contacts) {
+    for (auto &contact : _particle_particle_broadphase_pairs) {
       if (contact.normal_force_lagrange != 0.0f) {
         auto const v =
             contact.particles[0]->velocity - contact.particles[1]->velocity;
@@ -474,7 +498,7 @@ private:
   void solve_particle_static_rigid_body_contact_velocities(float h) {
     auto const restitution_threshold =
         2.0f * math::length(_gravitational_acceleration) * h;
-    for (auto &contact : _particle_static_rigid_body_contacts) {
+    for (auto &contact : _particle_static_rigid_body_broadphase_pairs) {
       if (contact.normal_force_lagrange != 0.0f) {
         auto const v = contact.particle->velocity;
         auto const v_n = math::dot(v, contact.normal);
@@ -509,15 +533,14 @@ private:
   }
 
   Aabb_tree<Aabb_tree_payload_t> _aabb_tree;
-  ankerl::unordered_dense::map<Particle_handle, Particle> _particles;
+  Particle_storage _particles;
   ankerl::unordered_dense::map<Static_rigid_body_handle, Static_rigid_body>
       _static_rigid_bodies;
   ankerl::unordered_dense::map<Dynamic_rigid_body_handle, Dynamic_rigid_body>
       _dynamic_rigid_bodies;
-  std::vector<Particle_particle_contact> _particle_particle_contacts;
+  std::vector<Particle_particle_contact> _particle_particle_broadphase_pairs;
   std::vector<Particle_static_rigid_body_contact>
-      _particle_static_rigid_body_contacts;
-  std::uint64_t _next_particle_handle_value{};
+      _particle_static_rigid_body_broadphase_pairs;
   std::uint64_t _next_static_rigid_body_handle_value{};
   std::uint64_t _next_dynamic_rigid_body_handle_value{};
   math::Vec3f _gravitational_acceleration;

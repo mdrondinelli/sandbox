@@ -10,6 +10,7 @@
 namespace marlon {
 namespace physics {
 struct Space_create_info {
+  std::ptrdiff_t max_particles{1000000};
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 
