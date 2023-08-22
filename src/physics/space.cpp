@@ -252,43 +252,57 @@ private:
     _particle_static_rigid_body_contacts.clear();
     _bounds_tree.build();
     _bounds_tree.for_each_overlapping_leaf_pair(
-        [this](Bounds_tree_payload const &first_reference,
-               Bounds_tree_payload const &second_reference) {
-          if (first_reference.index() == 0) {
-            if (second_reference.index() == 0) {
-              _particle_particle_contacts.emplace_back(
-                  Particle_particle_contact{
-                      .particles =
-                          {&_particles.at(std::get<0>(first_reference)),
-                           &_particles.at(std::get<0>(second_reference))},
-                      .normal_force_lagrange = 0.0f,
-                      .tangent_force_lagrange = 0.0f});
-            } else {
-              _particle_static_rigid_body_contacts.emplace_back(
-                  Particle_static_rigid_body_contact{
-                      .particle = &_particles.at(std::get<0>(first_reference)),
-                      .static_rigid_body = &_static_rigid_bodies.at(
-                          std::get<1>(second_reference)),
-                      .normal = math::Vec3f::zero(),
-                      .normal_force_lagrange = 0.0f,
-                      .tangent_force_lagrange = 0.0f,
-                      .separating_velocity = 0.0f});
-            }
-          } else {
-            if (second_reference.index() == 0) {
-              _particle_static_rigid_body_contacts.emplace_back(
-                  Particle_static_rigid_body_contact{
-                      .particle = &_particles.at(std::get<0>(second_reference)),
-                      .static_rigid_body = &_static_rigid_bodies.at(
-                          std::get<1>(first_reference)),
-                      .normal = math::Vec3f::zero(),
-                      .normal_force_lagrange = 0.0f,
-                      .tangent_force_lagrange = 0.0f,
-                      .separating_velocity = 0.0f});
-            } else {
-              // ignore static rigid bodies colliding with each other
-            }
-          }
+        [this](Bounds_tree_payload const &first_payload,
+               Bounds_tree_payload const &second_payload) {
+          std::visit(
+              [this, &second_payload](auto &&first_handle) {
+                using T = std::decay_t<decltype(first_handle)>;
+                if constexpr (std::is_same_v<T, Particle_handle>) {
+                  std::visit(
+                      [this, first_handle](auto &&second_handle) {
+                        using U = std::decay_t<decltype(second_handle)>;
+                        if constexpr (std::is_same_v<U, Particle_handle>) {
+                          _particle_particle_contacts.emplace_back(
+                              Particle_particle_contact{
+                                  .particles = {&_particles.at(first_handle),
+                                                &_particles.at(second_handle)},
+                                  .normal_force_lagrange = 0.0f,
+                                  .tangent_force_lagrange = 0.0f});
+                        } else if constexpr (std::is_same_v<
+                                                 U, Static_rigid_body_handle>) {
+                          _particle_static_rigid_body_contacts.emplace_back(
+                              Particle_static_rigid_body_contact{
+                                  .particle = &_particles.at(first_handle),
+                                  .static_rigid_body =
+                                      &_static_rigid_bodies.at(second_handle),
+                                  .normal = math::Vec3f::zero(),
+                                  .normal_force_lagrange = 0.0f,
+                                  .tangent_force_lagrange = 0.0f,
+                                  .separating_velocity = 0.0f});
+                        }
+                      },
+                      second_payload);
+                } else if constexpr (std::is_same_v<T,
+                                                    Static_rigid_body_handle>) {
+                  std::visit(
+                      [this, first_handle](auto &&second_handle) {
+                        using U = std::decay_t<decltype(second_handle)>;
+                        if constexpr (std::is_same_v<U, Particle_handle>) {
+                          _particle_static_rigid_body_contacts.emplace_back(
+                              Particle_static_rigid_body_contact{
+                                  .particle = &_particles.at(second_handle),
+                                  .static_rigid_body =
+                                      &_static_rigid_bodies.at(first_handle),
+                                  .normal = math::Vec3f::zero(),
+                                  .normal_force_lagrange = 0.0f,
+                                  .tangent_force_lagrange = 0.0f,
+                                  .separating_velocity = 0.0f});
+                        }
+                      },
+                      second_payload);
+                }
+              },
+              first_payload);
         });
   }
 

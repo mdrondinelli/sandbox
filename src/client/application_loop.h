@@ -16,7 +16,7 @@ public:
   explicit Application_loop(
       Application_loop_create_info const &create_info);
 
-  void run_once(double delta_time);
+  bool run_once(double delta_time);
 
 private:
   physics::Space *_space;

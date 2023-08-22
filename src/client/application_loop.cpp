@@ -14,13 +14,16 @@ Application_loop::Application_loop(
   assert(create_info.physics_substep_count >= 1);
 }
 
-void Application_loop::run_once(double delta_time) {
+bool Application_loop::run_once(double delta_time) {
+  auto retval = false;
   _accumulated_time += delta_time;
   while (_accumulated_time >= _tick_duration) {
     _accumulated_time -= _tick_duration;
     _space->simulate({.delta_time = _tick_duration,
                       .substep_count = _physics_substep_count});
+    retval = true;
   }
+  return retval;
 }
 } // namespace client
 } // namespace marlon

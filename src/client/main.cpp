@@ -246,7 +246,8 @@ graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
 void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
                    graphics::Render_target *render_target,
                    graphics::Scene *scene, graphics::Camera *camera,
-                   physics::Space *space, client::Test_entity_manager *) {
+                   physics::Space *space,
+                   client::Test_entity_manager *test_entity_manager) {
   auto loop = client::Application_loop{{.space = space,
                                         .tick_duration = 1.0f / 30.0f,
                                         .physics_substep_count = 4}};
@@ -262,7 +263,12 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
     auto const current_time = glfwGetTime();
     auto const elapsed_time = current_time - previous_time;
     previous_time = current_time;
-    loop.run_once(elapsed_time);
+    if (loop.run_once(elapsed_time)) {
+      test_entity_manager->tick(1.0f / 30.0f);
+      for (auto i = 0; i < 8; ++i) {
+        test_entity_manager->create_entity({});
+      }
+    }
     graphics->render(scene, camera, render_target);
     glfwSwapBuffers(window);
     fps_time_accumulator += elapsed_time;
