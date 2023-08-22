@@ -16,7 +16,7 @@ using Aabb_tree_payload_t =
                  Dynamic_rigid_body_handle>;
 
 struct Particle_data {
-  Aabb_tree<Aabb_tree_payload_t>::Node *bounds_tree_leaf;
+  Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node;
   Particle_motion_callback *motion_callback;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
@@ -80,7 +80,7 @@ private:
 };
 
 struct Static_rigid_body_data {
-  Aabb_tree<Aabb_tree_payload_t>::Node *bounds_tree_leaf;
+  Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
   math::Mat3x4f transform;
@@ -143,7 +143,7 @@ private:
 };
 
 struct Dynamic_rigid_body {
-  Aabb_tree<Aabb_tree_payload_t>::Node *bounds_tree_leaf;
+  Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node;
   Dynamic_rigid_body_motion_callback *motion_callback;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
@@ -194,7 +194,7 @@ public:
     auto const data = _particles.data(handle);
     // TODO: cleanup allocated handle if create_leaf fails
     new (data)
-        Particle_data{.bounds_tree_leaf = _aabb_tree.create_leaf(bounds, data),
+        Particle_data{.aabb_tree_node = _aabb_tree.create_leaf(bounds, data),
                       .motion_callback = create_info.motion_callback,
                       .collision_flags = create_info.collision_flags,
                       .collision_mask = create_info.collision_mask,
@@ -209,7 +209,7 @@ public:
   }
 
   void destroy_particle(Particle_handle handle) {
-    _aabb_tree.destroy_leaf(_particles.data(handle)->bounds_tree_leaf);
+    _aabb_tree.destroy_leaf(_particles.data(handle)->aabb_tree_node);
     _particles.free(handle);
   }
 
@@ -218,22 +218,11 @@ public:
     auto const transform =
         math::Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
-    // Static_rigid_body_handle const reference{
-    //     _next_static_rigid_body_handle_value};
-    // Static_rigid_body const value{
-    //     .bounds_tree_leaf = _aabb_tree.create_leaf(
-    //         physics::bounds(create_info.shape, transform), reference),
-    //     .collision_flags = create_info.collision_flags,
-    //     .collision_mask = create_info.collision_mask,
-    //     .transform = transform,
-    //     .transform_inverse = transform_inverse,
-    //     .shape = create_info.shape,
-    //     .material = create_info.material};
     // TODO: cleanup allocated handle if create_leaf fails
     auto const handle = _static_rigid_bodies.alloc();
     auto const data = _static_rigid_bodies.data(handle);
     new (data) Static_rigid_body_data{
-        .bounds_tree_leaf = _aabb_tree.create_leaf(
+        .aabb_tree_node = _aabb_tree.create_leaf(
             physics::bounds(create_info.shape, transform), data),
         .collision_flags = create_info.collision_flags,
         .collision_mask = create_info.collision_mask,
@@ -241,23 +230,12 @@ public:
         .transform_inverse = transform_inverse,
         .shape = create_info.shape,
         .material = create_info.material};
-    // try {
-    //   _static_rigid_bodies.emplace(reference, value);
-    // } catch (...) {
-    //   _aabb_tree.destroy_leaf(value.bounds_tree_leaf);
-    //   throw;
-    // }
-    // ++_next_static_rigid_body_handle_value;
-    // return reference;
     return handle;
   }
 
   void destroy_static_rigid_body(Static_rigid_body_handle handle) {
-    // auto const it = _static_rigid_bodies.find(reference);
-    // _aabb_tree.destroy_leaf(it->second.bounds_tree_leaf);
-    // _static_rigid_bodies.erase(it);
     _aabb_tree.destroy_leaf(
-        _static_rigid_bodies.data(handle)->bounds_tree_leaf);
+        _static_rigid_bodies.data(handle)->aabb_tree_node);
     _static_rigid_bodies.free(handle);
   }
 
@@ -268,7 +246,7 @@ public:
     Dynamic_rigid_body_handle const handle{
         _next_dynamic_rigid_body_handle_value};
     Dynamic_rigid_body const value{
-        .bounds_tree_leaf = _aabb_tree.create_leaf(
+        .aabb_tree_node = _aabb_tree.create_leaf(
             physics::bounds(create_info.shape, transform), handle),
         .motion_callback = create_info.motion_callback,
         .collision_flags = create_info.collision_flags,
@@ -288,7 +266,7 @@ public:
     try {
       _dynamic_rigid_bodies.emplace(handle, value);
     } catch (...) {
-      _aabb_tree.destroy_leaf(value.bounds_tree_leaf);
+      _aabb_tree.destroy_leaf(value.aabb_tree_node);
       throw;
     }
     ++_next_dynamic_rigid_body_handle_value;
@@ -297,7 +275,7 @@ public:
 
   void destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle) {
     auto const it = _dynamic_rigid_bodies.find(handle);
-    _aabb_tree.destroy_leaf(it->second.bounds_tree_leaf);
+    _aabb_tree.destroy_leaf(it->second.aabb_tree_node);
     _dynamic_rigid_bodies.erase(it);
   }
 
@@ -359,7 +337,7 @@ private:
           safety_factor * delta_time * math::length(data->velocity) +
           gravity_term;
       auto const half_extents = math::Vec3f::all(radius);
-      data->bounds_tree_leaf->bounds = {data->current_position - half_extents,
+      data->aabb_tree_node->bounds = {data->current_position - half_extents,
                                         data->current_position + half_extents};
     });
     _aabb_tree.build();
