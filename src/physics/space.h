@@ -15,7 +15,7 @@ struct Space_create_info {
 
 struct Space_simulate_info {
   float delta_time;
-  int substep_count;
+  int substep_count{1};
 };
 
 class Space {

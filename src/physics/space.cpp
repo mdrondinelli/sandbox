@@ -2,17 +2,17 @@
 
 #include <ankerl/unordered_dense.h>
 
-#include "bounds_tree.h"
+#include "aabb_tree.h"
 
 namespace marlon {
 namespace physics {
 namespace {
-using Bounds_tree_payload =
+using Aabb_tree_payload_t =
     std::variant<Particle_handle, Static_rigid_body_handle,
                  Dynamic_rigid_body_handle>;
 
 struct Particle {
-  Bounds_tree<Bounds_tree_payload>::Node *bounds_tree_leaf;
+  Aabb_tree<Aabb_tree_payload_t>::Node *bounds_tree_leaf;
   Particle_motion_callback *motion_callback;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
@@ -26,7 +26,7 @@ struct Particle {
 };
 
 struct Static_rigid_body {
-  Bounds_tree<Bounds_tree_payload>::Node *bounds_tree_leaf;
+  Aabb_tree<Aabb_tree_payload_t>::Node *bounds_tree_leaf;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
   math::Mat3x4f transform;
@@ -36,7 +36,7 @@ struct Static_rigid_body {
 };
 
 struct Dynamic_rigid_body {
-  Bounds_tree<Bounds_tree_payload>::Node *bounds_tree_leaf;
+  Aabb_tree<Aabb_tree_payload_t>::Node *bounds_tree_leaf;
   Dynamic_rigid_body_motion_callback *motion_callback;
   std::uint64_t collision_flags;
   std::uint64_t collision_mask;
@@ -70,6 +70,14 @@ struct Particle_static_rigid_body_contact {
   float tangent_force_lagrange;
   float separating_velocity;
 };
+
+template <typename F, typename... Args> double timed(F &&f) {
+  auto const start = std::chrono::high_resolution_clock::now();
+  f();
+  auto const end = std::chrono::high_resolution_clock::now();
+  return std::chrono::duration_cast<std::chrono::duration<double>>(end - start)
+      .count();
+}
 } // namespace
 
 class Space::Impl {
@@ -79,15 +87,15 @@ public:
 
   Particle_handle create_particle(Particle_create_info const &create_info) {
     auto const bounds =
-        Bounds{create_info.position - math::Vec3f{create_info.radius,
-                                                  create_info.radius,
-                                                  create_info.radius},
-               create_info.position + math::Vec3f{create_info.radius,
-                                                  create_info.radius,
-                                                  create_info.radius}};
+        Aabb{create_info.position - math::Vec3f{create_info.radius,
+                                                create_info.radius,
+                                                create_info.radius},
+             create_info.position + math::Vec3f{create_info.radius,
+                                                create_info.radius,
+                                                create_info.radius}};
     Particle_handle const reference{_next_particle_handle_value};
     Particle const value{.bounds_tree_leaf =
-                             _bounds_tree.create_leaf(bounds, reference),
+                             _aabb_tree.create_leaf(bounds, reference),
                          .motion_callback = create_info.motion_callback,
                          .collision_flags = create_info.collision_flags,
                          .collision_mask = create_info.collision_mask,
@@ -101,7 +109,7 @@ public:
     try {
       _particles.emplace(reference, value);
     } catch (...) {
-      _bounds_tree.destroy_leaf(value.bounds_tree_leaf);
+      _aabb_tree.destroy_leaf(value.bounds_tree_leaf);
       throw;
     }
     ++_next_particle_handle_value;
@@ -110,7 +118,7 @@ public:
 
   void destroy_particle(Particle_handle reference) {
     auto const it = _particles.find(reference);
-    _bounds_tree.destroy_leaf(it->second.bounds_tree_leaf);
+    _aabb_tree.destroy_leaf(it->second.bounds_tree_leaf);
     _particles.erase(it);
   }
 
@@ -122,7 +130,7 @@ public:
     Static_rigid_body_handle const reference{
         _next_static_rigid_body_handle_value};
     Static_rigid_body const value{
-        .bounds_tree_leaf = _bounds_tree.create_leaf(
+        .bounds_tree_leaf = _aabb_tree.create_leaf(
             physics::bounds(create_info.shape, transform), reference),
         .collision_flags = create_info.collision_flags,
         .collision_mask = create_info.collision_mask,
@@ -133,7 +141,7 @@ public:
     try {
       _static_rigid_bodies.emplace(reference, value);
     } catch (...) {
-      _bounds_tree.destroy_leaf(value.bounds_tree_leaf);
+      _aabb_tree.destroy_leaf(value.bounds_tree_leaf);
       throw;
     }
     ++_next_static_rigid_body_handle_value;
@@ -142,7 +150,7 @@ public:
 
   void destroy_static_rigid_body(Static_rigid_body_handle reference) {
     auto const it = _static_rigid_bodies.find(reference);
-    _bounds_tree.destroy_leaf(it->second.bounds_tree_leaf);
+    _aabb_tree.destroy_leaf(it->second.bounds_tree_leaf);
     _static_rigid_bodies.erase(it);
   }
 
@@ -153,7 +161,7 @@ public:
     Dynamic_rigid_body_handle const handle{
         _next_dynamic_rigid_body_handle_value};
     Dynamic_rigid_body const value{
-        .bounds_tree_leaf = _bounds_tree.create_leaf(
+        .bounds_tree_leaf = _aabb_tree.create_leaf(
             physics::bounds(create_info.shape, transform), handle),
         .motion_callback = create_info.motion_callback,
         .collision_flags = create_info.collision_flags,
@@ -173,7 +181,7 @@ public:
     try {
       _dynamic_rigid_bodies.emplace(handle, value);
     } catch (...) {
-      _bounds_tree.destroy_leaf(value.bounds_tree_leaf);
+      _aabb_tree.destroy_leaf(value.bounds_tree_leaf);
       throw;
     }
     ++_next_dynamic_rigid_body_handle_value;
@@ -182,14 +190,15 @@ public:
 
   void destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle) {
     auto const it = _dynamic_rigid_bodies.find(handle);
-    _bounds_tree.destroy_leaf(it->second.bounds_tree_leaf);
+    _aabb_tree.destroy_leaf(it->second.bounds_tree_leaf);
     _dynamic_rigid_bodies.erase(it);
   }
 
   void simulate(Space_simulate_info const &simulate_info) {
     auto const h = simulate_info.delta_time / simulate_info.substep_count;
     auto const h_inv = 1.0f / h;
-    find_contacts(simulate_info.delta_time);
+    build_aabb_tree(simulate_info.delta_time);
+    find_contacts();
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
       for (auto &element : _particles) {
         auto &particle = element.second;
@@ -233,7 +242,7 @@ public:
   }
 
 private:
-  void find_contacts(float delta_time) {
+  void build_aabb_tree(float delta_time) {
     auto const safety_factor = 2.0f;
     auto const gravity_term =
         math::length(_gravitational_acceleration) * delta_time * delta_time;
@@ -248,12 +257,15 @@ private:
           particle.current_position - half_extents,
           particle.current_position + half_extents};
     }
+    _aabb_tree.build();
+  }
+
+  void find_contacts() {
     _particle_particle_contacts.clear();
     _particle_static_rigid_body_contacts.clear();
-    _bounds_tree.build();
-    _bounds_tree.for_each_overlapping_leaf_pair(
-        [this](Bounds_tree_payload const &first_payload,
-               Bounds_tree_payload const &second_payload) {
+    _aabb_tree.for_each_overlapping_leaf_pair(
+        [this](Aabb_tree_payload_t const &first_payload,
+               Aabb_tree_payload_t const &second_payload) {
           std::visit(
               [this, &second_payload](auto &&first_handle) {
                 using T = std::decay_t<decltype(first_handle)>;
@@ -496,7 +508,7 @@ private:
     }
   }
 
-  Bounds_tree<Bounds_tree_payload> _bounds_tree;
+  Aabb_tree<Aabb_tree_payload_t> _aabb_tree;
   ankerl::unordered_dense::map<Particle_handle, Particle> _particles;
   ankerl::unordered_dense::map<Static_rigid_body_handle, Static_rigid_body>
       _static_rigid_bodies;
@@ -545,7 +557,7 @@ void Space::destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle) {
 }
 
 void Space::simulate(Space_simulate_info const &simulate_info) {
-  _impl->simulate(simulate_info);
+  return _impl->simulate(simulate_info);
 }
 } // namespace physics
 } // namespace marlon

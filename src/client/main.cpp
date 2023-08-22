@@ -248,8 +248,10 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
                    graphics::Scene *scene, graphics::Camera *camera,
                    physics::Space *space,
                    client::Test_entity_manager *test_entity_manager) {
+  auto const tick_rate = 60.0f;
+  auto const tick_duration = 1.0f / tick_rate;
   auto loop = client::Application_loop{{.space = space,
-                                        .tick_duration = 1.0f / 30.0f,
+                                        .tick_duration = tick_duration,
                                         .physics_substep_count = 4}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
@@ -264,8 +266,8 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
     auto const elapsed_time = current_time - previous_time;
     previous_time = current_time;
     if (loop.run_once(elapsed_time)) {
-      test_entity_manager->tick(1.0f / 30.0f);
-      for (auto i = 0; i < 8; ++i) {
+      test_entity_manager->tick(tick_duration);
+      for (auto i = 0; i < 4; ++i) {
         test_entity_manager->create_entity({});
       }
     }

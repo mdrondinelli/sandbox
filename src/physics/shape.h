@@ -9,7 +9,7 @@
 
 #include "../math/mat.h"
 #include "../math/vec.h"
-#include "bounds.h"
+#include "aabb.h"
 #include "particle.h"
 
 namespace marlon {
@@ -30,7 +30,7 @@ public:
 
   Shape(Box const &box) noexcept : _v{box} {}
 
-  friend Bounds bounds(Shape const &shape,
+  friend Aabb bounds(Shape const &shape,
                        math::Mat3x4f const &shape_transform) noexcept;
 
   friend std::optional<Particle_contact>
@@ -43,12 +43,12 @@ private:
   std::variant<Ball, Box> _v;
 };
 
-inline Bounds bounds(Ball const &ball, math::Vec3f const &position) {
+inline Aabb bounds(Ball const &ball, math::Vec3f const &position) {
   return {.min = position - math::Vec3f::all(ball.radius),
           .max = position + math::Vec3f::all(ball.radius)};
 }
 
-inline Bounds bounds(Box const &box, math::Mat3x4f const &transform) noexcept {
+inline Aabb bounds(Box const &box, math::Mat3x4f const &transform) noexcept {
   auto const shape_space_points = std::array<math::Vec3f, 8>{
       math::Vec3f{-box.half_width, -box.half_height, -box.half_depth},
       math::Vec3f{-box.half_width, -box.half_height, box.half_depth},
@@ -75,7 +75,7 @@ inline Bounds bounds(Box const &box, math::Mat3x4f const &transform) noexcept {
                           transform[2][2] * shape_space_point.z +
                           transform[2][3];
   }
-  auto bounds = Bounds{world_space_points[0], world_space_points[0]};
+  auto bounds = Aabb{world_space_points[0], world_space_points[0]};
   for (auto i = 1; i < 8; ++i) {
     auto const &world_space_point = world_space_points[i];
     bounds.min.x = std::min(bounds.min.x, world_space_point.x);
@@ -181,7 +181,7 @@ find_particle_contact(math::Vec3f const &particle_position,
   }
 }
 
-inline Bounds bounds(Shape const &shape,
+inline Aabb bounds(Shape const &shape,
                      math::Mat3x4f const &shape_transform) noexcept {
   return std::visit(
       [&](auto &&arg) {

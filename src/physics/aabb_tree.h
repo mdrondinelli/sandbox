@@ -6,20 +6,20 @@
 #include <utility>
 #include <variant>
 
-#include "bounds.h"
+#include "aabb.h"
 
 namespace marlon {
 namespace physics {
 // Payload must be nothrow copyable
-template <typename Payload> class Bounds_tree {
+template <typename Payload> class Aabb_tree {
 public:
   struct Node {
     Node *parent;
-    Bounds bounds;
+    Aabb bounds;
     std::variant<std::array<Node *, 2>, Payload> payload;
   };
 
-  Node *create_leaf(Bounds const &bounds, Payload const &payload) {
+  Node *create_leaf(Aabb const &bounds, Payload const &payload) {
     auto const node = _node_pool.alloc();
     try {
       _leaf_nodes.emplace(node);
@@ -181,8 +181,9 @@ private:
       return retval;
     }();
     for (auto const axis_index : axis_indices) {
+      auto const split_position = node_center[axis_index];
       auto const partition_iterator =
-          partition(leaf_nodes, axis_index, node_center[axis_index]);
+          partition(leaf_nodes, axis_index, split_position);
       auto const partitions = std::array<std::span<Node *>, 2>{
           std::span{leaf_nodes.begin(), partition_iterator},
           std::span{partition_iterator, leaf_nodes.end()}};

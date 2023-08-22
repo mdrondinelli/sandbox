@@ -45,12 +45,12 @@ Test_entity_manager::create_entity(Test_entity_create_info const &) {
   auto const collision_masks =
       std::array<std::uint64_t, 3>{0b01u, 0b01u, 0b11u};
   auto const centers = std::array<math::Vec3f, 3>{
-      math::Vec3f{-3.0f, 0.12f, -3.0f}, math::Vec3f{0.0f, 3.5f, 0.0f},
-      math::Vec3f{3.0f, 0.12f, 3.0f}};
-  auto const radii = std::array<float, 3>{0.05f, 0.1f, 0.05f};
+      math::Vec3f{-3.0f, 0.5f, -3.0f}, math::Vec3f{0.0f, 5.5f, 0.0f},
+      math::Vec3f{3.0f, 0.5f, 3.0f}};
+  auto const radii = std::array<float, 3>{0.1f, 0.5f, 0.1f};
   auto const velocities = std::array<math::Vec3f, 3>{
-      math::Vec3f{0.0f, 9.0f, 0.0f}, math::Vec3f{0.0f, -3.0f, 0.0f},
-      math::Vec3f{-0.0f, 9.0f, -0.0f}};
+      math::Vec3f{0.0f, 9.0f, 0.0f}, math::Vec3f{0.0f, 0.0f, 0.0f},
+      math::Vec3f{0.0f, 9.0f, 0.0f}};
   auto const velocity_jitter_factors = std::array<float, 3>{0.0f, 0.0f, 0.0f};
   auto const densities = std::array<float, 3>{1600.0f, 1600.0f, 1600.0f};
   std::uniform_int_distribution index_distribution{0, 5};
