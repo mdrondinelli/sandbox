@@ -238,17 +238,6 @@ private:
         if (right->payload.index() == 0) {
           // right is internal
           auto const &right_children = std::get<0>(right->payload);
-          // if (volume(left->bounds) > volume(right->bounds)) {
-          //   for (auto const child : left_children) {
-          //     for_each_overlapping_leaf_pair(child, right,
-          //     std::forward<F>(f));
-          //   }
-          // } else {
-          //   for (auto const child : right_children) {
-          //     for_each_overlapping_leaf_pair(left, child,
-          //     std::forward<F>(f));
-          //   }
-          // }
           for_each_overlapping_leaf_pair(left_children[0], right_children[0],
                                          std::forward<F>(f));
           for_each_overlapping_leaf_pair(left_children[0], right_children[1],
