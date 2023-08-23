@@ -417,6 +417,7 @@ private:
   void find_potential_contacts() {
     _particle_particle_contacts.clear();
     _particle_static_rigid_body_contacts.clear();
+    _particle_dynamic_rigid_body_contacts.clear();
     _aabb_tree.for_each_overlapping_leaf_pair([this](Aabb_tree_payload_t const
                                                          &first_payload,
                                                      Aabb_tree_payload_t const
@@ -807,6 +808,8 @@ private:
   std::vector<Particle_particle_contact> _particle_particle_contacts;
   std::vector<Particle_static_rigid_body_contact>
       _particle_static_rigid_body_contacts;
+  std::vector<std::pair<Particle_data *, Dynamic_rigid_body_data *>>
+      _particle_dynamic_rigid_body_broadphase_pairs;
   std::vector<Particle_dynamic_rigid_body_contact>
       _particle_dynamic_rigid_body_contacts;
   math::Vec3f _gravitational_acceleration;
