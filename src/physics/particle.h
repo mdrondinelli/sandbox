@@ -34,11 +34,6 @@ struct Particle_motion_event {
   math::Vec3f position;
 };
 
-struct Particle_contact {
-  math::Vec3f normal;
-  float separation;
-};
-
 class Particle_motion_callback {
 public:
   virtual ~Particle_motion_callback() = default;

@@ -133,7 +133,7 @@ private:
     for (auto it = leaf_nodes.begin() + 1; it != leaf_nodes.end(); ++it) {
       node->bounds = merge(node->bounds, (*it)->bounds);
     }
-    auto const node_center = center(node->bounds);
+    // auto const node_center = center(node->bounds);
     auto const node_extents = extents(node->bounds);
     auto const axis_indices = [&]() {
       auto retval = std::array{0, 1, 2};
@@ -148,7 +148,15 @@ private:
       return retval;
     }();
     for (auto const axis_index : axis_indices) {
-      auto const split_position = node_center[axis_index];
+      // auto const split_position = node_center[axis_index];
+      auto const split_position = [&]() {
+        auto accumulator = 0.0f;
+        for (auto const leaf_node : leaf_nodes) {
+          accumulator += leaf_node->bounds.min[axis_index] +
+                         leaf_node->bounds.max[axis_index];
+        }
+        return accumulator / (2.0f * leaf_nodes.size());
+      }();
       auto const partition_iterator =
           partition(leaf_nodes, axis_index, split_position);
       auto const partitions = std::array<std::span<Node *>, 2>{
@@ -230,6 +238,17 @@ private:
         if (right->payload.index() == 0) {
           // right is internal
           auto const &right_children = std::get<0>(right->payload);
+          // if (volume(left->bounds) > volume(right->bounds)) {
+          //   for (auto const child : left_children) {
+          //     for_each_overlapping_leaf_pair(child, right,
+          //     std::forward<F>(f));
+          //   }
+          // } else {
+          //   for (auto const child : right_children) {
+          //     for_each_overlapping_leaf_pair(left, child,
+          //     std::forward<F>(f));
+          //   }
+          // }
           for_each_overlapping_leaf_pair(left_children[0], right_children[0],
                                          std::forward<F>(f));
           for_each_overlapping_leaf_pair(left_children[0], right_children[1],

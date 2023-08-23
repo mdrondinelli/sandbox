@@ -37,11 +37,11 @@ public:
                         2.0f * _orientation.v.y * _orientation.v.y)}};
     return math::Mat3x4f{
         {upper_left_inv[0][0], upper_left_inv[0][1], upper_left_inv[0][2],
-         -dot(upper_left_inv[0], _position)},
+         -(upper_left_inv[0] * _position)},
         {upper_left_inv[1][0], upper_left_inv[1][1], upper_left_inv[1][2],
-         -dot(upper_left_inv[1], _position)},
+         -(upper_left_inv[1] * _position)},
         {upper_left_inv[2][0], upper_left_inv[2][1], upper_left_inv[2][2],
-         -dot(upper_left_inv[2], _position)}};
+         -(upper_left_inv[2] * _position)}};
   }
 
   math::Mat4x4f get_clip_matrix() const noexcept {

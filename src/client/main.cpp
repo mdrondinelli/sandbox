@@ -247,6 +247,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
                    graphics::Render_target *render_target,
                    graphics::Scene *scene, graphics::Camera *camera,
                    physics::Space *space,
+                   client::Dynamic_prop_manager *cotton_box_manager,
                    client::Test_entity_manager *test_entity_manager) {
   auto const tick_rate = 60.0f;
   auto const tick_duration = 1.0f / tick_rate;
@@ -279,6 +280,12 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
       worst_frame_time = elapsed_time;
     }
     while (fps_time_accumulator >= 1.0) {
+      cotton_box_manager->create(
+          {.position = math::Vec3f{3.0f, 1.5f, 3.0f},
+           .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},
+           .orientation = math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
+                                                  math::deg_to_rad(90.0f)),
+           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
       std::cout << "frames per second: " << fps_frame_accumulator << std::endl;
       std::cout << "worst frame time: " << worst_frame_time << std::endl;
       fps_time_accumulator -= 1.0;
@@ -333,7 +340,7 @@ int main() {
   physics::Box ground_shape{50.0f, 0.5f, 50.0f};
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{1.0f, 1.0f, 1.0f};
-  physics::Box cotton_box_shape{0.5f, 0.5f, 0.5f};
+  physics::Box cotton_box_shape{0.2f, 1.0f, 0.01f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
@@ -366,12 +373,12 @@ int main() {
        .scene = scene.get(),
        .surface_mesh = resources.cube_mesh.get(),
        .surface_material = resources.striped_cotton_material.get(),
-       .surface_pretransform = math::Mat3x4f{{0.5f, 0.0f, 0.0f, 0.0f},
-                                             {0.0f, 0.5f, 0.0f, 0.0f},
-                                             {0.0f, 0.0f, 0.5f, 0.0f}},
+       .surface_pretransform = math::Mat3x4f{{0.2f, 0.0f, 0.0f, 0.0f},
+                                             {0.0f, 1.0f, 0.0f, 0.0f},
+                                             {0.0f, 0.0f, 0.01f, 0.0f}},
        .space = &space,
-       .body_mass = 1.0f,
-       .body_inertia_tensor = math::Mat3x3f::identity(),
+       .body_mass = 50.0f,
+       .body_inertia_tensor = 50.0f * physics::inertia_tensor(cotton_box_shape),
        .body_shape = cotton_box_shape,
        .body_material = physics_material}};
   client::Test_entity_manager test_entity_manager{
@@ -388,12 +395,22 @@ int main() {
                                               math::deg_to_rad(-45.0f)) *
                       math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
                                               math::deg_to_rad(45.0f))});
-  cotton_box_manager.create(
-      {.position = math::Vec3f{0.0f, 5.0f, 0.0f},
-       .angular_velocity = math::Vec3f{0.0f, 1.0f, 0.0f}});
+  // cotton_box_manager.create(
+  //     {.position = math::Vec3f{3.0f, 1.5f, 3.0f},
+  //      .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},
+  //      .orientation = math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
+  //                                             math::deg_to_rad(90.0f)),
+  //      .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
+  // cotton_box_manager.create(
+  //     {.position = math::Vec3f{-3.0f, 1.5f, -3.0f},
+  //      .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},
+  //      .orientation = math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
+  //                                             math::deg_to_rad(90.0f)),
+  //      .angular_velocity = math::Vec3f{0.0f, 20.0f, 0.0f}});
   // graphics->apply_scene_diff(scene_diff.get());
   auto const render_target = graphics->get_default_render_target();
   run_game_loop(window.get(), graphics.get(), render_target, scene.get(),
-                camera.get(), &space, &test_entity_manager);
+                camera.get(), &space, &cotton_box_manager,
+                &test_entity_manager);
   return 0;
 }

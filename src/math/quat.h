@@ -110,6 +110,14 @@ template <typename T> constexpr auto normalize(Quat<T> const &q) noexcept {
   return q / length(q);
 }
 
+template <typename T> constexpr auto conjugate(Quat<T> const &q) noexcept {
+  return Quat<T>{q.w, -q.v};
+}
+
+template <typename T> constexpr auto inverse(Quat<T> const &q) noexcept {
+  return normalize(conjugate(q));
+}
+
 template <typename T> constexpr auto deg_to_rad(T deg) noexcept {
   return deg * (std::numbers::pi_v<T> / T(180));
 }
