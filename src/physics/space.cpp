@@ -550,7 +550,7 @@ private:
       auto const particle = contact.particle;
       auto const static_rigid_body = contact.static_rigid_body;
       if (auto const contact_geometry =
-              find_positionless_particle_contact_geometry(
+              positionless_particle_shape_contact_geometry(
                   particle->current_position, particle->radius,
                   static_rigid_body->shape, static_rigid_body->transform,
                   static_rigid_body->transform_inverse)) {
@@ -592,7 +592,7 @@ private:
       auto const body_transform = math::Mat3x4f::rigid(
           body->current_position, body->current_orientation);
       auto const inverse_body_transform = math::rigid_inverse(body_transform);
-      if (auto const geometry = find_positioned_particle_contact_geometry(
+      if (auto const geometry = positioned_particle_shape_contact_geometry(
               particle->current_position, particle->radius, body->shape,
               body_transform, inverse_body_transform)) {
         auto const body_rotation =
