@@ -335,8 +335,7 @@ find_positioned_particle_contact_geometry(
     auto const separation = distance - particle_radius;
     return Positioned_contact_geometry{
         .position = position, .normal = normal, .separation = separation};
-  }
-  if (distance2 == 0.0f) {
+  } else {
     auto const face_distances = std::array<float, 6>{
         shape_space_clamped_particle_position.x + box.half_width,
         box.half_width - shape_space_clamped_particle_position.x,
@@ -377,10 +376,6 @@ find_positioned_particle_contact_geometry(
     auto const separation = -face_distances[face_index] - particle_radius;
     return Positioned_contact_geometry{
         .position = position, .normal = normal, .separation = separation};
-  } else if (distance2 <= particle_radius2) {
-
-  } else {
-    return std::nullopt;
   }
 }
 

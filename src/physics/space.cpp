@@ -742,25 +742,28 @@ private:
     auto const restitution_threshold =
         2.0f * math::length(_gravitational_acceleration) * h;
     for (auto &contact : _particle_dynamic_rigid_body_contacts) {
+      auto const particle = contact.particle;
+      auto const body = contact.body;
       if (contact.lambda_n != 0.0f) {
         // auto const v = contact.particle->velocity;
         // auto const v_n = math::dot(v, contact.normal);
-        // auto const v_t = v - contact.normal * v_n;
-        // auto const v_t_length2 = math::length2(v_t);
-        // if (v_t_length2 != 0.0f) {
-        //   auto const v_t_length = std::sqrt(v_t_length2);
-        //   auto const dynamic_friction_coefficient =
-        //       0.5f * (contact.particle->material.dynamic_friction_coefficient
-        //       +
-        //               contact.static_rigid_body->material
-        //                   .dynamic_friction_coefficient);
-        //   auto const friction_delta_velocity =
-        //       -v_t / v_t_length *
-        //       std::min(dynamic_friction_coefficient *
-        //                    contact.normal_force_lagrange / h,
-        //                v_t_length);
-        //   contact.particle->velocity += friction_delta_velocity;
-        // }
+        auto const v =
+            particle->velocity -
+            (body->velocity + math::cross(body->angular_velocity, contact.r_2));
+        auto const v_t = v - contact.n * contact.v_n;
+        auto const v_t_length2 = math::length2(v_t);
+        auto p = math::Vec3f::zero();
+        if (v_t_length2 != 0.0f) {
+          auto const v_t_length = std::sqrt(v_t_length2);
+          auto const mu_k =
+              0.5f * (particle->material.dynamic_friction_coefficient +
+                      body->material.dynamic_friction_coefficient);
+          auto const friction_delta_velocity =
+              -v_t / v_t_length *
+              std::min(mu_k * contact.lambda_n / h, v_t_length);
+          p += friction_delta_velocity;
+          // contact.particle->velocity += friction_delta_velocity;
+        }
         auto const body_rotation =
             math::Mat3x3f::rotation(contact.body->current_orientation);
         auto const body_rotation_inverse = math::transpose(body_rotation);
@@ -776,7 +779,8 @@ private:
             contact.n *
             (-contact.v_n +
              std::max(-restitution_coefficient * contact.v_n, 0.0f));
-        auto const p = restitution_delta_velocity * contact.w_sum_inverse;
+        p += restitution_delta_velocity;
+        p *= contact.w_sum_inverse;
         contact.particle->velocity += p * contact.particle->mass_inverse;
         contact.body->velocity -= p * contact.body->inverse_mass;
         contact.body->angular_velocity -=
