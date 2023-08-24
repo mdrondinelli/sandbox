@@ -163,7 +163,6 @@ struct Dynamic_rigid_body_data {
   Shape shape;
   Material material;
   Aabb_tree<Aabb_tree_payload_t>::Node *broadphase_node;
-  Aabb midphase_bounds;
 };
 
 class Dynamic_rigid_body_storage {
@@ -331,8 +330,7 @@ public:
         .inverse_inertia_tensor = inverse(create_info.inertia_tensor),
         .shape = create_info.shape,
         .material = create_info.material,
-        .broadphase_node = _aabb_tree.create_leaf(bounds, data),
-        .midphase_bounds = bounds};
+        .broadphase_node = _aabb_tree.create_leaf(bounds, data)};
     return handle;
   }
 
@@ -492,9 +490,6 @@ private:
                                    math::Quatf{0.0f, data->angular_velocity} *
                                    data->current_orientation;
       data->current_orientation = math::normalize(data->current_orientation);
-      data->midphase_bounds =
-          bounds(data->shape, math::Mat3x4f::rigid(data->current_position,
-                                                   data->current_orientation));
     });
   }
 
@@ -593,73 +588,62 @@ private:
   void solve_particle_dynamic_rigid_body_contact_positions() {
     for (auto &contact : _particle_dynamic_rigid_body_contacts) {
       auto const particle = contact.particle;
-      auto const particle_bounds =
-          Aabb{particle->current_position - math::Vec3f::all(particle->radius),
-               particle->current_position + math::Vec3f::all(particle->radius)};
       auto const body = contact.body;
-      if (overlaps(particle_bounds, body->midphase_bounds)) {
-        auto const body_transform = math::Mat3x4f::rigid(
-            body->current_position, body->current_orientation);
-        auto const inverse_body_transform = math::rigid_inverse(body_transform);
-        if (auto const geometry = find_positioned_particle_contact_geometry(
-                particle->current_position, particle->radius, body->shape,
-                body_transform, inverse_body_transform)) {
-          auto const body_rotation =
-              math::Mat3x3f::rotation(body->current_orientation);
-          auto const inverse_body_rotation = math::transpose(body_rotation);
-          auto const inverse_body_inertia_tensor =
-              body_rotation * body->inverse_inertia_tensor *
-              inverse_body_rotation;
-          auto const previous_body_transform = math::Mat3x4f::rigid(
-              body->previous_position, body->previous_orientation);
-          auto const r_2 = geometry->position - body->current_position;
-          auto const w_1 = particle->mass_inverse;
-          auto const w_2 = body->inverse_mass +
-                           math::transpose(math::cross(r_2, geometry->normal)) *
-                               inverse_body_inertia_tensor *
-                               math::cross(r_2, geometry->normal);
-          auto const w_sum_inverse = 1.0f / (w_1 + w_2);
-          auto const delta_lambda_n = -geometry->separation * w_sum_inverse;
-          auto const delta_p =
-              (particle->current_position - particle->previous_position) -
-              (geometry->position -
-               previous_body_transform *
-                   math::Vec4f{inverse_body_transform *
-                                   math::Vec4f{geometry->position, 1.0f},
-                               1.0f});
-          auto const delta_p_t =
-              delta_p - math::dot(delta_p, geometry->normal) * geometry->normal;
-          auto const delta_lambda_t = math::length(delta_p_t) * w_sum_inverse;
-          auto const mu_s =
-              0.5f * (particle->material.static_friction_coefficient +
-                      body->material.static_friction_coefficient);
-          auto p = delta_lambda_n * geometry->normal;
-          if (delta_lambda_t < mu_s * delta_lambda_n) {
-            p -= delta_p_t * w_sum_inverse;
-          }
-          particle->current_position += p * particle->mass_inverse;
-          body->current_position -= p * body->inverse_mass;
-          body->current_orientation -=
-              0.5f *
-              math::Quatf{0.0f,
-                          inverse_body_inertia_tensor * math::cross(r_2, p)} *
-              body->current_orientation;
-          body->midphase_bounds = bounds(
-              body->shape, math::Mat3x4f::rigid(body->current_position,
-                                                body->current_orientation));
-          contact.r_2 = r_2;
-          contact.n = geometry->normal;
-          contact.w_sum_inverse = w_sum_inverse;
-          contact.lambda_n = delta_lambda_n;
-          contact.lambda_t = delta_lambda_t;
-          contact.v_n = math::dot(
-              particle->velocity -
-                  (body->velocity + math::cross(body->angular_velocity, r_2)),
-              geometry->normal);
-        } else {
-          contact.lambda_n = 0.0f;
-          contact.lambda_t = 0.0f;
+      auto const body_transform = math::Mat3x4f::rigid(
+          body->current_position, body->current_orientation);
+      auto const inverse_body_transform = math::rigid_inverse(body_transform);
+      if (auto const geometry = find_positioned_particle_contact_geometry(
+              particle->current_position, particle->radius, body->shape,
+              body_transform, inverse_body_transform)) {
+        auto const body_rotation =
+            math::Mat3x3f::rotation(body->current_orientation);
+        auto const inverse_body_rotation = math::transpose(body_rotation);
+        auto const inverse_body_inertia_tensor = body_rotation *
+                                                 body->inverse_inertia_tensor *
+                                                 inverse_body_rotation;
+        auto const previous_body_transform = math::Mat3x4f::rigid(
+            body->previous_position, body->previous_orientation);
+        auto const r_2 = geometry->position - body->current_position;
+        auto const w_1 = particle->mass_inverse;
+        auto const w_2 = body->inverse_mass +
+                         math::transpose(math::cross(r_2, geometry->normal)) *
+                             inverse_body_inertia_tensor *
+                             math::cross(r_2, geometry->normal);
+        auto const w_sum_inverse = 1.0f / (w_1 + w_2);
+        auto const delta_lambda_n = -geometry->separation * w_sum_inverse;
+        auto const delta_p =
+            (particle->current_position - particle->previous_position) -
+            (geometry->position -
+             previous_body_transform *
+                 math::Vec4f{inverse_body_transform *
+                                 math::Vec4f{geometry->position, 1.0f},
+                             1.0f});
+        auto const delta_p_t =
+            delta_p - math::dot(delta_p, geometry->normal) * geometry->normal;
+        auto const delta_lambda_t = math::length(delta_p_t) * w_sum_inverse;
+        auto const mu_s =
+            0.5f * (particle->material.static_friction_coefficient +
+                    body->material.static_friction_coefficient);
+        auto p = delta_lambda_n * geometry->normal;
+        if (delta_lambda_t < mu_s * delta_lambda_n) {
+          p -= delta_p_t * w_sum_inverse;
         }
+        particle->current_position += p * particle->mass_inverse;
+        body->current_position -= p * body->inverse_mass;
+        body->current_orientation -=
+            0.5f *
+            math::Quatf{0.0f,
+                        inverse_body_inertia_tensor * math::cross(r_2, p)} *
+            body->current_orientation;
+        contact.r_2 = r_2;
+        contact.n = geometry->normal;
+        contact.w_sum_inverse = w_sum_inverse;
+        contact.lambda_n = delta_lambda_n;
+        contact.lambda_t = delta_lambda_t;
+        contact.v_n = math::dot(
+            particle->velocity -
+                (body->velocity + math::cross(body->angular_velocity, r_2)),
+            geometry->normal);
       } else {
         contact.lambda_n = 0.0f;
         contact.lambda_t = 0.0f;
