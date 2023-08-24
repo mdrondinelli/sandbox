@@ -221,10 +221,10 @@ private:
     assert(root != nullptr);
     if (root->payload.index() == 0) {
       auto const &children = std::get<0>(root->payload);
-      for_each_overlapping_leaf_pair(children[0], std::forward<F>(f));
-      for_each_overlapping_leaf_pair(children[1], std::forward<F>(f));
       for_each_overlapping_leaf_pair(children[0], children[1],
                                      std::forward<F>(f));
+      for_each_overlapping_leaf_pair(children[0], std::forward<F>(f));
+      for_each_overlapping_leaf_pair(children[1], std::forward<F>(f));
     }
   }
 
