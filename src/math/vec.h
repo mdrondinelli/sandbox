@@ -272,7 +272,7 @@ constexpr auto &operator/=(Vec<T, N> &v, T s) noexcept {
 }
 
 template <typename T, int N>
-constexpr auto length2(Vec<T, N> const &v) noexcept {
+constexpr auto length_squared(Vec<T, N> const &v) noexcept {
   auto retval = T(0);
   for (int i = 0; i < N; ++i) {
     retval += v[i] * v[i];
@@ -282,7 +282,7 @@ constexpr auto length2(Vec<T, N> const &v) noexcept {
 
 template <typename T, int N>
 constexpr auto length(Vec<T, N> const &v) noexcept {
-  return std::sqrt(length2(v));
+  return std::sqrt(length_squared(v));
 }
 
 template <typename T, int N>

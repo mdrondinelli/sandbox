@@ -65,7 +65,7 @@ TEST_CASE("Quaternions can be subtracted from quaternions.") {
 
 TEST_CASE("Quaternions can have their length taken.") {
   auto const q = Quatf::identity();
-  REQUIRE(length2(q) == 1.0f);
+  REQUIRE(length_squared(q) == 1.0f);
   REQUIRE(length(q) == 1.0f);
 }
 

@@ -98,12 +98,12 @@ constexpr auto &operator-=(Quat<T> &q1, Quat<T> const &q2) noexcept {
   return q1 = (q1 - q2);
 }
 
-template <typename T> constexpr auto length2(Quat<T> const &q) noexcept {
-  return q.w * q.w + dot(q.v, q.v);
+template <typename T> constexpr auto length_squared(Quat<T> const &q) noexcept {
+  return q.w * q.w + length_squared(q.v);
 }
 
 template <typename T> constexpr auto length(Quat<T> const &q) noexcept {
-  return std::sqrt(length2(q));
+  return std::sqrt(length_squared(q));
 }
 
 template <typename T> constexpr auto normalize(Quat<T> const &q) noexcept {
@@ -115,7 +115,7 @@ template <typename T> constexpr auto conjugate(Quat<T> const &q) noexcept {
 }
 
 template <typename T> constexpr auto inverse(Quat<T> const &q) noexcept {
-  return normalize(conjugate(q));
+  return conjugate(q) / length_squared(q);
 }
 
 template <typename T> constexpr auto deg_to_rad(T deg) noexcept {

@@ -253,11 +253,12 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto const tick_duration = 1.0f / tick_rate;
   auto loop = client::Application_loop{{.space = space,
                                         .tick_duration = tick_duration,
-                                        .physics_substep_count = 4}};
+                                        .physics_substep_count = 10}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
   auto fps_frame_accumulator = 0;
   auto worst_frame_time = 0.0;
+  auto box_spawn_timer = 0.0;
   for (;;) {
     glfwPollEvents();
     if (glfwWindowShouldClose(window)) {
@@ -266,10 +267,23 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
     auto const current_time = glfwGetTime();
     auto const elapsed_time = current_time - previous_time;
     previous_time = current_time;
-    if (loop.run_once(elapsed_time)) {
-      test_entity_manager->tick(tick_duration);
-      for (auto i = 0; i < 4; ++i) {
-        test_entity_manager->create_entity({});
+    if (glfwGetKey(window, GLFW_KEY_SPACE) ||
+        !glfwGetKey(window, GLFW_KEY_SPACE)) {
+      if (loop.run_once(elapsed_time)) {
+        test_entity_manager->tick(tick_duration);
+        for (auto i = 0; i < 1; ++i) {
+          test_entity_manager->create_entity({});
+        }
+      }
+      box_spawn_timer += elapsed_time;
+      if (box_spawn_timer > 2.0f) {
+        box_spawn_timer = 0.0f;
+        cotton_box_manager->create(
+            {.position = math::Vec3f{-3.0f, 0.5f, 3.0f},
+             .velocity = math::Vec3f{4.0f, 0.0f, -4.0f},
+             .orientation = math::Quatf::axis_angle(
+                 math::Vec3f{0.0f, 1.0f, 0.0f}, math::deg_to_rad(45.0f)),
+             .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
       }
     }
     graphics->render(scene, camera, render_target);
@@ -280,12 +294,6 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
       worst_frame_time = elapsed_time;
     }
     while (fps_time_accumulator >= 1.0) {
-      cotton_box_manager->create(
-          {.position = math::Vec3f{3.0f, 1.5f, 3.0f},
-           .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},
-           .orientation = math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
-                                                  math::deg_to_rad(90.0f)),
-           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
       std::cout << "frames per second: " << fps_frame_accumulator << std::endl;
       std::cout << "worst frame time: " << worst_frame_time << std::endl;
       fps_time_accumulator -= 1.0;
@@ -294,16 +302,6 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
     }
   }
 }
-
-// void tick(physics::Space *space,
-//           client::Test_entity_manager *test_entity_manager, float delta_time)
-//           {
-//   space->simulate({.delta_time = delta_time, .substep_count = 4});
-//   test_entity_manager->tick(delta_time);
-//   for (auto i = 0; i < 8; ++i) {
-//     test_entity_manager->create_entity({});
-//   }
-// }
 
 int main() {
   client::Shared_glfw_instance const glfw;
@@ -324,23 +322,18 @@ int main() {
   auto const ground_surface = graphics->create_surface_unique(
       {.mesh = resources.cube_mesh.get(),
        .material = resources.blue_material.get(),
-       .transform = math::Mat3x4f{{
-                                      100.0f,
-                                      0.0f,
-                                      0.0f,
-                                      0.0f,
-                                  },
+       .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
                                   {0.0f, 100.0f, 0.0f, -100.0f},
                                   {0.0f, 0.0f, 100.0f, 0.0f}}});
   scene->add_surface(ground_surface.get());
   physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
-  physics::Material const physics_material{.static_friction_coefficient = 1.1f,
-                                           .dynamic_friction_coefficient = 0.6f,
-                                           .restitution_coefficient = 0.0f};
-  physics::Box ground_shape{50.0f, 0.5f, 50.0f};
+  physics::Material const physics_material{.static_friction_coefficient = 0.4f,
+                                           .dynamic_friction_coefficient = 0.4f,
+                                           .restitution_coefficient = 0.1f};
+  physics::Box ground_shape{100.0f, 0.5f, 100.0f};
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{1.0f, 1.0f, 1.0f};
-  physics::Box cotton_box_shape{0.2f, 1.0f, 0.01f};
+  physics::Box cotton_box_shape{0.5f, 0.5f, 0.5f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
@@ -357,9 +350,9 @@ int main() {
                                              {0.0f, 0.0f, 0.5f, 0.0f}},
        .space = &space,
        .body_shape = ball_shape,
-       .body_material = {.static_friction_coefficient = 1.1f,
-                         .dynamic_friction_coefficient = 0.75f,
-                         .restitution_coefficient = 0.0f}}};
+       .body_material = {.static_friction_coefficient = 0.2f,
+                         .dynamic_friction_coefficient = 0.1f,
+                         .restitution_coefficient = 0.1f}}};
   client::Static_prop_manager brick_box_manager{
       {.graphics = graphics.get(),
        .scene = scene.get(),
@@ -373,14 +366,18 @@ int main() {
        .scene = scene.get(),
        .surface_mesh = resources.cube_mesh.get(),
        .surface_material = resources.striped_cotton_material.get(),
-       .surface_pretransform = math::Mat3x4f{{0.2f, 0.0f, 0.0f, 0.0f},
-                                             {0.0f, 1.0f, 0.0f, 0.0f},
-                                             {0.0f, 0.0f, 0.01f, 0.0f}},
+       .surface_pretransform =
+           math::Mat3x4f{{cotton_box_shape.half_width, 0.0f, 0.0f, 0.0f},
+                         {0.0f, cotton_box_shape.half_height, 0.0f, 0.0f},
+                         {0.0f, 0.0f, cotton_box_shape.half_depth, 0.0f}},
        .space = &space,
-       .body_mass = 50.0f,
-       .body_inertia_tensor = 50.0f * physics::inertia_tensor(cotton_box_shape),
+       .body_mass = 80.0f,
+       .body_inertia_tensor =
+           80.0f * physics::solid_inerta_tensor(cotton_box_shape),
        .body_shape = cotton_box_shape,
-       .body_material = physics_material}};
+       .body_material = {.static_friction_coefficient = 0.6f,
+                         .dynamic_friction_coefficient = 0.4f,
+                         .restitution_coefficient = 0.4f}}};
   client::Test_entity_manager test_entity_manager{
       {.graphics = graphics.get(),
        .scene = scene.get(),
@@ -390,11 +387,16 @@ int main() {
   red_ball_manager.create({.position = {-1.5f, 0.5f, -1.5f}});
   red_ball_manager.create({.position = {1.5f, 0.5f, 1.5f}});
   brick_box_manager.create(
-      {.position = {0.0f, 1.5f, 0.0f},
+      {.position = {0.0f, 10.5f, 0.0f},
        .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
                                               math::deg_to_rad(-45.0f)) *
                       math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
                                               math::deg_to_rad(45.0f))});
+  cotton_box_manager.create({.position = math::Vec3f{0.0f, 1.5f, 0.0f}});
+  // cotton_box_manager.create(
+  //     {.position = math::Vec3f{0.0f, 3.5f, 0.0f},
+  //      .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},
+  //      .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
   // cotton_box_manager.create(
   //     {.position = math::Vec3f{3.0f, 1.5f, 3.0f},
   //      .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},

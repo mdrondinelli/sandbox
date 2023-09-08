@@ -52,7 +52,7 @@ Test_entity_manager::create_entity(Test_entity_create_info const &) {
       math::Vec3f{0.0f, 9.0f, 0.0f}, math::Vec3f{0.0f, 0.0f, 0.0f},
       math::Vec3f{0.0f, 9.0f, 0.0f}};
   auto const velocity_jitter_factors = std::array<float, 3>{0.0f, 0.0f, 0.0f};
-  auto const densities = std::array<float, 3>{1600.0f, 1600.0f, 1600.0f};
+  auto const densities = std::array<float, 3>{500.0f, 500.0f, 500.0f};
   std::uniform_int_distribution index_distribution{0, 5};
   auto const index = [](int n) {
     return n >= 3 ? 1 : n;
@@ -84,9 +84,9 @@ Test_entity_manager::create_entity(Test_entity_create_info const &) {
        .velocity = velocity,
        .mass = density * 4.0f / 3.0f * 3.14f * scale * scale * scale,
        .radius = scale,
-       .material = {.static_friction_coefficient = 1.1f,
-                    .dynamic_friction_coefficient = 1.0f,
-                    .restitution_coefficient = 0.0f}});
+       .material = {.static_friction_coefficient = 0.3f,
+                    .dynamic_friction_coefficient = 0.2f,
+                    .restitution_coefficient = 0.1f}});
   return {_next_entity_reference_value++};
 }
 
