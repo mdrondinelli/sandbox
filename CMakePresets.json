@@ -103,5 +103,15 @@
                 "value": "x64"
             }
         }
+    ],
+    "buildPresets": [
+      {
+        "name": "clang-relwithdebinfo",
+        "configurePreset": "clang-relwithdebinfo"
+      },
+      {
+        "name": "clang-release",
+        "configurePreset": "clang-release"
+      }
     ]
 }
