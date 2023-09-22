@@ -1196,7 +1196,7 @@ private:
       if (auto const contact =
               find_contact_of_least_negative_separating_velocity()) {
         std::visit(
-            [=](auto &&arg) {
+            [=, this](auto &&arg) {
               using T = std::decay_t<decltype(arg)>;
               if constexpr (std::is_same_v<T, Particle_particle_contact *>) {
                 resolve_particle_particle_contact_velocity(
