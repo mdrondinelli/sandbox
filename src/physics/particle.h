@@ -15,7 +15,7 @@ namespace physics {
 class Particle_motion_callback;
 
 struct Particle_handle {
-  std::ptrdiff_t value;
+  std::size_t value;
 };
 
 struct Particle_create_info {
@@ -51,7 +51,7 @@ namespace std {
 template <> struct hash<marlon::physics::Particle_handle> {
   std::size_t operator()(
       marlon::physics::Particle_handle particle_reference) const noexcept {
-    return hash<std::uint64_t>{}(particle_reference.value);
+    return hash<std::size_t>{}(particle_reference.value);
   }
 };
 } // namespace std

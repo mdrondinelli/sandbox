@@ -12,7 +12,7 @@ namespace physics {
 class Dynamic_rigid_body_motion_callback;
 
 struct Dynamic_rigid_body_handle {
-  std::ptrdiff_t value;
+  std::size_t value;
 };
 
 struct Dynamic_rigid_body_create_info {
@@ -54,7 +54,7 @@ namespace std {
 template <> struct hash<marlon::physics::Dynamic_rigid_body_handle> {
   std::size_t operator()(
       marlon::physics::Dynamic_rigid_body_handle reference) const noexcept {
-    return hash<std::uint64_t>{}(reference.value);
+    return hash<std::size_t>{}(reference.value);
   }
 };
 } // namespace std

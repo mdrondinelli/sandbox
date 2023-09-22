@@ -10,7 +10,7 @@
 namespace marlon {
 namespace physics {
 struct Static_rigid_body_handle {
-  std::ptrdiff_t value;
+  std::size_t value;
 };
 
 struct Static_rigid_body_create_info {
@@ -33,7 +33,7 @@ namespace std {
 template <> struct hash<marlon::physics::Static_rigid_body_handle> {
   std::size_t operator()(
       marlon::physics::Static_rigid_body_handle reference) const noexcept {
-    return hash<std::uint64_t>{}(reference.value);
+    return hash<std::size_t>{}(reference.value);
   }
 };
 } // namespace std
