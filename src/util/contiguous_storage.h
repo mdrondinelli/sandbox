@@ -58,6 +58,12 @@ public:
     }
   }
 
+  void push_back_n(std::size_t n, T const &value) {
+    for (auto i = std::size_t{}; i != n; ++i) {
+      push_back(value);
+    }
+  }
+
   template <typename... Args> T &emplace_back(Args &&...args) {
     if (size() < capacity()) {
       return _vector.emplace_back(std::forward<Args>(args)...);
