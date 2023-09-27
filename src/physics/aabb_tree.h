@@ -5,6 +5,7 @@
 #include <span>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "aabb.h"
 

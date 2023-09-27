@@ -1,7 +1,7 @@
 #ifndef MARLON_PHYSICS_PHYSICS_H
 #define MARLON_PHYSICS_PHYSICS_H
 
-#include "aabb_tree.h"
+// #include "aabb_tree.h"
 #include "aabb.h"
 #include "dynamic_rigid_body.h"
 #include "material.h"

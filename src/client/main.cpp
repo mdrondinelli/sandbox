@@ -279,8 +279,8 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
       if (box_spawn_timer > 2.0f) {
         box_spawn_timer = 0.0f;
         cotton_box_manager->create(
-            {.position = math::Vec3f{-3.0f, 0.5f, 3.0f},
-             .velocity = math::Vec3f{4.0f, 0.0f, -4.0f},
+            {.position = math::Vec3f{0.0f, 2.5f, 0.0f},
+             .velocity = math::Vec3f{0.0f, 2.0f, 0.0f},
              .orientation = math::Quatf::axis_angle(
                  math::Vec3f{0.0f, 1.0f, 0.0f}, math::deg_to_rad(45.0f)),
              .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});

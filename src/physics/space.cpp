@@ -74,6 +74,7 @@ struct Particle_data {
   std::uint16_t particle_contact_count;
   std::uint16_t static_rigid_body_contact_count;
   std::uint16_t dynamic_rigid_body_contact_count;
+  bool marked;
 };
 
 struct Dynamic_rigid_body_data {
@@ -95,6 +96,7 @@ struct Dynamic_rigid_body_data {
   std::uint16_t particle_contact_count;
   std::uint16_t static_rigid_body_contact_count;
   std::uint16_t dynamic_rigid_body_contact_count;
+  bool marked;
 };
 
 struct Static_rigid_body_data {
@@ -260,6 +262,163 @@ private:
   std::vector<bool> _occupancy_bits;
 };
 
+class Island_storage {
+public:
+  explicit Island_storage(std::size_t max_objects, std::size_t max_contacts)
+      : _particles{max_objects}, _dynamic_rigid_bodies{max_objects},
+        _particle_particle_contacts{max_contacts},
+        _particle_dynamic_rigid_body_contacts{max_contacts},
+        _particle_static_rigid_body_contacts{max_contacts},
+        _dynamic_rigid_body_dynamic_rigid_body_contacts{max_contacts},
+        _dynamic_rigid_body_static_rigid_body_contacts{max_contacts} {}
+
+  void reset() {
+    _particles.clear();
+    _dynamic_rigid_bodies.clear();
+    _particle_particle_contacts.clear();
+    _particle_dynamic_rigid_body_contacts.clear();
+    _particle_static_rigid_body_contacts.clear();
+    _dynamic_rigid_body_dynamic_rigid_body_contacts.clear();
+    _dynamic_rigid_body_static_rigid_body_contacts.clear();
+    _popped_particle_count = 0;
+    _popped_dynamic_rigid_body_count = 0;
+  }
+
+  void push_object(Particle_handle h) { _particles.emplace_back(h); }
+
+  void push_object(Dynamic_rigid_body_handle h) {
+    _dynamic_rigid_bodies.emplace_back(h);
+  }
+
+  std::optional<std::variant<Particle_handle, Dynamic_rigid_body_handle>>
+  pop_object() {
+    if (_popped_particle_count < _particles.size()) {
+      return _particles[_popped_particle_count++];
+    } else if (_popped_dynamic_rigid_body_count <
+               _dynamic_rigid_bodies.size()) {
+      return _dynamic_rigid_bodies[_popped_dynamic_rigid_body_count++];
+    } else {
+      return std::nullopt;
+    }
+  }
+
+  void push_contact(Particle_particle_contact *contact) {
+    _particle_particle_contacts.emplace_back(contact);
+  }
+
+  void push_contact(Particle_dynamic_rigid_body_contact *contact) {
+    _particle_dynamic_rigid_body_contacts.emplace_back(contact);
+  }
+
+  void push_contact(Particle_static_rigid_body_contact *contact) {
+    _particle_static_rigid_body_contacts.emplace_back(contact);
+  }
+
+  void push_contact(Dynamic_rigid_body_dynamic_rigid_body_contact *contact) {
+    _dynamic_rigid_body_dynamic_rigid_body_contacts.emplace_back(contact);
+  }
+
+  void push_contact(Dynamic_rigid_body_static_rigid_body_contact *contact) {
+    _dynamic_rigid_body_static_rigid_body_contacts.emplace_back(contact);
+  }
+
+  std::size_t contact_count() const noexcept {
+    return _particle_particle_contacts.size() +
+           _particle_dynamic_rigid_body_contacts.size() +
+           _particle_static_rigid_body_contacts.size() +
+           _dynamic_rigid_body_dynamic_rigid_body_contacts.size() +
+           _dynamic_rigid_body_static_rigid_body_contacts.size();
+  }
+
+  std::optional<std::variant<Particle_particle_contact *,
+                             Particle_static_rigid_body_contact *,
+                             Particle_dynamic_rigid_body_contact *,
+                             Dynamic_rigid_body_static_rigid_body_contact *,
+                             Dynamic_rigid_body_dynamic_rigid_body_contact *>>
+  find_contact_of_least_negative_separation() const noexcept {
+    auto retval = std::optional<std::variant<
+        Particle_particle_contact *, Particle_static_rigid_body_contact *,
+        Particle_dynamic_rigid_body_contact *,
+        Dynamic_rigid_body_static_rigid_body_contact *,
+        Dynamic_rigid_body_dynamic_rigid_body_contact *>>{};
+    auto retval_separation = 0.0f;
+    auto const process_contact = [&](auto contact) {
+      if (contact->separation < retval_separation) {
+        retval = contact;
+        retval_separation = contact->separation;
+      }
+    };
+    for (auto const contact : _particle_particle_contacts) {
+      process_contact(contact);
+    }
+    for (auto const contact : _particle_dynamic_rigid_body_contacts) {
+      process_contact(contact);
+    }
+    for (auto const contact : _particle_static_rigid_body_contacts) {
+      process_contact(contact);
+    }
+    for (auto const contact : _dynamic_rigid_body_dynamic_rigid_body_contacts) {
+      process_contact(contact);
+    }
+    for (auto const contact : _dynamic_rigid_body_static_rigid_body_contacts) {
+      process_contact(contact);
+    }
+    return retval;
+  }
+
+  std::optional<std::variant<Particle_particle_contact *,
+                             Particle_static_rigid_body_contact *,
+                             Particle_dynamic_rigid_body_contact *,
+                             Dynamic_rigid_body_static_rigid_body_contact *,
+                             Dynamic_rigid_body_dynamic_rigid_body_contact *>>
+  find_contact_of_least_negative_separating_velocity() const noexcept {
+    auto retval = std::optional<std::variant<
+        Particle_particle_contact *, Particle_static_rigid_body_contact *,
+        Particle_dynamic_rigid_body_contact *,
+        Dynamic_rigid_body_static_rigid_body_contact *,
+        Dynamic_rigid_body_dynamic_rigid_body_contact *>>{};
+    auto retval_separating_velocity = 0.0f;
+    auto const process_contact = [&](auto contact) {
+      if (contact->separating_velocity < retval_separating_velocity) {
+        retval = contact;
+        retval_separating_velocity = contact->separating_velocity;
+      }
+    };
+    for (auto const contact : _particle_particle_contacts) {
+      process_contact(contact);
+    }
+    for (auto const contact : _particle_dynamic_rigid_body_contacts) {
+      process_contact(contact);
+    }
+    for (auto const contact : _particle_static_rigid_body_contacts) {
+      process_contact(contact);
+    }
+    for (auto const contact : _dynamic_rigid_body_dynamic_rigid_body_contacts) {
+      process_contact(contact);
+    }
+    for (auto const contact : _dynamic_rigid_body_static_rigid_body_contacts) {
+      process_contact(contact);
+    }
+    return retval;
+  }
+
+private:
+  util::Contiguous_storage<Particle_handle> _particles;
+  util::Contiguous_storage<Dynamic_rigid_body_handle> _dynamic_rigid_bodies;
+  util::Contiguous_storage<Particle_particle_contact *>
+      _particle_particle_contacts;
+  util::Contiguous_storage<Particle_dynamic_rigid_body_contact *>
+      _particle_dynamic_rigid_body_contacts;
+  util::Contiguous_storage<Particle_static_rigid_body_contact *>
+      _particle_static_rigid_body_contacts;
+  util::Contiguous_storage<Dynamic_rigid_body_dynamic_rigid_body_contact *>
+      _dynamic_rigid_body_dynamic_rigid_body_contacts;
+  util::Contiguous_storage<Dynamic_rigid_body_static_rigid_body_contact *>
+      _dynamic_rigid_body_static_rigid_body_contacts;
+  std::size_t _popped_particle_count{0};
+  std::size_t _popped_dynamic_rigid_body_count{0};
+};
+
 auto const max_tangential_move_coefficient = 0.1f;
 } // namespace
 
@@ -298,6 +457,12 @@ public:
             2 * create_info.max_dynamic_rigid_body_dynamic_rigid_body_contacts},
         _dynamic_rigid_body_static_rigid_body_contact_pointers{
             create_info.max_dynamic_rigid_body_static_rigid_body_contacts},
+        _island_storage{create_info.max_island_object_count,
+                        create_info.max_island_contact_count},
+        _position_iterations_multiplier{
+            create_info.position_iterations_multiplier},
+        _velocity_iterations_multiplier{
+            create_info.velocity_iterations_multiplier},
         _gravitational_acceleration{create_info.gravitational_acceleration} {}
 
   Particle_handle create_particle(Particle_create_info const &create_info) {
@@ -315,13 +480,43 @@ public:
                       .velocity = create_info.velocity,
                       .inverse_mass = 1.0f / create_info.mass,
                       .radius = create_info.radius,
-                      .material = create_info.material};
+                      .material = create_info.material,
+                      .marked = false};
     return handle;
   }
 
   void destroy_particle(Particle_handle handle) {
     _aabb_tree.destroy_leaf(_particles.data(handle)->aabb_tree_node);
     _particles.free(handle);
+  }
+
+  Dynamic_rigid_body_handle
+  create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info) {
+    auto const transform =
+        math::Mat3x4f::rigid(create_info.position, create_info.orientation);
+    auto const handle = _dynamic_rigid_bodies.alloc();
+    auto const bounds = physics::bounds(create_info.shape, transform);
+    new (_dynamic_rigid_bodies.data(handle)) Dynamic_rigid_body_data{
+        .broadphase_node = _aabb_tree.create_leaf(bounds, handle),
+        .motion_callback = create_info.motion_callback,
+        // .collision_flags = create_info.collision_flags,
+        // .collision_mask = create_info.collision_mask,
+        .position = create_info.position,
+        .velocity = create_info.velocity,
+        .orientation = create_info.orientation,
+        .angular_velocity = create_info.angular_velocity,
+        .inverse_mass = 1.0f / create_info.mass,
+        .inverse_inertia_tensor = inverse(create_info.inertia_tensor),
+        .shape = create_info.shape,
+        .material = create_info.material,
+        .marked = false};
+    return handle;
+  }
+
+  void destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle) {
+    _aabb_tree.destroy_leaf(
+        _dynamic_rigid_bodies.data(handle)->broadphase_node);
+    _dynamic_rigid_bodies.free(handle);
   }
 
   Static_rigid_body_handle
@@ -348,48 +543,14 @@ public:
     _static_rigid_bodies.free(handle);
   }
 
-  Dynamic_rigid_body_handle
-  create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info) {
-    auto const transform =
-        math::Mat3x4f::rigid(create_info.position, create_info.orientation);
-    auto const handle = _dynamic_rigid_bodies.alloc();
-    auto const bounds = physics::bounds(create_info.shape, transform);
-    new (_dynamic_rigid_bodies.data(handle)) Dynamic_rigid_body_data{
-        .broadphase_node = _aabb_tree.create_leaf(bounds, handle),
-        .motion_callback = create_info.motion_callback,
-        // .collision_flags = create_info.collision_flags,
-        // .collision_mask = create_info.collision_mask,
-        .position = create_info.position,
-        .velocity = create_info.velocity,
-        .orientation = create_info.orientation,
-        .angular_velocity = create_info.angular_velocity,
-        .inverse_mass = 1.0f / create_info.mass,
-        .inverse_inertia_tensor = inverse(create_info.inertia_tensor),
-        .shape = create_info.shape,
-        .material = create_info.material};
-    return handle;
-  }
-
-  void destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle) {
-    _aabb_tree.destroy_leaf(
-        _dynamic_rigid_bodies.data(handle)->broadphase_node);
-    _dynamic_rigid_bodies.free(handle);
-  }
-
   void simulate(Space_simulate_info const &simulate_info) {
     auto const h = simulate_info.delta_time / simulate_info.substep_count;
-    auto const gravitational_velocity_delta = _gravitational_acceleration * h;
-    auto const max_separating_velocity_for_bounce =
-        -2.0f * math::length(gravitational_velocity_delta);
     build_aabb_tree(simulate_info.delta_time);
     find_potential_contacts();
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
       integrate(h);
       find_contacts();
-      auto const contact_count = count_contacts();
-      resolve_contact_positions(contact_count);
-      resolve_contact_velocities(contact_count, gravitational_velocity_delta,
-                                 max_separating_velocity_for_bounce);
+      solve(h);
     }
     call_particle_motion_callbacks();
     call_dynamic_rigid_body_motion_callbacks();
@@ -834,18 +995,131 @@ private:
     }
   }
 
-  int count_contacts() const {
-    return static_cast<int>(
-        _particle_particle_contacts.size() +
-        _particle_static_rigid_body_contacts.size() +
-        _particle_dynamic_rigid_body_contacts.size() +
-        _dynamic_rigid_body_static_rigid_body_contacts.size() +
-        _dynamic_rigid_body_dynamic_rigid_body_contacts.size());
+  void solve(float h) {
+    auto const gravitational_velocity_delta = _gravitational_acceleration * h;
+    auto const max_separating_velocity_for_bounce =
+        -2.0f * math::length(gravitational_velocity_delta);
+    unmark_particles();
+    unmark_dynamic_rigid_bodies();
+    auto const island_object_visitor = [this](auto &&handle) {
+      using T = std::decay_t<decltype(handle)>;
+      if constexpr (std::is_same_v<T, Particle_handle>) {
+        // std::cout << "visiting particle" << std::endl;
+        auto const data = _particles.data(handle);
+        data->marked = true;
+        for (auto const contact :
+             std::span{data->particle_contacts, data->particle_contact_count}) {
+          auto const other_handle =
+              contact->particles[contact->particles[0] == handle ? 1 : 0];
+          auto const other_data = _particles.data(other_handle);
+          if (!other_data->marked) {
+            _island_storage.push_contact(contact);
+            _island_storage.push_object(other_handle);
+          }
+        }
+        for (auto const contact :
+             std::span{data->dynamic_rigid_body_contacts,
+                       data->dynamic_rigid_body_contact_count}) {
+          auto const other_handle = contact->body;
+          auto const other_data = _dynamic_rigid_bodies.data(other_handle);
+          if (!other_data->marked) {
+            _island_storage.push_contact(contact);
+            _island_storage.push_object(other_handle);
+          }
+        }
+        for (auto const contact :
+             std::span{data->static_rigid_body_contacts,
+                       data->static_rigid_body_contact_count}) {
+          _island_storage.push_contact(contact);
+        }
+      } else if constexpr (std::is_same_v<T, Dynamic_rigid_body_handle>) {
+        // std::cout << "visiting dynamic rigid body" << std::endl;
+        auto const data = _dynamic_rigid_bodies.data(handle);
+        data->marked = true;
+        for (auto const contact :
+             std::span{data->particle_contacts, data->particle_contact_count}) {
+          auto const other_handle = contact->particle;
+          auto const other_data = _particles.data(other_handle);
+          if (!other_data->marked) {
+            _island_storage.push_contact(contact);
+            _island_storage.push_object(other_handle);
+          }
+        }
+        for (auto const contact :
+             std::span{data->dynamic_rigid_body_contacts,
+                       data->dynamic_rigid_body_contact_count}) {
+          auto const other_handle =
+              contact->bodies[contact->bodies[0] == handle ? 1 : 0];
+          auto const other_data = _dynamic_rigid_bodies.data(other_handle);
+          if (!other_data->marked) {
+            _island_storage.push_contact(contact);
+            _island_storage.push_object(other_handle);
+          }
+        }
+        for (auto const contact :
+             std::span{data->static_rigid_body_contacts,
+                       data->static_rigid_body_contact_count}) {
+          _island_storage.push_contact(contact);
+        }
+      }
+    };
+    _particles.for_each([&, this](Particle_handle handle, Particle_data *data) {
+      if (!data->marked) {
+        _island_storage.reset();
+        _island_storage.push_object(handle);
+        for (;;) {
+          auto const handle = _island_storage.pop_object();
+          if (handle) {
+            std::visit(island_object_visitor, *handle);
+          } else {
+            break;
+          }
+        }
+        solve_current_island(gravitational_velocity_delta,
+                             max_separating_velocity_for_bounce);
+      }
+    });
+    _dynamic_rigid_bodies.for_each([&, this](Dynamic_rigid_body_handle handle,
+                                             Dynamic_rigid_body_data *data) {
+      if (!data->marked) {
+        _island_storage.reset();
+        _island_storage.push_object(handle);
+        for (;;) {
+          auto const handle = _island_storage.pop_object();
+          if (handle) {
+            std::visit(island_object_visitor, *handle);
+          } else {
+            break;
+          }
+        }
+        solve_current_island(gravitational_velocity_delta,
+                             max_separating_velocity_for_bounce);
+      }
+    });
   }
 
-  void resolve_contact_positions(int iterations) {
-    for (auto i = 0; i != iterations; ++i) {
-      if (auto const contact = find_contact_of_least_negative_separation()) {
+  void unmark_particles() {
+    _particles.for_each(
+        [](Particle_handle, Particle_data *data) { data->marked = false; });
+  }
+
+  void unmark_dynamic_rigid_bodies() {
+    _dynamic_rigid_bodies.for_each(
+        [](Dynamic_rigid_body_handle, Dynamic_rigid_body_data *data) {
+          data->marked = false;
+        });
+  }
+
+  void solve_current_island(math::Vec3f const &gravitational_velocity_delta,
+                            float max_separating_velocity_for_bounce) {
+    auto const contact_count = _island_storage.contact_count();
+    auto const position_iterations =
+        _position_iterations_multiplier * contact_count;
+    auto const velocity_iterations =
+        _velocity_iterations_multiplier * contact_count;
+    for (auto i = std::size_t{}; i != position_iterations; ++i) {
+      if (auto const contact =
+              _island_storage.find_contact_of_least_negative_separation()) {
         std::visit(
             [this](auto &&arg) {
               using T = std::decay_t<decltype(arg)>;
@@ -877,43 +1151,131 @@ private:
         break;
       }
     }
+    for (auto i = std::size_t{}; i != velocity_iterations; ++i) {
+      if (auto const contact =
+              _island_storage
+                  .find_contact_of_least_negative_separating_velocity()) {
+        std::visit(
+            [=, this](auto &&arg) {
+              using T = std::decay_t<decltype(arg)>;
+              if constexpr (std::is_same_v<T, Particle_particle_contact *>) {
+                resolve_particle_particle_contact_velocity(
+                    arg, max_separating_velocity_for_bounce);
+              } else if constexpr (std::is_same_v<
+                                       T,
+                                       Particle_static_rigid_body_contact *>) {
+                resolve_particle_static_rigid_body_contact_velocity(
+                    arg, gravitational_velocity_delta,
+                    max_separating_velocity_for_bounce);
+              } else if constexpr (std::is_same_v<
+                                       T,
+                                       Particle_dynamic_rigid_body_contact *>) {
+                resolve_particle_dynamic_rigid_body_contact_velocity(
+                    arg, max_separating_velocity_for_bounce);
+              } else if constexpr (
+                  std::is_same_v<
+                      T, Dynamic_rigid_body_static_rigid_body_contact *>) {
+                resolve_dynamic_rigid_body_static_rigid_body_contact_velocity(
+                    arg, gravitational_velocity_delta,
+                    max_separating_velocity_for_bounce);
+              } else {
+                static_assert(
+                    std::is_same_v<
+                        T, Dynamic_rigid_body_dynamic_rigid_body_contact *>);
+                resolve_dynamic_rigid_body_dynamic_rigid_body_contact_velocity(
+                    arg, max_separating_velocity_for_bounce);
+              }
+            },
+            *contact);
+      } else {
+        break;
+      }
+    }
   }
 
-  std::optional<std::variant<Particle_particle_contact *,
-                             Particle_static_rigid_body_contact *,
-                             Particle_dynamic_rigid_body_contact *,
-                             Dynamic_rigid_body_static_rigid_body_contact *,
-                             Dynamic_rigid_body_dynamic_rigid_body_contact *>>
-  find_contact_of_least_negative_separation() {
-    auto retval = std::optional<std::variant<
-        Particle_particle_contact *, Particle_static_rigid_body_contact *,
-        Particle_dynamic_rigid_body_contact *,
-        Dynamic_rigid_body_static_rigid_body_contact *,
-        Dynamic_rigid_body_dynamic_rigid_body_contact *>>{};
-    auto retval_separation = 0.0f;
-    auto const process_contact = [&](auto &contact) {
-      if (contact.separation < retval_separation) {
-        retval = &contact;
-        retval_separation = contact.separation;
-      }
-    };
-    for (auto &contact : _particle_particle_contacts) {
-      process_contact(contact);
-    }
-    for (auto &contact : _particle_dynamic_rigid_body_contacts) {
-      process_contact(contact);
-    }
-    for (auto &contact : _particle_static_rigid_body_contacts) {
-      process_contact(contact);
-    }
-    for (auto &contact : _dynamic_rigid_body_dynamic_rigid_body_contacts) {
-      process_contact(contact);
-    }
-    for (auto &contact : _dynamic_rigid_body_static_rigid_body_contacts) {
-      process_contact(contact);
-    }
-    return retval;
-  }
+  // int count_contacts() const {
+  //   return static_cast<int>(
+  //       _particle_particle_contacts.size() +
+  //       _particle_static_rigid_body_contacts.size() +
+  //       _particle_dynamic_rigid_body_contacts.size() +
+  //       _dynamic_rigid_body_static_rigid_body_contacts.size() +
+  //       _dynamic_rigid_body_dynamic_rigid_body_contacts.size());
+  // }
+
+  // void resolve_contact_positions(int iterations) {
+  //   for (auto i = 0; i != iterations; ++i) {
+  //     if (auto const contact = find_contact_of_least_negative_separation()) {
+  //       std::visit(
+  //           [this](auto &&arg) {
+  //             using T = std::decay_t<decltype(arg)>;
+  //             if constexpr (std::is_same_v<T, Particle_particle_contact *>) {
+  //               resolve_particle_particle_contact_position(arg);
+  //             } else if constexpr (std::is_same_v<
+  //                                      T,
+  //                                      Particle_static_rigid_body_contact *>)
+  //                                      {
+  //               resolve_particle_static_rigid_body_contact_position(arg);
+  //             } else if constexpr (std::is_same_v<
+  //                                      T,
+  //                                      Particle_dynamic_rigid_body_contact
+  //                                      *>) {
+  //               resolve_particle_dynamic_rigid_body_contact_position(arg);
+  //             } else if constexpr (
+  //                 std::is_same_v<
+  //                     T, Dynamic_rigid_body_static_rigid_body_contact *>) {
+  //               resolve_dynamic_rigid_body_static_rigid_body_contact_position(
+  //                   arg);
+  //             } else {
+  //               static_assert(
+  //                   std::is_same_v<
+  //                       T, Dynamic_rigid_body_dynamic_rigid_body_contact *>);
+  //               resolve_dynamic_rigid_body_dynamic_rigid_body_contact_position(
+  //                   arg);
+  //             }
+  //           },
+  //           *contact);
+  //     } else {
+  //       break;
+  //     }
+  //   }
+  // }
+
+  // std::optional<std::variant<Particle_particle_contact *,
+  //                            Particle_static_rigid_body_contact *,
+  //                            Particle_dynamic_rigid_body_contact *,
+  //                            Dynamic_rigid_body_static_rigid_body_contact *,
+  //                            Dynamic_rigid_body_dynamic_rigid_body_contact
+  //                            *>>
+  // find_contact_of_least_negative_separation() {
+  //   auto retval = std::optional<std::variant<
+  //       Particle_particle_contact *, Particle_static_rigid_body_contact *,
+  //       Particle_dynamic_rigid_body_contact *,
+  //       Dynamic_rigid_body_static_rigid_body_contact *,
+  //       Dynamic_rigid_body_dynamic_rigid_body_contact *>>{};
+  //   auto retval_separation = 0.0f;
+  //   auto const process_contact = [&](auto &contact) {
+  //     if (contact.separation < retval_separation) {
+  //       retval = &contact;
+  //       retval_separation = contact.separation;
+  //     }
+  //   };
+  //   for (auto &contact : _particle_particle_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   for (auto &contact : _particle_dynamic_rigid_body_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   for (auto &contact : _particle_static_rigid_body_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   for (auto &contact : _dynamic_rigid_body_dynamic_rigid_body_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   for (auto &contact : _dynamic_rigid_body_static_rigid_body_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   return retval;
+  // }
 
   void resolve_particle_particle_contact_position(
       Particle_particle_contact *contact) {
@@ -1236,86 +1598,89 @@ private:
     }
   }
 
-  void
-  resolve_contact_velocities(int iterations,
-                             math::Vec3f const &gravitational_velocity_delta,
-                             float max_separating_velocity_for_bounce) {
-    for (auto i = 0; i != iterations; ++i) {
-      if (auto const contact =
-              find_contact_of_least_negative_separating_velocity()) {
-        std::visit(
-            [=, this](auto &&arg) {
-              using T = std::decay_t<decltype(arg)>;
-              if constexpr (std::is_same_v<T, Particle_particle_contact *>) {
-                resolve_particle_particle_contact_velocity(
-                    arg, max_separating_velocity_for_bounce);
-              } else if constexpr (std::is_same_v<
-                                       T,
-                                       Particle_static_rigid_body_contact *>) {
-                resolve_particle_static_rigid_body_contact_velocity(
-                    arg, gravitational_velocity_delta,
-                    max_separating_velocity_for_bounce);
-              } else if constexpr (std::is_same_v<
-                                       T,
-                                       Particle_dynamic_rigid_body_contact *>) {
-                resolve_particle_dynamic_rigid_body_contact_velocity(
-                    arg, max_separating_velocity_for_bounce);
-              } else if constexpr (
-                  std::is_same_v<
-                      T, Dynamic_rigid_body_static_rigid_body_contact *>) {
-                resolve_dynamic_rigid_body_static_rigid_body_contact_velocity(
-                    arg, gravitational_velocity_delta,
-                    max_separating_velocity_for_bounce);
-              } else {
-                static_assert(
-                    std::is_same_v<
-                        T, Dynamic_rigid_body_dynamic_rigid_body_contact *>);
-                resolve_dynamic_rigid_body_dynamic_rigid_body_contact_velocity(
-                    arg, max_separating_velocity_for_bounce);
-              }
-            },
-            *contact);
-      } else {
-        break;
-      }
-    }
-  }
+  // void
+  // resolve_contact_velocities(int iterations,
+  //                            math::Vec3f const &gravitational_velocity_delta,
+  //                            float max_separating_velocity_for_bounce) {
+  //   for (auto i = 0; i != iterations; ++i) {
+  //     if (auto const contact =
+  //             find_contact_of_least_negative_separating_velocity()) {
+  //       std::visit(
+  //           [=, this](auto &&arg) {
+  //             using T = std::decay_t<decltype(arg)>;
+  //             if constexpr (std::is_same_v<T, Particle_particle_contact *>) {
+  //               resolve_particle_particle_contact_velocity(
+  //                   arg, max_separating_velocity_for_bounce);
+  //             } else if constexpr (std::is_same_v<
+  //                                      T,
+  //                                      Particle_static_rigid_body_contact *>)
+  //                                      {
+  //               resolve_particle_static_rigid_body_contact_velocity(
+  //                   arg, gravitational_velocity_delta,
+  //                   max_separating_velocity_for_bounce);
+  //             } else if constexpr (std::is_same_v<
+  //                                      T,
+  //                                      Particle_dynamic_rigid_body_contact
+  //                                      *>) {
+  //               resolve_particle_dynamic_rigid_body_contact_velocity(
+  //                   arg, max_separating_velocity_for_bounce);
+  //             } else if constexpr (
+  //                 std::is_same_v<
+  //                     T, Dynamic_rigid_body_static_rigid_body_contact *>) {
+  //               resolve_dynamic_rigid_body_static_rigid_body_contact_velocity(
+  //                   arg, gravitational_velocity_delta,
+  //                   max_separating_velocity_for_bounce);
+  //             } else {
+  //               static_assert(
+  //                   std::is_same_v<
+  //                       T, Dynamic_rigid_body_dynamic_rigid_body_contact *>);
+  //               resolve_dynamic_rigid_body_dynamic_rigid_body_contact_velocity(
+  //                   arg, max_separating_velocity_for_bounce);
+  //             }
+  //           },
+  //           *contact);
+  //     } else {
+  //       break;
+  //     }
+  //   }
+  // }
 
-  std::optional<std::variant<Particle_particle_contact *,
-                             Particle_static_rigid_body_contact *,
-                             Particle_dynamic_rigid_body_contact *,
-                             Dynamic_rigid_body_static_rigid_body_contact *,
-                             Dynamic_rigid_body_dynamic_rigid_body_contact *>>
-  find_contact_of_least_negative_separating_velocity() {
-    auto retval = std::optional<std::variant<
-        Particle_particle_contact *, Particle_static_rigid_body_contact *,
-        Particle_dynamic_rigid_body_contact *,
-        Dynamic_rigid_body_static_rigid_body_contact *,
-        Dynamic_rigid_body_dynamic_rigid_body_contact *>>{};
-    auto retval_separating_velocity = 0.0f;
-    auto const process_contact = [&](auto &contact) {
-      if (contact.separating_velocity < retval_separating_velocity) {
-        retval = &contact;
-        retval_separating_velocity = contact.separating_velocity;
-      }
-    };
-    for (auto &contact : _particle_particle_contacts) {
-      process_contact(contact);
-    }
-    for (auto &contact : _particle_dynamic_rigid_body_contacts) {
-      process_contact(contact);
-    }
-    for (auto &contact : _particle_static_rigid_body_contacts) {
-      process_contact(contact);
-    }
-    for (auto &contact : _dynamic_rigid_body_dynamic_rigid_body_contacts) {
-      process_contact(contact);
-    }
-    for (auto &contact : _dynamic_rigid_body_static_rigid_body_contacts) {
-      process_contact(contact);
-    }
-    return retval;
-  }
+  // std::optional<std::variant<Particle_particle_contact *,
+  //                            Particle_static_rigid_body_contact *,
+  //                            Particle_dynamic_rigid_body_contact *,
+  //                            Dynamic_rigid_body_static_rigid_body_contact *,
+  //                            Dynamic_rigid_body_dynamic_rigid_body_contact
+  //                            *>>
+  // find_contact_of_least_negative_separating_velocity() {
+  //   auto retval = std::optional<std::variant<
+  //       Particle_particle_contact *, Particle_static_rigid_body_contact *,
+  //       Particle_dynamic_rigid_body_contact *,
+  //       Dynamic_rigid_body_static_rigid_body_contact *,
+  //       Dynamic_rigid_body_dynamic_rigid_body_contact *>>{};
+  //   auto retval_separating_velocity = 0.0f;
+  //   auto const process_contact = [&](auto &contact) {
+  //     if (contact.separating_velocity < retval_separating_velocity) {
+  //       retval = &contact;
+  //       retval_separating_velocity = contact.separating_velocity;
+  //     }
+  //   };
+  //   for (auto &contact : _particle_particle_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   for (auto &contact : _particle_dynamic_rigid_body_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   for (auto &contact : _particle_static_rigid_body_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   for (auto &contact : _dynamic_rigid_body_dynamic_rigid_body_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   for (auto &contact : _dynamic_rigid_body_static_rigid_body_contacts) {
+  //     process_contact(contact);
+  //   }
+  //   return retval;
+  // }
 
   void resolve_particle_particle_contact_velocity(
       Particle_particle_contact *contact,
@@ -1570,11 +1935,6 @@ private:
   void update_dynamic_rigid_body_contact_separating_velocities(
       Dynamic_rigid_body_handle body, math::Vec3f const &velocity_delta,
       math::Vec3f const &angular_velocity_delta) {
-    // other_contact.separating_velocity -=
-    //     math::dot(body_velocity_delta +
-    //                   math::cross(body_angular_velocity_delta,
-    //                               other_contact.body_relative_position),
-    //               other_contact.normal);
     auto const data = _dynamic_rigid_bodies.data(body);
     auto const particle_contacts =
         std::span{data->particle_contacts, data->particle_contact_count};
@@ -1666,6 +2026,9 @@ private:
       _dynamic_rigid_body_dynamic_rigid_body_contact_pointers;
   util::Contiguous_storage<Dynamic_rigid_body_static_rigid_body_contact *>
       _dynamic_rigid_body_static_rigid_body_contact_pointers;
+  Island_storage _island_storage;
+  std::size_t _position_iterations_multiplier;
+  std::size_t _velocity_iterations_multiplier;
   math::Vec3f _gravitational_acceleration;
 };
 
