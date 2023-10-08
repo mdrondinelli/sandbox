@@ -18,45 +18,78 @@ using Aabb_tree_payload_t =
     std::variant<Particle_handle, Static_rigid_body_handle,
                  Dynamic_rigid_body_handle>;
 
-struct Particle_particle_contact {
-  std::array<Particle_handle, 2> particles;
+struct Contact {
   math::Vec3f normal;
   float separation;
   float separating_velocity;
+
+  constexpr Contact(math::Vec3f const &normal, float separation,
+                    float separating_velocity) noexcept
+      : normal{normal}, separation{separation},
+        separating_velocity{separating_velocity} {}
 };
 
-struct Particle_static_rigid_body_contact {
+struct Particle_particle_contact : Contact {
+  std::array<Particle_handle, 2> particles;
+
+  constexpr Particle_particle_contact(
+      math::Vec3f const &normal, float separation, float separating_velocity,
+      std::array<Particle_handle, 2> const &particles) noexcept
+      : Contact{normal, separation, separating_velocity}, particles{particles} {
+  }
+};
+
+struct Particle_static_rigid_body_contact : Contact {
   Particle_handle particle;
   Static_rigid_body_handle body;
-  math::Vec3f normal;
-  float separation;
-  float separating_velocity;
+
+  constexpr Particle_static_rigid_body_contact(math::Vec3f const &normal,
+                                               float separation,
+                                               float separating_velocity,
+                                               Particle_handle particle,
+                                               Static_rigid_body_handle body)
+      : Contact{normal, separation, separating_velocity}, particle{particle},
+        body{body} {}
 };
 
-struct Particle_dynamic_rigid_body_contact {
+struct Particle_dynamic_rigid_body_contact : Contact {
   Particle_handle particle;
   Dynamic_rigid_body_handle body;
   math::Vec3f body_relative_position;
-  math::Vec3f normal;
-  float separation;
-  float separating_velocity;
+
+  constexpr Particle_dynamic_rigid_body_contact(
+      math::Vec3f const &normal, float separation, float separating_velocity,
+      Particle_handle particle, Dynamic_rigid_body_handle body,
+      math::Vec3f const &body_relative_position) noexcept
+      : Contact{normal, separation, separating_velocity}, particle{particle},
+        body{body}, body_relative_position{body_relative_position} {}
 };
 
-struct Dynamic_rigid_body_static_rigid_body_contact {
+struct Dynamic_rigid_body_static_rigid_body_contact : Contact {
   Dynamic_rigid_body_handle dynamic_body;
   Static_rigid_body_handle static_body;
   math::Vec3f dynamic_body_relative_position;
-  math::Vec3f normal;
-  float separation;
-  float separating_velocity;
+
+  constexpr Dynamic_rigid_body_static_rigid_body_contact(
+      math::Vec3f const &normal, float separation, float separating_velocity,
+      Dynamic_rigid_body_handle dynamic_body,
+      Static_rigid_body_handle static_body,
+      math::Vec3f const &dynamic_body_relative_position) noexcept
+      : Contact{normal, separation, separating_velocity},
+        dynamic_body{dynamic_body}, static_body{static_body},
+        dynamic_body_relative_position{dynamic_body_relative_position} {}
 };
 
-struct Dynamic_rigid_body_dynamic_rigid_body_contact {
+struct Dynamic_rigid_body_dynamic_rigid_body_contact : Contact {
   std::array<Dynamic_rigid_body_handle, 2> bodies;
   std::array<math::Vec3f, 2> body_relative_positions;
-  math::Vec3f normal;
-  float separation;
-  float separating_velocity;
+
+  constexpr Dynamic_rigid_body_dynamic_rigid_body_contact(
+      math::Vec3f const &normal, float separation, float separating_velocity,
+      std::array<Dynamic_rigid_body_handle, 2> const &bodies,
+      std::array<math::Vec3f, 2> const &body_relative_positions) noexcept
+      : Contact{normal, separation, separating_velocity}, bodies{bodies},
+        body_relative_positions{body_relative_positions} {}
 };
 
 struct Particle_data {
@@ -816,10 +849,10 @@ private:
         auto const separating_velocity = math::dot(
             particle_datas[0]->velocity - particle_datas[1]->velocity, normal);
         _particle_particle_contacts.push_back(
-            {.particles = {particle_handles.first, particle_handles.second},
-             .normal = normal,
-             .separation = separation,
-             .separating_velocity = separating_velocity});
+            {normal,
+             separation,
+             separating_velocity,
+             {particle_handles.first, particle_handles.second}});
         for (auto i = 0; i != 2; ++i) {
           ++particle_datas[i]->particle_contact_count;
         }
@@ -849,12 +882,9 @@ private:
         auto const separating_velocity =
             math::dot(relative_velocity, contact_geometry->normal);
         _particle_dynamic_rigid_body_contacts.push_back(
-            {.particle = particle_handle,
-             .body = body_handle,
-             .body_relative_position = body_relative_position,
-             .normal = contact_geometry->normal,
-             .separation = contact_geometry->separation,
-             .separating_velocity = separating_velocity});
+            {contact_geometry->normal, contact_geometry->separation,
+             separating_velocity, particle_handle, body_handle,
+             body_relative_position});
         ++particle_data->dynamic_rigid_body_contact_count;
         ++body_data->particle_contact_count;
       }
@@ -875,11 +905,8 @@ private:
         auto const separating_velocity =
             math::dot(particle_data->velocity, contact_geometry->normal);
         _particle_static_rigid_body_contacts.push_back(
-            {.particle = particle_handle,
-             .body = body_handle,
-             .normal = contact_geometry->normal,
-             .separation = contact_geometry->separation,
-             .separating_velocity = separating_velocity});
+            {contact_geometry->normal, contact_geometry->separation,
+             separating_velocity, particle_handle, body_handle});
         ++particle_data->static_rigid_body_contact_count;
       }
     }
@@ -917,11 +944,11 @@ private:
         auto const separating_velocity =
             math::dot(relative_velocity, contact_geometry->normal);
         _dynamic_rigid_body_dynamic_rigid_body_contacts.push_back(
-            {.bodies = {body_handles.first, body_handles.second},
-             .body_relative_positions = body_relative_contact_positions,
-             .normal = contact_geometry->normal,
-             .separation = contact_geometry->separation,
-             .separating_velocity = separating_velocity});
+            {contact_geometry->normal,
+             contact_geometry->separation,
+             separating_velocity,
+             {body_handles.first, body_handles.second},
+             body_relative_contact_positions});
         for (auto i = 0; i != 2; ++i) {
           ++body_datas[i]->dynamic_rigid_body_contact_count;
         }
@@ -955,13 +982,9 @@ private:
         auto const separating_velocity =
             math::dot(relative_velocity, contact_geometry->normal);
         _dynamic_rigid_body_static_rigid_body_contacts.push_back(
-            {.dynamic_body = dynamic_body_handle,
-             .static_body = static_body_handle,
-             .dynamic_body_relative_position =
-                 dynamic_body_relative_contact_position,
-             .normal = contact_geometry->normal,
-             .separation = contact_geometry->separation,
-             .separating_velocity = separating_velocity});
+            {contact_geometry->normal, contact_geometry->separation,
+             separating_velocity, dynamic_body_handle, static_body_handle,
+             dynamic_body_relative_contact_position});
         ++dynamic_body_data->static_rigid_body_contact_count;
       }
     }
