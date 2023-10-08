@@ -77,7 +77,7 @@ template <typename T> struct Vec<T, 3> {
 
   constexpr Vec(T x, Vec<T, 2> yz) noexcept : x{x}, y{yz.x}, z{yz.y} {}
 
-  template <typename F>
+  template <std::invocable<int> F>
   constexpr explicit Vec(F &&f) noexcept(noexcept(f(0)))
       : x{f(0)}, y{f(1)}, z{f(2)} {}
 
