@@ -1,17 +1,21 @@
 #ifndef MARLON_UTIL_CONTIGUOUS_STORAGE_H
 #define MARLON_UTIL_CONTIGUOUS_STORAGE_H
 
-#include <exception>
 #include <vector>
+
+#include "capacity_error.h"
 
 namespace marlon {
 namespace util {
-class Contiguous_storage_capacity_error : public std::exception {};
-
 template <typename T> class Contiguous_storage {
 public:
   explicit Contiguous_storage(std::size_t capacity) {
     _vector.reserve(capacity);
+  }
+
+  explicit Contiguous_storage(std::size_t capacity, std::size_t size) {
+    _vector.reserve(capacity);
+    _vector.resize(size);
   }
 
   T const &operator[](std::size_t index) const noexcept {
@@ -46,7 +50,7 @@ public:
     if (size() < capacity()) {
       _vector.push_back(value);
     } else {
-      throw Contiguous_storage_capacity_error{};
+      throw Capacity_error{};
     }
   }
 
@@ -54,7 +58,7 @@ public:
     if (size() < capacity()) {
       _vector.push_back(std::move(value));
     } else {
-      throw Contiguous_storage_capacity_error{};
+      throw Capacity_error{};
     }
   }
 
@@ -68,7 +72,7 @@ public:
     if (size() < capacity()) {
       return _vector.emplace_back(std::forward<Args>(args)...);
     } else {
-      throw Contiguous_storage_capacity_error{};
+      throw Capacity_error{};
     }
   }
 

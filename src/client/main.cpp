@@ -75,11 +75,9 @@ graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
   retval.brick_base_color_texture = create_texture(
-      graphics,
-      "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
+      graphics, "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
   retval.striped_cotton_base_color_texture = create_texture(
-      graphics,
-      "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
+      graphics, "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
   retval.brick_material = graphics->create_material_unique(
       {.base_color_texture = retval.brick_base_color_texture.get()});
   retval.striped_cotton_material = graphics->create_material_unique(
@@ -253,7 +251,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto const tick_duration = 1.0f / tick_rate;
   auto loop = client::Application_loop{{.space = space,
                                         .tick_duration = tick_duration,
-                                        .physics_substep_count = 10}};
+                                        .physics_substep_count = 40}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
   auto fps_frame_accumulator = 0;
@@ -271,12 +269,12 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
         !glfwGetKey(window, GLFW_KEY_SPACE)) {
       if (loop.run_once(elapsed_time)) {
         test_entity_manager->tick(tick_duration);
-        for (auto i = 0; i < 1; ++i) {
+        for (auto i = 0; i < 0; ++i) {
           test_entity_manager->create_entity({});
         }
       }
       box_spawn_timer += elapsed_time;
-      if (box_spawn_timer > 2.0f) {
+      if (box_spawn_timer > 1.0f) {
         box_spawn_timer = 0.0f;
         cotton_box_manager->create(
             {.position = math::Vec3f{0.0f, 2.5f, 0.0f},
@@ -296,6 +294,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
     while (fps_time_accumulator >= 1.0) {
       std::cout << "frames per second: " << fps_frame_accumulator << std::endl;
       std::cout << "worst frame time: " << worst_frame_time << std::endl;
+      std::cout << "running for " << glfwGetTime() << " seconds" << std::endl;
       fps_time_accumulator -= 1.0;
       fps_frame_accumulator = 0;
       worst_frame_time = 0.0;
@@ -326,14 +325,16 @@ int main() {
                                   {0.0f, 100.0f, 0.0f, -100.0f},
                                   {0.0f, 0.0f, 100.0f, 0.0f}}});
   scene->add_surface(ground_surface.get());
-  physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
+  physics::Space space{{.position_iterations_multiplier = 1,
+                        .velocity_iterations_multiplier = 1,
+                        .gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
   physics::Material const physics_material{.static_friction_coefficient = 0.4f,
                                            .dynamic_friction_coefficient = 0.4f,
                                            .restitution_coefficient = 0.1f};
   physics::Box ground_shape{100.0f, 0.5f, 100.0f};
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{1.0f, 1.0f, 1.0f};
-  physics::Box cotton_box_shape{0.5f, 0.5f, 0.5f};
+  physics::Box cotton_box_shape{0.5f, 0.1f, 0.5f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
@@ -371,13 +372,13 @@ int main() {
                          {0.0f, cotton_box_shape.half_height, 0.0f, 0.0f},
                          {0.0f, 0.0f, cotton_box_shape.half_depth, 0.0f}},
        .space = &space,
-       .body_mass = 80.0f,
+       .body_mass = 240.0f,
        .body_inertia_tensor =
-           80.0f * physics::solid_inerta_tensor(cotton_box_shape),
+           240.0f * physics::solid_inerta_tensor(cotton_box_shape),
        .body_shape = cotton_box_shape,
-       .body_material = {.static_friction_coefficient = 0.6f,
-                         .dynamic_friction_coefficient = 0.4f,
-                         .restitution_coefficient = 0.4f}}};
+       .body_material = {.static_friction_coefficient = 0.4f,
+                         .dynamic_friction_coefficient = 0.3f,
+                         .restitution_coefficient = 0.1f}}};
   client::Test_entity_manager test_entity_manager{
       {.graphics = graphics.get(),
        .scene = scene.get(),
@@ -392,7 +393,9 @@ int main() {
                                               math::deg_to_rad(-45.0f)) *
                       math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
                                               math::deg_to_rad(45.0f))});
-  cotton_box_manager.create({.position = math::Vec3f{0.0f, 1.5f, 0.0f}});
+  cotton_box_manager.create(
+      {.position = math::Vec3f{0.0f, 1.5f, 0.0f},
+       .angular_velocity = math::Vec3f{0.0f, 10.0f, 0.0f}});
   // cotton_box_manager.create(
   //     {.position = math::Vec3f{0.0f, 3.5f, 0.0f},
   //      .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},

@@ -103,7 +103,7 @@ void Test_entity_manager::tick(float delta_time) {
   auto entities_to_destroy = std::vector<Test_entity_handle>{};
   for (auto &[handle, value] : _entities) {
     value.time_alive += delta_time;
-    if (value.time_alive > 20.0f) {
+    if (value.time_alive > 10.0f) {
       entities_to_destroy.push_back({handle});
     }
   }
