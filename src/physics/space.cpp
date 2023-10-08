@@ -147,7 +147,8 @@ public:
     auto k = std::size_t{};
     for (auto i = std::size_t{}; i != n && k != m; ++i) {
       if (_occupancy_bits[i]) {
-        f(Particle_handle{i}, data({i}));
+        auto const handle = Particle_handle{static_cast<std::uint32_t>(i)};
+        f(handle, data(handle));
         ++k;
       }
     }
@@ -155,7 +156,7 @@ public:
 
 private:
   std::unique_ptr<std::byte[]> _data;
-  std::vector<std::size_t> _free_indices;
+  std::vector<std::uint32_t> _free_indices;
   std::vector<bool> _occupancy_bits;
 };
 
@@ -197,7 +198,9 @@ public:
     auto k = std::size_t{};
     for (auto i = std::size_t{}; i != n && k != m; ++i) {
       if (_occupancy_bits[i]) {
-        f(Dynamic_rigid_body_handle{i}, data({i}));
+        auto const handle =
+            Dynamic_rigid_body_handle{static_cast<std::uint32_t>(i)};
+        f(handle, data(handle));
         ++k;
       }
     }
@@ -205,7 +208,7 @@ public:
 
 private:
   std::unique_ptr<std::byte[]> _data;
-  std::vector<std::size_t> _free_indices;
+  std::vector<std::uint32_t> _free_indices;
   std::vector<bool> _occupancy_bits;
 };
 
@@ -247,7 +250,9 @@ public:
     auto k = std::size_t{};
     for (auto i = std::size_t{}; i != n; ++i) {
       if (_occupancy_bits[i]) {
-        f(Static_rigid_body_handle{i}, data({i}));
+        auto const handle =
+            Static_rigid_body_handle{static_cast<std::uint32_t>(i)};
+        f(handle, data(handle));
         if (++k == m) {
           return;
         }
@@ -257,7 +262,7 @@ public:
 
 private:
   std::unique_ptr<std::byte[]> _data;
-  std::vector<std::size_t> _free_indices;
+  std::vector<std::uint32_t> _free_indices;
   std::vector<bool> _occupancy_bits;
 };
 
@@ -1141,7 +1146,6 @@ private:
           auto const handle = _island_search_stack.back();
           _island_search_stack.pop_back();
           std::visit(island_object_visitor, handle);
-
         } while (!_island_search_stack.empty());
         solve_current_island(gravitational_velocity_delta,
                              max_separating_velocity_for_bounce);

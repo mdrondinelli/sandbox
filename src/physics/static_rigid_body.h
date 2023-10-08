@@ -10,7 +10,7 @@
 namespace marlon {
 namespace physics {
 struct Static_rigid_body_handle {
-  std::size_t value;
+  std::uint32_t value;
 };
 
 struct Static_rigid_body_create_info {

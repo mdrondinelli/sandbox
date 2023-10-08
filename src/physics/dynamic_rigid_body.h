@@ -12,7 +12,7 @@ namespace physics {
 class Dynamic_rigid_body_motion_callback;
 
 struct Dynamic_rigid_body_handle {
-  std::size_t value;
+  std::uint32_t value;
 };
 
 struct Dynamic_rigid_body_create_info {

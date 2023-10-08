@@ -15,7 +15,7 @@ namespace physics {
 class Particle_motion_callback;
 
 struct Particle_handle {
-  std::size_t value;
+  std::uint32_t value;
 };
 
 struct Particle_create_info {
