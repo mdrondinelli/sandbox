@@ -334,7 +334,7 @@ int main() {
   physics::Box ground_shape{100.0f, 0.5f, 100.0f};
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{1.0f, 1.0f, 1.0f};
-  physics::Box cotton_box_shape{0.5f, 0.05f, 0.5f};
+  physics::Box cotton_box_shape{0.5f, 0.1f, 0.5f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
@@ -372,12 +372,12 @@ int main() {
                          {0.0f, cotton_box_shape.half_height, 0.0f, 0.0f},
                          {0.0f, 0.0f, cotton_box_shape.half_depth, 0.0f}},
        .space = &space,
-       .body_mass = 240.0f,
+       .body_mass = 20.0f,
        .body_inertia_tensor =
-           240.0f * physics::solid_inerta_tensor(cotton_box_shape),
+           20.0f * physics::solid_inerta_tensor(cotton_box_shape),
        .body_shape = cotton_box_shape,
-       .body_material = {.static_friction_coefficient = 0.4f,
-                         .dynamic_friction_coefficient = 0.3f,
+       .body_material = {.static_friction_coefficient = 0.5f,
+                         .dynamic_friction_coefficient = 0.4f,
                          .restitution_coefficient = 0.1f}}};
   client::Test_entity_manager test_entity_manager{
       {.graphics = graphics.get(),
