@@ -5,6 +5,8 @@
 
 #include "../math/quat.h"
 #include "../math/vec.h"
+#include "handle.h"
+#include "material.h"
 #include "shape.h"
 
 namespace marlon {
@@ -12,7 +14,7 @@ namespace physics {
 class Dynamic_rigid_body_motion_callback;
 
 struct Dynamic_rigid_body_handle {
-  std::uint32_t value;
+  Handle_value_t value;
 };
 
 struct Dynamic_rigid_body_create_info {

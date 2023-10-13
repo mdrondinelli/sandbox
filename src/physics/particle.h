@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "../math/vec.h"
+#include "handle.h"
 #include "material.h"
 
 namespace marlon {
@@ -15,7 +16,7 @@ namespace physics {
 class Particle_motion_callback;
 
 struct Particle_handle {
-  std::uint32_t value;
+  Handle_value_t value;
 };
 
 struct Particle_create_info {
