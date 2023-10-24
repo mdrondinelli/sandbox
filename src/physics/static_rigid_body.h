@@ -12,7 +12,7 @@
 namespace marlon {
 namespace physics {
 struct Static_rigid_body_handle {
-  Handle_value_t value;
+  Object_handle_t value;
 };
 
 struct Static_rigid_body_create_info {

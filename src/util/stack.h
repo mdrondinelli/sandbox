@@ -1,11 +1,8 @@
 #ifndef MARLON_UTIL_STACK_H
 #define MARLON_UTIL_STACK_H
 
-#include <cstdlib>
-
-#include <new>
-
 #include "capacity_error.h"
+#include "memory.h"
 
 namespace marlon {
 namespace util {
@@ -14,20 +11,19 @@ public:
   using Const_iterator = T const *;
   using Iterator = T *;
 
-  explicit Stack(std::size_t capacity) {
-    _begin = static_cast<T *>(std::malloc(capacity * sizeof(T)));
-    if (_begin) {
-      _stack_end = _begin;
-      _buffer_end = _begin + capacity;
-    } else {
-      throw std::bad_alloc{};
-    }
+  static constexpr std::size_t
+  memory_requirement(std::size_t capacity) noexcept {
+    return sizeof(T) * capacity;
   }
 
-  ~Stack() {
-    clear();
-    free(_begin);
-  }
+  explicit Stack(Block block, std::size_t capacity) noexcept
+      : Stack{block.begin, capacity} {}
+
+  explicit Stack(void *block_begin, std::size_t capacity) noexcept
+      : _begin{static_cast<T *>(block_begin)}, _stack_end{_begin},
+        _buffer_end{_begin + capacity} {}
+
+  ~Stack() { clear(); }
 
   T const &operator[](std::size_t index) const noexcept {
     return _begin[index];

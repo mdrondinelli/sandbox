@@ -106,6 +106,10 @@
     ],
     "buildPresets": [
       {
+        "name": "clang-debug",
+        "configurePreset": "clang-debug"
+      },
+      {
         "name": "clang-relwithdebinfo",
         "configurePreset": "clang-relwithdebinfo"
       },

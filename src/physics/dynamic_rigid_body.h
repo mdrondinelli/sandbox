@@ -14,7 +14,7 @@ namespace physics {
 class Dynamic_rigid_body_motion_callback;
 
 struct Dynamic_rigid_body_handle {
-  Handle_value_t value;
+  Object_handle_t value;
 };
 
 struct Dynamic_rigid_body_create_info {

@@ -16,7 +16,7 @@ namespace physics {
 class Particle_motion_callback;
 
 struct Particle_handle {
-  Handle_value_t value;
+  Object_handle_t value;
 };
 
 struct Particle_create_info {

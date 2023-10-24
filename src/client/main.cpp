@@ -334,7 +334,7 @@ int main() {
   physics::Box ground_shape{100.0f, 0.5f, 100.0f};
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{1.0f, 1.0f, 1.0f};
-  physics::Box cotton_box_shape{0.5f, 0.05f, 0.5f};
+  physics::Box cotton_box_shape{0.5f, 0.1f, 0.5f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},

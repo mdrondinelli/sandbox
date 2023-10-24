@@ -14,10 +14,10 @@ struct Space_create_info {
   std::size_t max_dynamic_rigid_bodies{100000};
   std::size_t max_static_rigid_bodies{100000};
   std::size_t max_particle_particle_contacts{10000};
-  std::size_t max_particle_dynamic_rigid_body_contacts{10000};
-  std::size_t max_particle_static_rigid_body_contacts{10000};
-  std::size_t max_dynamic_rigid_body_dynamic_rigid_body_contacts{10000};
-  std::size_t max_dynamic_rigid_body_static_rigid_body_contacts{10000};
+  std::size_t max_particle_rigid_body_contacts{10000};
+  std::size_t max_particle_static_body_contacts{10000};
+  std::size_t max_rigid_body_rigid_body_contacts{10000};
+  std::size_t max_rigid_body_static_body_contacts{10000};
   std::size_t max_island_object_count{1000};
   std::size_t max_island_contact_count{10000};
   std::size_t position_iterations_multiplier{2};
