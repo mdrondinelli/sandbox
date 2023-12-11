@@ -13,7 +13,18 @@ add_executable(
   math_tests
   "src/math/mat.cpp"
   "src/math/quat.cpp"
-  "src/math/vec.cpp")
+  "src/math/vec.cpp"
+)
+add_library(
+  util
+  "src/util/memory.cpp"
+)
+add_executable(
+  util_tests
+  "src/util/map_tests.cpp"
+  "src/util/memory_tests.cpp"
+  "src/util/stack_tests.cpp"
+)
 add_library(
   graphics
   "src/graphics/gl/default_render_target.cpp"
@@ -27,10 +38,12 @@ add_library(
   "src/graphics/gl/unique_shader_program_handle.cpp"
   "src/graphics/gl/unique_texture_handle.cpp"
   "src/graphics/gl/unique_vertex_array_handle.cpp"
-  "src/graphics/glad/glad.cpp")
+  "src/graphics/glad/glad.cpp"
+)
 add_library(
   physics
-  "src/physics/space.cpp")
+  "src/physics/space.cpp"
+)
 set(
   CLIENT_SOURCES
   "src/client/application_loop.cpp"
@@ -38,17 +51,19 @@ set(
   "src/client/glfw_instance.cpp"
   "src/client/glfw_window.cpp"
   "src/client/static_prop.cpp"
-  "src/client/test_entity.cpp")
-add_executable(
-  client ${CLIENT_SOURCES} "src/client/main.cpp")
+  "src/client/test_entity.cpp"
+)
+add_executable(client ${CLIENT_SOURCES} "src/client/main.cpp")
 add_executable(client_tests ${CLIENT_SOURCES})
-set_target_properties(client graphics physics PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set_target_properties(util physics graphics client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+set_target_properties(math_tests util_tests PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)
 target_include_directories(client PRIVATE include)
 target_include_directories(client_tests PRIVATE include)
 target_include_directories(graphics PRIVATE include)
 target_include_directories(physics PRIVATE include)
-target_link_libraries(client glfw graphics physics)
+target_link_libraries(client glfw util graphics physics)
 target_link_libraries(client_tests glfw Catch2::Catch2WithMain)
 target_link_libraries(math_tests Catch2::Catch2WithMain)
 target_link_libraries(graphics ${CMAKE_SOURCE_DIR}/lib/ktx.lib)
+target_link_libraries(util_tests util Catch2::Catch2WithMain)

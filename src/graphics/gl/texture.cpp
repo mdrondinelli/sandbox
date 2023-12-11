@@ -26,9 +26,8 @@ ktxTexture *create_ktx_texture(Texture_create_info const &create_info) {
     assert(source.data != nullptr);
     assert(source.size != 0);
     auto const result = ktxTexture2_CreateFromMemory(
-        static_cast<ktx_uint8_t const *>(source.data),
-        static_cast<ktx_size_t>(source.size), KTX_TEXTURE_CREATE_NO_FLAGS,
-        &retval);
+        source.data, static_cast<ktx_size_t>(source.size),
+        KTX_TEXTURE_CREATE_NO_FLAGS, &retval);
     if (result != KTX_SUCCESS) {
       throw std::runtime_error{"Failed to create ktx texture"};
     }

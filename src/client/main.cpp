@@ -51,7 +51,7 @@ client::Unique_glfw_window_ptr create_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  return client::make_unique_glfw_window(1280, 720, "title");
+  return client::make_unique_glfw_window(1920, 1280, "title");
 }
 
 std::unique_ptr<graphics::Gl_graphics> create_graphics(GLFWwindow *window) {
@@ -326,7 +326,7 @@ int main() {
                                   {0.0f, 0.0f, 100.0f, 0.0f}}});
   scene->add_surface(ground_surface.get());
   physics::Space space{{.position_iterations_multiplier = 1,
-                        .velocity_iterations_multiplier = 1,
+                        .velocity_iterations_multiplier = 3,
                         .gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
   physics::Material const physics_material{.static_friction_coefficient = 0.4f,
                                            .dynamic_friction_coefficient = 0.4f,

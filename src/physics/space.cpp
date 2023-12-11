@@ -7,7 +7,6 @@
 
 #include <ankerl/unordered_dense.h>
 
-#include "../util/contiguous_storage.h"
 #include "../util/stack.h"
 #include "aabb_tree.h"
 
@@ -180,6 +179,7 @@ public:
     auto const index = _free_indices.back();
     _free_indices.pop_back();
     _occupancy_bits[index] = true;
+    // TODO: FIX UNDEFINED BEHAVIOR, Particle_data object lifetime never starts
     return Particle_handle{index};
   }
 
@@ -321,7 +321,7 @@ class Object_stack {
 public:
   static constexpr std::size_t
   memory_requirement(std::size_t capacity) noexcept {
-    return Stack_allocator::memory_requirement(
+    return Stack_allocator<>::memory_requirement(
         {Stack<Object_type>::memory_requirement(capacity),
          Stack<Object_handle_t>::memory_requirement(capacity)});
   }
@@ -329,9 +329,9 @@ public:
   explicit Object_stack(Block block, std::size_t capacity) noexcept
       : _impl{[&]() {
           auto allocator = Stack_allocator{block};
-          auto const object_types_block = allocator.allocate(
-              Stack<Object_type>::memory_requirement(capacity));
-          auto const object_handles_block = allocator.allocate(
+          auto const object_types_block =
+              allocator.alloc(Stack<Object_type>::memory_requirement(capacity));
+          auto const object_handles_block = allocator.alloc(
               Stack<Object_handle_t>::memory_requirement(capacity));
           return Impl{
               .object_types =
@@ -384,7 +384,7 @@ class Contact_stack {
 public:
   static constexpr std::size_t
   memory_requirement(std::size_t capacity) noexcept {
-    return Stack_allocator::memory_requirement(
+    return Stack_allocator<>::memory_requirement(
         {Stack<Contact_type>::memory_requirement(capacity),
          Stack<Contact *>::memory_requirement(capacity)});
   }
@@ -392,10 +392,10 @@ public:
   explicit Contact_stack(Block block, std::size_t const capacity) noexcept
       : _impl{[&]() {
           auto allocator = Stack_allocator{block};
-          auto const contact_types_block = allocator.allocate(
+          auto const contact_types_block = allocator.alloc(
               Stack<Contact_type>::memory_requirement(capacity));
-          auto const contacts_block = allocator.allocate(
-              Stack<Contact *>::memory_requirement(capacity));
+          auto const contacts_block =
+              allocator.alloc(Stack<Contact *>::memory_requirement(capacity));
           return Impl{
               .contact_types =
                   Stack<Contact_type>{contact_types_block.begin, capacity},
@@ -532,8 +532,8 @@ private:
 // class Contact_heap_node {
 // public:
 //   explicit Contact_heap_node(Contact_type contact_type, Contact *contact,
-//                              Contact_heap_node *parent, Contact_heap_node *left,
-//                              Contact_heap_node *right)
+//                              Contact_heap_node *parent, Contact_heap_node
+//                              *left, Contact_heap_node *right)
 //       : contact_type{contact_type}, contact{contact}, parent{parent},
 //         left{left}, right{right} {}
 
@@ -2377,7 +2377,7 @@ Space::Space(Space_create_info const &create_info)
             decltype(Impl::_island_contacts)::memory_requirement(
                 create_info.max_island_contact_count);
         auto const total_memory_requirement =
-            Stack_allocator::memory_requirement(
+            Stack_allocator<>::memory_requirement(
                 {close_particle_particle_pairs_memory_requirement,
                  close_particle_rigid_body_pairs_memory_requirement,
                  close_particle_static_body_pairs_memory_requirement,
@@ -2401,59 +2401,52 @@ Space::Space(Space_create_info const &create_info)
               make_block(system_allocation, total_memory_requirement)};
           return std::make_unique<Impl>(
               create_info, system_allocation,
-              allocator
-                  .allocate(close_particle_particle_pairs_memory_requirement)
+              allocator.alloc(close_particle_particle_pairs_memory_requirement)
                   .begin,
               allocator
-                  .allocate(close_particle_rigid_body_pairs_memory_requirement)
+                  .alloc(close_particle_rigid_body_pairs_memory_requirement)
                   .begin,
               allocator
-                  .allocate(close_particle_static_body_pairs_memory_requirement)
+                  .alloc(close_particle_static_body_pairs_memory_requirement)
                   .begin,
               allocator
-                  .allocate(
-                      close_rigid_body_rigid_body_pairs_memory_requirement)
+                  .alloc(close_rigid_body_rigid_body_pairs_memory_requirement)
                   .begin,
               allocator
-                  .allocate(
-                      close_rigid_body_static_body_pairs_memory_requirement)
+                  .alloc(close_rigid_body_static_body_pairs_memory_requirement)
                   .begin,
-              allocator.allocate(particle_particle_contacts_memory_requirement)
+              allocator.alloc(particle_particle_contacts_memory_requirement)
                   .begin,
-              allocator
-                  .allocate(particle_rigid_body_contacts_memory_requirement)
+              allocator.alloc(particle_rigid_body_contacts_memory_requirement)
                   .begin,
-              allocator
-                  .allocate(particle_static_body_contacts_memory_requirement)
+              allocator.alloc(particle_static_body_contacts_memory_requirement)
                   .begin,
-              allocator
-                  .allocate(rigid_body_rigid_body_contacts_memory_requirement)
+              allocator.alloc(rigid_body_rigid_body_contacts_memory_requirement)
                   .begin,
               allocator
-                  .allocate(rigid_body_static_body_contacts_memory_requirement)
+                  .alloc(rigid_body_static_body_contacts_memory_requirement)
                   .begin,
               allocator
-                  .allocate(
-                      particle_particle_contact_pointers_memory_requirement)
+                  .alloc(particle_particle_contact_pointers_memory_requirement)
                   .begin,
               allocator
-                  .allocate(
+                  .alloc(
                       particle_rigid_body_contact_pointers_memory_requirement)
                   .begin,
               allocator
-                  .allocate(
+                  .alloc(
                       particle_static_body_contact_pointers_memory_requirement)
                   .begin,
               allocator
-                  .allocate(
+                  .alloc(
                       rigid_body_rigid_body_contact_pointers_memory_requirement)
                   .begin,
               allocator
-                  .allocate(
+                  .alloc(
                       rigid_body_static_body_contact_pointers_memory_requirement)
                   .begin,
-              allocator.allocate(island_fringe_memory_requirement).begin,
-              allocator.allocate(island_contacts_memory_requirement).begin);
+              allocator.alloc(island_fringe_memory_requirement).begin,
+              allocator.alloc(island_contacts_memory_requirement).begin);
         } else {
           throw std::bad_alloc{};
         }
