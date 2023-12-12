@@ -251,7 +251,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto const tick_duration = 1.0f / tick_rate;
   auto loop = client::Application_loop{{.space = space,
                                         .tick_duration = tick_duration,
-                                        .physics_substep_count = 40}};
+                                        .physics_substep_count = 50}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
   auto fps_frame_accumulator = 0;
@@ -325,8 +325,8 @@ int main() {
                                   {0.0f, 100.0f, 0.0f, -100.0f},
                                   {0.0f, 0.0f, 100.0f, 0.0f}}});
   scene->add_surface(ground_surface.get());
-  physics::Space space{{.position_iterations_multiplier = 1,
-                        .velocity_iterations_multiplier = 3,
+  physics::Space space{{.position_iterations_multiplier = 2,
+                        .velocity_iterations_multiplier = 2,
                         .gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
   physics::Material const physics_material{.static_friction_coefficient = 0.4f,
                                            .dynamic_friction_coefficient = 0.4f,
