@@ -32,10 +32,7 @@ enum class Contact_type {
   dynamic_rigid_body_static_rigid_body
 };
 
-class Contact_heap_node;
-
 struct Contact {
-  Contact_heap_node *heap_node;
   math::Vec3f normal;
   float separation;
   float separating_velocity;
