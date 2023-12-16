@@ -247,11 +247,14 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
                    physics::Space *space,
                    client::Dynamic_prop_manager *cotton_box_manager,
                    client::Test_entity_manager *test_entity_manager) {
-  auto const tick_rate = 60.0f;
+  auto const tick_rate = 64.0f;
   auto const tick_duration = 1.0f / tick_rate;
-  auto loop = client::Application_loop{{.space = space,
-                                        .tick_duration = tick_duration,
-                                        .physics_substep_count = 50}};
+  auto loop =
+      client::Application_loop{{.space = space,
+                                .physics_step_duration = tick_duration,
+                                .physics_substep_count = 16,
+                                .max_physics_island_position_iterations = 128,
+                                .max_physics_island_velocity_iterations = 64}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
   auto fps_frame_accumulator = 0;
@@ -277,8 +280,8 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
       if (box_spawn_timer > 1.0f) {
         box_spawn_timer = 0.0f;
         cotton_box_manager->create(
-            {.position = math::Vec3f{0.0f, 2.5f, 0.0f},
-             .velocity = math::Vec3f{0.0f, 2.0f, 0.0f},
+            {.position = math::Vec3f{0.0f, 20.0f, 0.0f},
+             .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
              .orientation = math::Quatf::axis_angle(
                  math::Vec3f{0.0f, 1.0f, 0.0f}, math::deg_to_rad(45.0f)),
              .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
@@ -310,14 +313,14 @@ int main() {
   auto const resources = create_resources(graphics.get());
   auto const scene = graphics->create_scene_unique({});
   auto const camera = graphics->create_camera_unique(
-      {.zoom = {9.0f / 16.0f, 1.0f},
+      {.zoom = math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f,
        .near_plane_distance = 0.001f,
        .far_plane_distance = 1000.0f,
-       .position = {-3.0f, 3.5f, 3.0f},
+       .position = {-10.0f, 3.5f, 10.0f},
        .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
                                               math::deg_to_rad(-45.0f)) *
                       math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
-                                              math::deg_to_rad(-30.0f))});
+                                              math::deg_to_rad(-15.0f))});
   auto const ground_surface = graphics->create_surface_unique(
       {.mesh = resources.cube_mesh.get(),
        .material = resources.blue_material.get(),
@@ -325,16 +328,14 @@ int main() {
                                   {0.0f, 100.0f, 0.0f, -100.0f},
                                   {0.0f, 0.0f, 100.0f, 0.0f}}});
   scene->add_surface(ground_surface.get());
-  physics::Space space{{.position_iterations_multiplier = 2,
-                        .velocity_iterations_multiplier = 2,
-                        .gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
+  physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
   physics::Material const physics_material{.static_friction_coefficient = 0.4f,
                                            .dynamic_friction_coefficient = 0.4f,
                                            .restitution_coefficient = 0.1f};
   physics::Box ground_shape{100.0f, 0.5f, 100.0f};
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{1.0f, 1.0f, 1.0f};
-  physics::Box cotton_box_shape{0.5f, 0.1f, 0.5f};
+  physics::Box cotton_box_shape{0.3f, 0.88f, 0.3f};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
@@ -372,12 +373,12 @@ int main() {
                          {0.0f, cotton_box_shape.half_height, 0.0f, 0.0f},
                          {0.0f, 0.0f, cotton_box_shape.half_depth, 0.0f}},
        .space = &space,
-       .body_mass = 20.0f,
+       .body_mass = 80.0f,
        .body_inertia_tensor =
-           20.0f * physics::solid_inerta_tensor(cotton_box_shape),
+           80.0f * physics::solid_inerta_tensor(cotton_box_shape),
        .body_shape = cotton_box_shape,
-       .body_material = {.static_friction_coefficient = 0.5f,
-                         .dynamic_friction_coefficient = 0.4f,
+       .body_material = {.static_friction_coefficient = 0.4f,
+                         .dynamic_friction_coefficient = 0.3f,
                          .restitution_coefficient = 0.1f}}};
   client::Test_entity_manager test_entity_manager{
       {.graphics = graphics.get(),
@@ -388,14 +389,14 @@ int main() {
   red_ball_manager.create({.position = {-1.5f, 0.5f, -1.5f}});
   red_ball_manager.create({.position = {1.5f, 0.5f, 1.5f}});
   brick_box_manager.create(
-      {.position = {0.0f, 10.5f, 0.0f},
+      {.position = {0.0f, 10.0f, 0.0f},
        .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
                                               math::deg_to_rad(-45.0f)) *
                       math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
                                               math::deg_to_rad(45.0f))});
-  cotton_box_manager.create(
-      {.position = math::Vec3f{0.0f, 1.5f, 0.0f},
-       .angular_velocity = math::Vec3f{0.0f, 10.0f, 0.0f}});
+  // cotton_box_manager.create(
+  //     {.position = math::Vec3f{0.0f, 1.5f, 0.0f},
+  //      .angular_velocity = math::Vec3f{0.0f, 10.0f, 0.0f}});
   // cotton_box_manager.create(
   //     {.position = math::Vec3f{0.0f, 3.5f, 0.0f},
   //      .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},

@@ -3,7 +3,6 @@
 #include <cstdint>
 
 #include <iostream>
-#include <random>
 
 #include <ankerl/unordered_dense.h>
 
@@ -418,6 +417,29 @@ public:
     return _impl.contacts.data();
   }
 
+  std::variant<Particle_particle_contact *,
+               Particle_dynamic_rigid_body_contact *,
+               Particle_static_rigid_body_contact *,
+               Dynamic_rigid_body_dynamic_rigid_body_contact *,
+               Dynamic_rigid_body_static_rigid_body_contact *>
+  at(std::size_t pos) const noexcept {
+    auto const result = _impl.contacts[pos];
+    switch (_impl.contact_types[pos]) {
+    case Contact_type::particle_particle:
+      return static_cast<Particle_particle_contact *>(result);
+    case Contact_type::particle_dynamic_rigid_body:
+      return static_cast<Particle_dynamic_rigid_body_contact *>(result);
+    case Contact_type::particle_static_rigid_body:
+      return static_cast<Particle_static_rigid_body_contact *>(result);
+    case Contact_type::dynamic_rigid_body_dynamic_rigid_body:
+      return static_cast<Dynamic_rigid_body_dynamic_rigid_body_contact *>(
+          result);
+    case Contact_type::dynamic_rigid_body_static_rigid_body:
+      return static_cast<Dynamic_rigid_body_static_rigid_body_contact *>(
+          result);
+    }
+  }
+
   std::optional<std::variant<Particle_particle_contact *,
                              Particle_dynamic_rigid_body_contact *,
                              Particle_static_rigid_body_contact *,
@@ -531,7 +553,7 @@ private:
 };
 
 auto const damping_factor = 0.99f;
-auto const max_tangential_move_coefficient = 0.2f;
+auto const max_rotational_displacement_coefficient = 0.2f;
 } // namespace
 
 class Space::Impl {
@@ -608,11 +630,6 @@ public:
                        create_info.max_island_object_count},
         _island_contacts{island_contacts_begin,
                          create_info.max_island_contact_count},
-        // _contact_heap{create_info.max_island_contact_count},
-        _position_iterations_multiplier{
-            create_info.position_iterations_multiplier},
-        _velocity_iterations_multiplier{
-            create_info.velocity_iterations_multiplier},
         _gravitational_acceleration{create_info.gravitational_acceleration} {}
 
   ~Impl() { free(_system_allocation); }
@@ -707,7 +724,8 @@ public:
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
       integrate(h);
       find_contacts();
-      solve(h);
+      solve(h, simulate_info.max_island_position_iterations,
+            simulate_info.max_island_velocity_iterations);
     }
     call_particle_motion_callbacks();
     call_dynamic_rigid_body_motion_callbacks();
@@ -715,7 +733,7 @@ public:
 
 private:
   void build_aabb_tree(float delta_time) {
-    auto const constant_safety_term = 0.0f;
+    auto const constant_safety_term = 0.1f;
     auto const velocity_safety_factor = 2.0f;
     auto const gravity_safety_factor = 2.0f;
     auto const gravity_safety_term = gravity_safety_factor *
@@ -1160,7 +1178,8 @@ private:
     }
   }
 
-  void solve(float h) {
+  void solve(float h, int max_island_position_iterations,
+             int max_island_velocity_iterations) {
     auto const gravitational_velocity_delta = _gravitational_acceleration * h;
     auto const max_separating_velocity_for_bounce =
         -2.0f * math::length(gravitational_velocity_delta);
@@ -1249,8 +1268,9 @@ private:
           auto const handle = _island_fringe.pop_back();
           std::visit(island_object_visitor, handle);
         } while (!_island_fringe.empty());
-        solve_current_island(gravitational_velocity_delta,
-                             max_separating_velocity_for_bounce);
+        solve_current_island(
+            max_island_position_iterations, max_island_velocity_iterations,
+            gravitational_velocity_delta, max_separating_velocity_for_bounce);
       }
     });
     _dynamic_rigid_bodies.for_each([&, this](Dynamic_rigid_body_handle handle,
@@ -1263,8 +1283,9 @@ private:
           auto const handle = _island_fringe.pop_back();
           std::visit(island_object_visitor, handle);
         } while (!_island_fringe.empty());
-        solve_current_island(gravitational_velocity_delta,
-                             max_separating_velocity_for_bounce);
+        solve_current_island(
+            max_island_position_iterations, max_island_velocity_iterations,
+            gravitational_velocity_delta, max_separating_velocity_for_bounce);
       }
     });
   }
@@ -1284,14 +1305,11 @@ private:
         });
   }
 
-  void solve_current_island(math::Vec3f const &gravitational_velocity_delta,
+  void solve_current_island(int max_position_iterations,
+                            int max_velocity_iterations,
+                            math::Vec3f const &gravitational_velocity_delta,
                             float max_separating_velocity_for_bounce) {
-    auto const contact_count = _island_contacts.size();
-    auto const position_iterations =
-        _position_iterations_multiplier * contact_count;
-    auto const velocity_iterations =
-        _velocity_iterations_multiplier * contact_count;
-    for (auto i = std::size_t{}; i != position_iterations; ++i) {
+    for (auto i = 0; i != max_position_iterations; ++i) {
       if (auto const contact =
               _island_contacts.find_contact_of_least_separation(-0.001f)) {
         std::visit([this](auto &&arg) { resolve_contact_position(arg); },
@@ -1300,7 +1318,7 @@ private:
         break;
       }
     }
-    for (auto i = std::size_t{}; i != velocity_iterations; ++i) {
+    for (auto i = 0; i != max_velocity_iterations; ++i) {
       if (auto const contact =
               _island_contacts.find_contact_of_least_separating_velocity(
                   -0.001f)) {
@@ -1324,6 +1342,135 @@ private:
         break;
       }
     }
+    // for (auto i = std::size_t{}; i != _position_iterations_multiplier; ++i) {
+    //   for (auto j = std::size_t{}; j != contact_count; ++j) {
+    //     std::visit(
+    //         [this](auto &&arg) {
+    //           if (arg->separation < 0.0f) {
+    //             resolve_contact_position(arg);
+    //           }
+    //         },
+    //         _island_contacts.at(j));
+    //   }
+    // }
+    // for (auto i = std::size_t{}; i != _velocity_iterations_multiplier; ++i) {
+    //   for (auto j = std::size_t{}; j != contact_count; ++j) {
+    //     std::visit(
+    //         [=, this](auto &&arg) {
+    //           using T = std::decay_t<decltype(arg)>;
+    //           if (arg->separating_velocity < 0.0f) {
+    //             if constexpr (
+    //                 std::is_same_v<T, Particle_static_rigid_body_contact *>
+    //                 || std::is_same_v<
+    //                     T, Dynamic_rigid_body_static_rigid_body_contact *>) {
+    //               resolve_contact_velocity(arg, gravitational_velocity_delta,
+    //                                        max_separating_velocity_for_bounce);
+    //             } else {
+    //               resolve_contact_velocity(arg,
+    //                                        max_separating_velocity_for_bounce);
+    //             }
+    //           }
+    //         },
+    //         _island_contacts.at(j));
+    //   }
+    // }
+  }
+
+  struct Positional_constraint_problem {
+    math::Vec3f correction_direction;
+    float correction_distance;
+    std::array<math::Vec3f, 2> relative_position;
+    std::array<float, 2> inverse_mass;
+    std::array<math::Mat3x3f, 2> inverse_inertia_tensor;
+  };
+
+  struct Positional_constraint_solution {
+    std::array<math::Vec3f, 2> delta_position;
+    std::array<math::Vec3f, 2> delta_orientation;
+    float lambda;
+  };
+
+  Positional_constraint_solution
+  solve_positional_constraint(Positional_constraint_problem const &problem) {
+    auto const angular_impulse_per_impulse = std::array<math::Vec3f, 2>{
+        math::cross(problem.relative_position[0], problem.correction_direction),
+        math::cross(problem.relative_position[1], problem.correction_direction),
+    };
+    auto const angular_displacement_per_impulse = std::array<math::Vec3f, 2>{
+        problem.inverse_inertia_tensor[0] * angular_impulse_per_impulse[0],
+        problem.inverse_inertia_tensor[1] * angular_impulse_per_impulse[1],
+    };
+    auto const rotational_displacement_per_impulse = std::array<math::Vec3f, 2>{
+        math::cross(angular_displacement_per_impulse[0],
+                    problem.relative_position[0]),
+        math::cross(angular_displacement_per_impulse[1],
+                    problem.relative_position[1]),
+    };
+    auto const correcting_rotational_displacement_per_impulse =
+        std::array<float, 2>{
+            math::dot(rotational_displacement_per_impulse[0],
+                      problem.correction_direction),
+            math::dot(rotational_displacement_per_impulse[1],
+                      problem.correction_direction),
+        };
+    auto const correcting_translational_displacement_per_impulse =
+        std::array<float, 2>{
+            problem.inverse_mass[0],
+            problem.inverse_mass[1],
+        };
+    auto const correcting_displacement_per_impulse =
+        correcting_translational_displacement_per_impulse[0] +
+        correcting_translational_displacement_per_impulse[1] +
+        correcting_rotational_displacement_per_impulse[0] +
+        correcting_rotational_displacement_per_impulse[1];
+    auto const impulse_per_correcting_displacement =
+        1.0f / correcting_displacement_per_impulse;
+    auto const impulse =
+        problem.correction_distance * impulse_per_correcting_displacement;
+    auto correcting_translational_displacement = std::array<float, 2>{
+        impulse * correcting_translational_displacement_per_impulse[0],
+        impulse * -correcting_translational_displacement_per_impulse[1],
+    };
+    auto correcting_rotational_displacement = std::array<float, 2>{
+        impulse * correcting_rotational_displacement_per_impulse[0],
+        impulse * -correcting_rotational_displacement_per_impulse[1],
+    };
+    auto const max_rotational_displacement =
+        std::array<float, 2>{max_rotational_displacement_coefficient *
+                                 math::length(problem.relative_position[0]),
+                             max_rotational_displacement_coefficient *
+                                 math::length(problem.relative_position[1])};
+    for (auto i = 0; i != 2; ++i) {
+      if (std::abs(correcting_rotational_displacement[i]) >
+          max_rotational_displacement[i]) {
+        auto const body_total_move = correcting_translational_displacement[i] +
+                                     correcting_rotational_displacement[i];
+        correcting_rotational_displacement[i] =
+            std::signbit(correcting_rotational_displacement[i])
+                ? -max_rotational_displacement[i]
+                : max_rotational_displacement[i];
+        correcting_translational_displacement[i] =
+            body_total_move - correcting_rotational_displacement[i];
+      }
+    }
+    auto const delta_position = std::array<math::Vec3f, 2>{
+        problem.correction_direction * correcting_translational_displacement[0],
+        problem.correction_direction * correcting_translational_displacement[1],
+    };
+    auto const angular_velocity_per_correcting_rotational_velocity =
+        std::array<math::Vec3f, 2>{
+            angular_displacement_per_impulse[0] /
+                correcting_rotational_displacement_per_impulse[0],
+            angular_displacement_per_impulse[1] /
+                correcting_rotational_displacement_per_impulse[1]};
+    auto const delta_orientation = std::array<math::Vec3f, 2>{
+        angular_velocity_per_correcting_rotational_velocity[0] *
+            correcting_rotational_displacement[0],
+        angular_velocity_per_correcting_rotational_velocity[1] *
+            correcting_rotational_displacement[1]};
+    return {.delta_position = delta_position,
+            .delta_orientation = delta_orientation,
+            .lambda = impulse};
   }
 
   void resolve_contact_position(Particle_particle_contact *contact) {
@@ -1384,7 +1531,7 @@ private:
     auto body_tangential_move =
         impulse * body_separating_tangential_velocity_per_impulse;
     auto const body_max_tangential_move_magnitude =
-        max_tangential_move_coefficient *
+        max_rotational_displacement_coefficient *
         math::length(body_relative_contact_position);
     if (std::abs(body_tangential_move) > body_max_tangential_move_magnitude) {
       auto const body_total_move = body_linear_move + body_tangential_move;
@@ -1420,170 +1567,159 @@ private:
 
   void resolve_contact_position(
       Dynamic_rigid_body_dynamic_rigid_body_contact *contact) {
-    auto const bodies = contact->bodies;
-    auto const body_datas = std::array<Dynamic_rigid_body_data *, 2>{
-        _dynamic_rigid_bodies.data(bodies[0]),
-        _dynamic_rigid_bodies.data(bodies[1])};
-    auto const body_rotations = std::array<math::Mat3x3f, 2>{
-        math::Mat3x3f::rotation(body_datas[0]->orientation),
-        math::Mat3x3f::rotation(body_datas[1]->orientation)};
-    auto const body_inverse_rotations = std::array<math::Mat3x3f, 2>{
-        math::transpose(body_rotations[0]), math::transpose(body_rotations[1])};
-    auto const body_inverse_inertia_tensors = std::array<math::Mat3x3f, 2>{
-        body_rotations[0] * body_datas[0]->inverse_inertia_tensor *
-            body_inverse_rotations[0],
-        body_rotations[1] * body_datas[1]->inverse_inertia_tensor *
-            body_inverse_rotations[1]};
-    auto const body_relative_contact_positions =
-        contact->body_relative_positions;
-    auto const body_angular_impulses_per_impulse = std::array<math::Vec3f, 2>{
-        math::cross(body_relative_contact_positions[0], contact->normal),
-        math::cross(body_relative_contact_positions[1], contact->normal)};
-    auto const body_angular_velocities_per_impulse = std::array<math::Vec3f, 2>{
-        body_inverse_inertia_tensors[0] * body_angular_impulses_per_impulse[0],
-        body_inverse_inertia_tensors[1] * body_angular_impulses_per_impulse[1]};
-    auto const body_tangential_velocities_per_impulse =
-        std::array<math::Vec3f, 2>{
-            math::cross(body_angular_velocities_per_impulse[0],
-                        body_relative_contact_positions[0]),
-            math::cross(body_angular_velocities_per_impulse[1],
-                        body_relative_contact_positions[1])};
-    auto const body_separating_linear_velocities_per_impulse =
-        std::array<float, 2>{body_datas[0]->inverse_mass,
-                             body_datas[1]->inverse_mass};
-    auto const body_separating_tangential_velocities_per_impulse =
-        std::array<float, 2>{
-            math::dot(body_tangential_velocities_per_impulse[0],
-                      contact->normal),
-            math::dot(body_tangential_velocities_per_impulse[1],
-                      contact->normal)};
-    auto const separating_velocity_per_impulse =
-        body_separating_linear_velocities_per_impulse[0] +
-        body_separating_linear_velocities_per_impulse[1] +
-        body_separating_tangential_velocities_per_impulse[0] +
-        body_separating_tangential_velocities_per_impulse[1];
-    auto const impulse_per_separating_velocity =
-        1.0f / separating_velocity_per_impulse;
-    auto const impulse = contact->separation * impulse_per_separating_velocity;
-    auto body_linear_moves = std::array<float, 2>{
-        impulse * -body_separating_linear_velocities_per_impulse[0],
-        impulse * body_separating_linear_velocities_per_impulse[1]};
-    auto body_tangential_moves = std::array<float, 2>{
-        impulse * -body_separating_tangential_velocities_per_impulse[0],
-        impulse * body_separating_tangential_velocities_per_impulse[1]};
-    auto const body_max_tangential_move_magnitudes = std::array<float, 2>{
-        max_tangential_move_coefficient *
-            math::length(body_relative_contact_positions[0]),
-        max_tangential_move_coefficient *
-            math::length(body_relative_contact_positions[1])};
-    for (auto i = 0; i != 2; ++i) {
-      if (std::abs(body_tangential_moves[i]) >
-          body_max_tangential_move_magnitudes[i]) {
-        auto const body_total_move =
-            body_linear_moves[i] + body_tangential_moves[i];
-        body_tangential_moves[i] = std::signbit(body_tangential_moves[i])
-                                       ? -body_max_tangential_move_magnitudes[i]
-                                       : body_max_tangential_move_magnitudes[i];
-        body_linear_moves[i] = body_total_move - body_tangential_moves[i];
+    auto const data = std::array<Dynamic_rigid_body_data *, 2>{
+        _dynamic_rigid_bodies.data(contact->bodies[0]),
+        _dynamic_rigid_bodies.data(contact->bodies[1])};
+    auto const previous_position = std::array<math::Vec3f, 2>{
+        data[0]->previous_position, data[1]->previous_position};
+    auto const position =
+        std::array<math::Vec3f, 2>{data[0]->position, data[1]->position};
+    auto const previous_rotation = std::array<math::Mat3x3f, 2>{
+        math::Mat3x3f::rotation(data[0]->previous_orientation),
+        math::Mat3x3f::rotation(data[1]->previous_orientation)};
+    auto const rotation = std::array<math::Mat3x3f, 2>{
+        math::Mat3x3f::rotation(data[0]->orientation),
+        math::Mat3x3f::rotation(data[1]->orientation)};
+    auto const inverse_rotation = std::array<math::Mat3x3f, 2>{
+        math::transpose(rotation[0]), math::transpose(rotation[1])};
+    auto const inverse_ineratia_tensor = std::array<math::Mat3x3f, 2>{
+        rotation[0] * data[0]->inverse_inertia_tensor * inverse_rotation[0],
+        rotation[1] * data[1]->inverse_inertia_tensor * inverse_rotation[1],
+    };
+    auto const relative_contact_position = std::array<math::Vec3f, 2>{
+        contact->body_relative_positions[0],
+        contact->body_relative_positions[1],
+    };
+    auto const previous_contact_position = std::array<math::Vec3f, 2>{
+        previous_position[0] + previous_rotation[0] * inverse_rotation[0] *
+                                   relative_contact_position[0],
+        previous_position[1] + previous_rotation[1] * inverse_rotation[1] *
+                                   relative_contact_position[1],
+    };
+    auto const contact_position = std::array<math::Vec3f, 2>{
+        position[0] + relative_contact_position[0],
+        position[1] + relative_contact_position[1],
+    };
+    auto const delta_contact_position = std::array<math::Vec3f, 2>{
+        contact_position[0] - previous_contact_position[0],
+        contact_position[1] - previous_contact_position[1],
+    };
+    auto const relative_delta_contact_position =
+        delta_contact_position[0] - delta_contact_position[1];
+    auto const tangential_relative_delta_contact_position =
+        relative_delta_contact_position -
+        math::dot(relative_delta_contact_position, contact->normal) *
+            contact->normal;
+    auto const separation_solution = solve_positional_constraint(
+        {.correction_direction = contact->normal,
+         .correction_distance = -contact->separation,
+         .relative_position = relative_contact_position,
+         .inverse_mass = {data[0]->inverse_mass, data[1]->inverse_mass},
+         .inverse_inertia_tensor = inverse_ineratia_tensor});
+    auto delta_position = separation_solution.delta_position;
+    auto delta_orientation = separation_solution.delta_orientation;
+    if (tangential_relative_delta_contact_position != math::Vec3f::zero()) {
+      auto const correction_distance =
+          math::length(tangential_relative_delta_contact_position);
+      auto const correction_direction =
+          tangential_relative_delta_contact_position / -correction_distance;
+      auto const friction_solution = solve_positional_constraint(
+          {.correction_direction = correction_direction,
+           .correction_distance = correction_distance,
+           .relative_position = relative_contact_position,
+           .inverse_mass = {data[0]->inverse_mass, data[1]->inverse_mass},
+           .inverse_inertia_tensor = inverse_ineratia_tensor});
+      auto const static_friction_coefficient =
+          0.5f * (data[0]->material.static_friction_coefficient +
+                  data[1]->material.static_friction_coefficient);
+      if (friction_solution.lambda <
+          static_friction_coefficient * separation_solution.lambda) {
+        for (auto i = 0; i != 2; ++i) {
+          delta_position[i] += friction_solution.delta_position[i];
+        }
+        for (auto i = 0; i != 2; ++i) {
+          delta_orientation[i] += friction_solution.delta_orientation[i];
+        }
       }
     }
-    auto const body_position_deltas =
-        std::array<math::Vec3f, 2>{contact->normal * body_linear_moves[0],
-                                   contact->normal * body_linear_moves[1]};
-    auto const body_angular_velocities_per_separating_tangential_velocity =
-        std::array<math::Vec3f, 2>{
-            body_angular_velocities_per_impulse[0] /
-                body_separating_tangential_velocities_per_impulse[0],
-            body_angular_velocities_per_impulse[1] /
-                body_separating_tangential_velocities_per_impulse[1]};
-    auto const body_orientation_deltas = std::array<math::Vec3f, 2>{
-        body_angular_velocities_per_separating_tangential_velocity[0] *
-            body_tangential_moves[0],
-        body_angular_velocities_per_separating_tangential_velocity[1] *
-            body_tangential_moves[1]};
     for (auto i = 0; i != 2; ++i) {
-      body_datas[i]->position += body_position_deltas[i];
-      body_datas[i]->orientation +=
-          0.5f * math::Quatf{0.0f, body_orientation_deltas[i]} *
-          body_datas[i]->orientation;
+      data[i]->position += delta_position[i];
+      data[i]->orientation +=
+          0.5f * math::Quatf{0.0f, delta_orientation[i]} * data[i]->orientation;
       // body_datas[i]->orientation =
       // math::normalize(body_datas[i]->orientation);
       update_dynamic_rigid_body_contact_separations(
-          bodies[i], body_position_deltas[i], body_orientation_deltas[i]);
+          contact->bodies[i], delta_position[i], delta_orientation[i]);
     }
   }
 
   void resolve_contact_position(
       Dynamic_rigid_body_static_rigid_body_contact *contact) {
-    auto const dynamic_body = contact->dynamic_body;
-    auto const dynamic_body_data = _dynamic_rigid_bodies.data(dynamic_body);
-    auto const dynamic_body_rotation =
+    auto const dynamic_body_data =
+        _dynamic_rigid_bodies.data(contact->dynamic_body);
+    auto const static_body_data =
+        _static_rigid_bodies.data(contact->static_body);
+    auto const previous_position = dynamic_body_data->previous_position;
+    auto const position = dynamic_body_data->position;
+    auto const previous_rotation =
+        math::Mat3x3f::rotation(dynamic_body_data->previous_orientation);
+    auto const rotation =
         math::Mat3x3f::rotation(dynamic_body_data->orientation);
-    auto const dynamic_body_inverse_rotation =
-        math::transpose(dynamic_body_rotation);
-    auto const dynamic_body_inverse_inertia_tensor =
-        dynamic_body_rotation * dynamic_body_data->inverse_inertia_tensor *
-        dynamic_body_inverse_rotation;
-    auto const dynamic_body_relative_contact_position =
+    auto const inverse_rotation = math::transpose(rotation);
+    auto const inverse_inertia_tensor =
+        rotation * dynamic_body_data->inverse_inertia_tensor * inverse_rotation;
+    auto const relative_contact_position =
         contact->dynamic_body_relative_position;
-    auto const dynamic_body_angular_impulse_per_impulse =
-        math::cross(dynamic_body_relative_contact_position, contact->normal);
-    auto const dynamic_body_angular_velocity_per_impulse =
-        dynamic_body_inverse_inertia_tensor *
-        dynamic_body_angular_impulse_per_impulse;
-    auto const dynamic_body_tangential_velocity_per_impulse =
-        math::cross(dynamic_body_angular_velocity_per_impulse,
-                    dynamic_body_relative_contact_position);
-    auto const dynamic_body_separating_linear_velocity_per_impulse =
-        dynamic_body_data->inverse_mass;
-    auto const dynamic_body_separating_tangential_velocity_per_impulse =
-        math::dot(dynamic_body_tangential_velocity_per_impulse,
-                  contact->normal);
-    auto const separating_velocity_per_impulse =
-        dynamic_body_separating_linear_velocity_per_impulse +
-        dynamic_body_separating_tangential_velocity_per_impulse;
-    auto const impulse_per_separating_velocity =
-        1.0f / separating_velocity_per_impulse;
-    auto dynamic_body_linear_move =
-        -contact->separation *
-        dynamic_body_separating_linear_velocity_per_impulse *
-        impulse_per_separating_velocity;
-    auto dynamic_body_tangential_move =
-        -contact->separation *
-        dynamic_body_separating_tangential_velocity_per_impulse *
-        impulse_per_separating_velocity;
-    auto const dynamic_body_max_tangential_move_magnitude =
-        max_tangential_move_coefficient *
-        math::length(dynamic_body_relative_contact_position);
-    if (std::abs(dynamic_body_tangential_move) >
-        dynamic_body_max_tangential_move_magnitude) {
-      auto const dynamic_body_total_move =
-          dynamic_body_linear_move + dynamic_body_tangential_move;
-      dynamic_body_tangential_move =
-          std::signbit(dynamic_body_tangential_move)
-              ? -dynamic_body_max_tangential_move_magnitude
-              : dynamic_body_max_tangential_move_magnitude;
-      dynamic_body_linear_move =
-          dynamic_body_total_move - dynamic_body_tangential_move;
+    auto const previous_contact_position =
+        previous_position +
+        previous_rotation * inverse_rotation * relative_contact_position;
+    auto const contact_position = position + relative_contact_position;
+    auto const delta_contact_position =
+        contact_position - previous_contact_position;
+    auto const tangential_delta_contact_position =
+        delta_contact_position -
+        math::dot(delta_contact_position, contact->normal) * contact->normal;
+    auto const separation_solution = solve_positional_constraint(
+        {.correction_direction = contact->normal,
+         .correction_distance = -contact->separation,
+         .relative_position = {contact->dynamic_body_relative_position,
+                               math::Vec3f::zero()},
+         .inverse_mass = {dynamic_body_data->inverse_mass, 0.0f},
+         .inverse_inertia_tensor = {inverse_inertia_tensor,
+                                    math::Mat3x3f::zero()}});
+    auto delta_position = separation_solution.delta_position[0];
+    auto delta_orientation = separation_solution.delta_orientation[0];
+    if (tangential_delta_contact_position != math::Vec3f::zero()) {
+      auto const correction_distance =
+          math::length(tangential_delta_contact_position);
+      auto const correction_direction =
+          tangential_delta_contact_position / -correction_distance;
+      auto const friction_solution = solve_positional_constraint(
+          {.correction_direction = correction_direction,
+           .correction_distance = correction_distance,
+           .relative_position = {relative_contact_position,
+                                 math::Vec3f::zero()},
+           .inverse_mass = {dynamic_body_data->inverse_mass, 0.0f},
+           .inverse_inertia_tensor = {inverse_inertia_tensor,
+                                      math::Mat3x3f::zero()}});
+      auto const static_friction_coefficient =
+          0.5f * (dynamic_body_data->material.static_friction_coefficient +
+                  static_body_data->material.static_friction_coefficient);
+      if (friction_solution.lambda <
+          static_friction_coefficient * separation_solution.lambda) {
+        delta_position += friction_solution.delta_position[0];
+        delta_orientation += friction_solution.delta_orientation[0];
+      }
     }
-    auto const dynamic_body_position_delta =
-        contact->normal * dynamic_body_linear_move;
-    auto const
-        dynamic_body_angular_velocity_per_separating_tangential_velocity =
-            dynamic_body_angular_velocity_per_impulse /
-            dynamic_body_separating_tangential_velocity_per_impulse;
-    auto const dynamic_body_orientation_delta =
-        dynamic_body_angular_velocity_per_separating_tangential_velocity *
-        dynamic_body_tangential_move;
-    dynamic_body_data->position += dynamic_body_position_delta;
-    dynamic_body_data->orientation +=
-        0.5f * math::Quatf{0.0f, dynamic_body_orientation_delta} *
-        dynamic_body_data->orientation;
+    dynamic_body_data->position += delta_position;
+    dynamic_body_data->orientation += 0.5f *
+                                      math::Quatf{0.0f, delta_orientation} *
+                                      dynamic_body_data->orientation;
     // dynamic_body_data->orientation =
     //     math::normalize(dynamic_body_data->orientation);
     update_dynamic_rigid_body_contact_separations(
-        dynamic_body, dynamic_body_position_delta,
-        dynamic_body_orientation_delta);
+        contact->dynamic_body, separation_solution.delta_position[0],
+        separation_solution.delta_orientation[0]);
   }
 
   void update_particle_contact_separations(Particle_handle particle,
@@ -2218,9 +2354,6 @@ private:
       _rigid_body_static_body_contact_pointers;
   Object_stack _island_fringe;
   Contact_stack _island_contacts;
-  // Contact_heap _contact_heap;
-  std::size_t _position_iterations_multiplier;
-  std::size_t _velocity_iterations_multiplier;
   math::Vec3f _gravitational_acceleration;
 };
 

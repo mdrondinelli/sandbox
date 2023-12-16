@@ -20,14 +20,14 @@ struct Space_create_info {
   std::size_t max_rigid_body_static_body_contacts{10000};
   std::size_t max_island_object_count{1000};
   std::size_t max_island_contact_count{10000};
-  std::size_t position_iterations_multiplier{2};
-  std::size_t velocity_iterations_multiplier{2};
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 
 struct Space_simulate_info {
   float delta_time;
-  int substep_count{1};
+  int substep_count{32};
+  int max_island_position_iterations{64};
+  int max_island_velocity_iterations{64};
 };
 
 class Space {
