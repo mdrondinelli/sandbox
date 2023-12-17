@@ -51,7 +51,7 @@ client::Unique_glfw_window_ptr create_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  return client::make_unique_glfw_window(1920, 1280, "title");
+  return client::make_unique_glfw_window(1280, 720, "title");
 }
 
 std::unique_ptr<graphics::Gl_graphics> create_graphics(GLFWwindow *window) {
@@ -75,9 +75,9 @@ graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
   retval.brick_base_color_texture = create_texture(
-      graphics, "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
+      graphics, "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
   retval.striped_cotton_base_color_texture = create_texture(
-      graphics, "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
+      graphics, "C:/Users/marlo/rendering-engine/res/StripedCotton01_2K_BaseColor.ktx");
   retval.brick_material = graphics->create_material_unique(
       {.base_color_texture = retval.brick_base_color_texture.get()});
   retval.striped_cotton_material = graphics->create_material_unique(
@@ -252,8 +252,8 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto loop =
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
-                                .physics_substep_count = 16,
-                                .max_physics_island_position_iterations = 128,
+                                .physics_substep_count = 32,
+                                .max_physics_island_position_iterations = 64,
                                 .max_physics_island_velocity_iterations = 64}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
@@ -313,14 +313,14 @@ int main() {
   auto const resources = create_resources(graphics.get());
   auto const scene = graphics->create_scene_unique({});
   auto const camera = graphics->create_camera_unique(
-      {.zoom = math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f,
+      {.zoom = math::Vec2f{9.0f / 16.0f, 1.0f} * 5.0f,
        .near_plane_distance = 0.001f,
        .far_plane_distance = 1000.0f,
        .position = {-10.0f, 3.5f, 10.0f},
        .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
                                               math::deg_to_rad(-45.0f)) *
                       math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
-                                              math::deg_to_rad(-15.0f))});
+                                              math::deg_to_rad(-12.0f))});
   auto const ground_surface = graphics->create_surface_unique(
       {.mesh = resources.cube_mesh.get(),
        .material = resources.blue_material.get(),
