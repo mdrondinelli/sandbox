@@ -167,7 +167,7 @@ public:
       : _data{std::make_unique<std::byte[]>(size * sizeof(Particle_data))},
         _free_indices(size), _occupancy_bits(size) {
     for (auto i = std::size_t{}; i != size; ++i) {
-      _free_indices[i] = size - i - 1;
+      _free_indices[i] = static_cast<std::uint32_t>(size - i - 1);
     }
   }
 
@@ -217,7 +217,7 @@ public:
                                             sizeof(Dynamic_rigid_body_data))},
         _free_indices(size), _occupancy_bits(size) {
     for (auto i = std::size_t{}; i != size; ++i) {
-      _free_indices[i] = size - i - 1;
+      _free_indices[i] = static_cast<std::uint32_t>(size - i - 1);
     }
   }
 
@@ -269,7 +269,7 @@ public:
                                             sizeof(Static_rigid_body_data))},
         _free_indices(size), _occupancy_bits(size) {
     for (auto i = std::size_t{}; i != size; ++i) {
-      _free_indices[i] = size - i - 1;
+      _free_indices[i] = static_cast<std::uint32_t>(size - i - 1);
     }
   }
 
@@ -364,6 +364,7 @@ public:
     case Object_type::dynamic_rigid_body:
       return Dynamic_rigid_body_handle{object_handle_value};
     case Object_type::static_rigid_body:
+    default:
       math::unreachable();
     }
   }
@@ -469,6 +470,8 @@ public:
       case Contact_type::dynamic_rigid_body_static_rigid_body:
         return static_cast<Dynamic_rigid_body_static_rigid_body_contact *>(
             *result);
+      default:
+        math::unreachable();
       }
     } else {
       return std::nullopt;
@@ -505,6 +508,8 @@ public:
       case Contact_type::dynamic_rigid_body_static_rigid_body:
         return static_cast<Dynamic_rigid_body_static_rigid_body_contact *>(
             *result);
+      default:
+        math::unreachable();
       }
     } else {
       return std::nullopt;
@@ -837,24 +842,25 @@ private:
     integrate_dynamic_rigid_bodies(h, time_compensated_damping_factor);
   }
 
-  void integrate_particles(float h, float damping_factor) {
+  void integrate_particles(float h, float time_compensated_damping_factor) {
     _particles.for_each([&](Particle_handle, Particle_data *data) {
       data->previous_position = data->position;
       data->velocity += h * _gravitational_acceleration;
-      data->velocity *= damping_factor;
+      data->velocity *= time_compensated_damping_factor;
       data->position += h * data->velocity;
     });
   }
 
-  void integrate_dynamic_rigid_bodies(float h, float damping_factor) {
+  void integrate_dynamic_rigid_bodies(float h,
+                                      float time_compensated_damping_factor) {
     _dynamic_rigid_bodies.for_each(
         [&](Dynamic_rigid_body_handle, Dynamic_rigid_body_data *data) {
           data->previous_position = data->position;
           data->velocity += h * _gravitational_acceleration;
-          data->velocity *= damping_factor;
+          data->velocity *= time_compensated_damping_factor;
           data->position += h * data->velocity;
           data->previous_orientation = data->orientation;
-          data->angular_velocity *= damping_factor;
+          data->angular_velocity *= time_compensated_damping_factor;
           data->orientation += 0.5f *
                                math::Quatf{0.0f, h * data->angular_velocity} *
                                data->orientation;
@@ -1265,8 +1271,7 @@ private:
         _island_fringe.push_back(handle);
         _island_contacts.clear();
         do {
-          auto const handle = _island_fringe.pop_back();
-          std::visit(island_object_visitor, handle);
+          std::visit(island_object_visitor, _island_fringe.pop_back());
         } while (!_island_fringe.empty());
         solve_current_island(
             max_island_position_iterations, max_island_velocity_iterations,
@@ -1280,8 +1285,7 @@ private:
         _island_fringe.push_back(handle);
         _island_contacts.clear();
         do {
-          auto const handle = _island_fringe.pop_back();
-          std::visit(island_object_visitor, handle);
+          std::visit(island_object_visitor, _island_fringe.pop_back());
         } while (!_island_fringe.empty());
         solve_current_island(
             max_island_position_iterations, max_island_velocity_iterations,

@@ -25,7 +25,7 @@ constexpr Block make_block(void *begin, std::size_t size) noexcept {
 }
 
 constexpr std::size_t align(std::size_t size, std::size_t alignment) noexcept {
-  return (size + alignment - 1) & -alignment;
+  return (size + alignment - 1) & (~alignment + 1);
 }
 
 inline std::ptrdiff_t ptrdiff(void const *p1, void const *p2) noexcept {
