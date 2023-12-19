@@ -176,10 +176,10 @@ public:
       throw std::runtime_error{"Out of space for particles"};
     }
     auto const index = _free_indices.back();
+    auto const handle = Particle_handle{index};
     _free_indices.pop_back();
     _occupancy_bits[index] = true;
-    // TODO: FIX UNDEFINED BEHAVIOR, Particle_data object lifetime never starts
-    return Particle_handle{index};
+    return handle;
   }
 
   void free(Particle_handle handle) {
@@ -887,22 +887,6 @@ private:
     reset_dynamic_rigid_body_contact_counts();
   }
 
-  void find_and_count_contacts() {
-    find_and_count_particle_particle_contacts();
-    find_and_count_particle_static_rigid_body_contacts();
-    find_and_count_particle_dynamic_rigid_body_contacts();
-    find_and_count_dynamic_rigid_body_static_rigid_body_contacts();
-    find_and_count_dynamic_rigid_body_dynamic_rigid_body_contacts();
-  }
-
-  void reset_contact_pointer_storage() {
-    _particle_particle_contact_pointers.clear();
-    _particle_rigid_body_contact_pointers.clear();
-    _particle_static_body_contact_pointers.clear();
-    _rigid_body_rigid_body_contact_pointers.clear();
-    _rigid_body_static_body_contact_pointers.clear();
-  }
-
   void reset_particle_contact_counts() {
     _particles.for_each([](Particle_handle, Particle_data *data) {
       data->particle_contact_count = 0;
@@ -918,6 +902,22 @@ private:
           data->dynamic_rigid_body_contact_count = 0;
           data->static_rigid_body_contact_count = 0;
         });
+  }
+
+  void find_and_count_contacts() {
+    find_and_count_particle_particle_contacts();
+    find_and_count_particle_static_rigid_body_contacts();
+    find_and_count_particle_dynamic_rigid_body_contacts();
+    find_and_count_dynamic_rigid_body_static_rigid_body_contacts();
+    find_and_count_dynamic_rigid_body_dynamic_rigid_body_contacts();
+  }
+
+  void reset_contact_pointer_storage() {
+    _particle_particle_contact_pointers.clear();
+    _particle_rigid_body_contact_pointers.clear();
+    _particle_static_body_contact_pointers.clear();
+    _rigid_body_rigid_body_contact_pointers.clear();
+    _rigid_body_static_body_contact_pointers.clear();
   }
 
   void find_and_count_particle_particle_contacts() {
