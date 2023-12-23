@@ -304,6 +304,26 @@ constexpr auto cross(Vec<T, 3> const &a, Vec<T, 3> const &b) noexcept {
   return Vec<T, 3>{a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
                    a.x * b.y - a.y * b.x};
 }
+
+template <typename T, int N>
+constexpr auto proj(Vec<T, N> const &u, Vec<T, N> const &d) noexcept {
+  return dot(u, d) / length_squared(d) * d;
+}
+
+template <typename T, int N>
+constexpr auto proj_unit(Vec<T, N> const &u, Vec<T, N> const &d) noexcept {
+  return dot(u, d) * d;
+}
+
+template <typename T, int N>
+constexpr auto perp(Vec<T, N> const &u, Vec<T, N> const &d) noexcept {
+  return u - proj(u, d);
+}
+
+template <typename T, int N>
+constexpr auto perp_unit(Vec<T, N> const &u, Vec<T, N> const &d) noexcept {
+  return u - proj_unit(u, d);
+}
 } // namespace math
 } // namespace marlon
 
