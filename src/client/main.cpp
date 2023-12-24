@@ -75,9 +75,11 @@ graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
   retval.brick_base_color_texture = create_texture(
-      graphics, "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
+      graphics,
+      "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
   retval.striped_cotton_base_color_texture = create_texture(
-      graphics, "C:/Users/marlo/rendering-engine/res/StripedCotton01_2K_BaseColor.ktx");
+      graphics,
+      "C:/Users/marlo/rendering-engine/res/StripedCotton01_2K_BaseColor.ktx");
   retval.brick_material = graphics->create_material_unique(
       {.base_color_texture = retval.brick_base_color_texture.get()});
   retval.striped_cotton_material = graphics->create_material_unique(
@@ -332,10 +334,10 @@ int main() {
   physics::Material const physics_material{.static_friction_coefficient = 0.4f,
                                            .dynamic_friction_coefficient = 0.4f,
                                            .restitution_coefficient = 0.1f};
-  physics::Box ground_shape{100.0f, 0.5f, 100.0f};
+  physics::Box ground_shape{{100.0f, 0.5f, 100.0f}};
   physics::Ball ball_shape{0.5f};
-  physics::Box brick_box_shape{1.0f, 1.0f, 1.0f};
-  physics::Box cotton_box_shape{0.3f, 0.88f, 0.3f};
+  physics::Box brick_box_shape{{1.0f, 1.0f, 1.0f}};
+  physics::Box cotton_box_shape{{0.3f, 0.88f, 0.3f}};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
@@ -369,9 +371,9 @@ int main() {
        .surface_mesh = resources.cube_mesh.get(),
        .surface_material = resources.striped_cotton_material.get(),
        .surface_pretransform =
-           math::Mat3x4f{{cotton_box_shape.half_width, 0.0f, 0.0f, 0.0f},
-                         {0.0f, cotton_box_shape.half_height, 0.0f, 0.0f},
-                         {0.0f, 0.0f, cotton_box_shape.half_depth, 0.0f}},
+           math::Mat3x4f{{cotton_box_shape.half_extents[0], 0.0f, 0.0f, 0.0f},
+                         {0.0f, cotton_box_shape.half_extents[1], 0.0f, 0.0f},
+                         {0.0f, 0.0f, cotton_box_shape.half_extents[2], 0.0f}},
        .space = &space,
        .body_mass = 80.0f,
        .body_inertia_tensor =

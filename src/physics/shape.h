@@ -19,9 +19,7 @@ struct Ball {
 };
 
 struct Box {
-  float half_width;
-  float half_height;
-  float half_depth;
+  math::Vec3f half_extents;
 };
 
 struct Positionless_contact_geometry {
@@ -74,10 +72,8 @@ inline Aabb bounds(Ball const &ball, math::Vec3f const &position) {
 
 inline Aabb bounds(Box const &box, math::Mat3x4f const &transform) noexcept {
   auto const world_space_center = column(transform, 3);
-  auto const shape_space_half_extents =
-      math::Vec3f{box.half_width, box.half_height, box.half_depth};
   auto const world_space_half_extents =
-      abs(transform) * math::Vec4f{shape_space_half_extents, 0.0f};
+      abs(transform) * math::Vec4f{box.half_extents, 0.0f};
   return Aabb{.min = world_space_center - world_space_half_extents,
               .max = world_space_center + world_space_half_extents};
 }
@@ -112,9 +108,9 @@ constexpr math::Mat3x3f hollow_inertia_tensor(Ball const &ball) noexcept {
 }
 
 constexpr math::Mat3x3f solid_inerta_tensor(Box const &box) noexcept {
-  auto const w2 = box.half_width * box.half_width;
-  auto const h2 = box.half_height * box.half_height;
-  auto const d2 = box.half_depth * box.half_depth;
+  auto const w2 = box.half_extents[0] * box.half_extents[0];
+  auto const h2 = box.half_extents[1] * box.half_extents[1];
+  auto const d2 = box.half_extents[2] * box.half_extents[2];
   return 1.0f / 3.0f *
          math::Mat3x3f{{h2 + d2, 0.0f, 0.0f},
                        {0.0f, w2 + d2, 0.0f},
@@ -160,20 +156,20 @@ particle_box_positionless_contact_geometry(
                       box_transform_inverse[2][2] * particle_position[2] +
                       box_transform_inverse[2][3]};
   if (std::abs(shape_space_particle_position.x) - particle_radius >
-          box.half_width ||
+          box.half_extents[0] ||
       std::abs(shape_space_particle_position.y) - particle_radius >
-          box.half_height ||
+          box.half_extents[1] ||
       std::abs(shape_space_particle_position.z) - particle_radius >
-          box.half_depth) {
+          box.half_extents[2]) {
     return std::nullopt;
   }
   auto const shape_space_clamped_particle_position =
-      math::Vec3f{std::clamp(shape_space_particle_position.x, -box.half_width,
-                             box.half_width),
-                  std::clamp(shape_space_particle_position.y, -box.half_height,
-                             box.half_height),
-                  std::clamp(shape_space_particle_position.z, -box.half_depth,
-                             box.half_depth)};
+      math::Vec3f{std::clamp(shape_space_particle_position.x,
+                             -box.half_extents[0], box.half_extents[0]),
+                  std::clamp(shape_space_particle_position.y,
+                             -box.half_extents[1], box.half_extents[1]),
+                  std::clamp(shape_space_particle_position.z,
+                             -box.half_extents[2], box.half_extents[2])};
   auto const displacement =
       shape_space_particle_position - shape_space_clamped_particle_position;
   auto const distance2 = math::length_squared(displacement);
@@ -197,12 +193,12 @@ particle_box_positionless_contact_geometry(
                                          .separation = separation};
   } else {
     auto const face_distances = std::array<float, 6>{
-        shape_space_clamped_particle_position.x + box.half_width,
-        box.half_width - shape_space_clamped_particle_position.x,
-        shape_space_clamped_particle_position.y + box.half_height,
-        box.half_height - shape_space_clamped_particle_position.y,
-        shape_space_clamped_particle_position.z + box.half_depth,
-        box.half_depth - shape_space_clamped_particle_position.z};
+        shape_space_clamped_particle_position.x + box.half_extents[0],
+        box.half_extents[0] - shape_space_clamped_particle_position.x,
+        shape_space_clamped_particle_position.y + box.half_extents[1],
+        box.half_extents[1] - shape_space_clamped_particle_position.y,
+        shape_space_clamped_particle_position.z + box.half_extents[2],
+        box.half_extents[2] - shape_space_clamped_particle_position.z};
     auto const face_normals = std::array<math::Vec3f, 6>{
         -math::Vec3f{box_transform[0][0], box_transform[1][0],
                      box_transform[2][0]},
@@ -290,20 +286,20 @@ particle_box_positioned_contact_geometry(
                       box_transform_inverse[2][2] * particle_position[2] +
                       box_transform_inverse[2][3]};
   if (std::abs(shape_space_particle_position.x) - particle_radius >
-          box.half_width ||
+          box.half_extents[0] ||
       std::abs(shape_space_particle_position.y) - particle_radius >
-          box.half_height ||
+          box.half_extents[1] ||
       std::abs(shape_space_particle_position.z) - particle_radius >
-          box.half_depth) {
+          box.half_extents[2]) {
     return std::nullopt;
   }
   auto const shape_space_clamped_particle_position =
-      math::Vec3f{std::clamp(shape_space_particle_position.x, -box.half_width,
-                             box.half_width),
-                  std::clamp(shape_space_particle_position.y, -box.half_height,
-                             box.half_height),
-                  std::clamp(shape_space_particle_position.z, -box.half_depth,
-                             box.half_depth)};
+      math::Vec3f{std::clamp(shape_space_particle_position.x,
+                             -box.half_extents[0], box.half_extents[0]),
+                  std::clamp(shape_space_particle_position.y,
+                             -box.half_extents[1], box.half_extents[1]),
+                  std::clamp(shape_space_particle_position.z,
+                             -box.half_extents[2], box.half_extents[2])};
   auto const displacement =
       shape_space_particle_position - shape_space_clamped_particle_position;
   auto const distance2 = math::length_squared(displacement);
@@ -331,28 +327,19 @@ particle_box_positioned_contact_geometry(
         .position = position, .normal = normal, .separation = separation};
   } else {
     auto const face_distances = std::array<float, 6>{
-        shape_space_clamped_particle_position.x + box.half_width,
-        box.half_width - shape_space_clamped_particle_position.x,
-        shape_space_clamped_particle_position.y + box.half_height,
-        box.half_height - shape_space_clamped_particle_position.y,
-        shape_space_clamped_particle_position.z + box.half_depth,
-        box.half_depth - shape_space_clamped_particle_position.z};
+        shape_space_clamped_particle_position.x + box.half_extents[0],
+        box.half_extents[0] - shape_space_clamped_particle_position.x,
+        shape_space_clamped_particle_position.y + box.half_extents[1],
+        box.half_extents[1] - shape_space_clamped_particle_position.y,
+        shape_space_clamped_particle_position.z + box.half_extents[2],
+        box.half_extents[2] - shape_space_clamped_particle_position.z};
     auto const face_index =
         std::min_element(face_distances.begin(), face_distances.end()) -
         face_distances.begin();
     auto const face_normals = std::array<math::Vec3f, 6>{
-        -math::Vec3f{box_transform[0][0], box_transform[1][0],
-                     box_transform[2][0]},
-        math::Vec3f{box_transform[0][0], box_transform[1][0],
-                    box_transform[2][0]},
-        -math::Vec3f{box_transform[0][1], box_transform[1][1],
-                     box_transform[2][1]},
-        math::Vec3f{box_transform[0][1], box_transform[1][1],
-                    box_transform[2][1]},
-        -math::Vec3f{box_transform[0][2], box_transform[1][2],
-                     box_transform[2][2]},
-        math::Vec3f{box_transform[0][2], box_transform[1][2],
-                    box_transform[2][2]}};
+        -column(box_transform, 0), column(box_transform, 0),
+        -column(box_transform, 1), column(box_transform, 1),
+        -column(box_transform, 2), column(box_transform, 2)};
     auto const position = math::Vec3f{
         box_transform[0][0] * shape_space_clamped_particle_position[0] +
             box_transform[0][1] * shape_space_clamped_particle_position[1] +
@@ -427,15 +414,18 @@ ball_box_contact_geometry(Ball const &ball, math::Vec3f const &ball_position,
                           math::Mat3x4f const &inverse_box_transform) {
   auto const box_space_ball_position =
       inverse_box_transform * math::Vec4f{ball_position, 1.0f};
-  if (std::abs(box_space_ball_position.x) - ball.radius > box.half_width ||
-      std::abs(box_space_ball_position.y) - ball.radius > box.half_height ||
-      std::abs(box_space_ball_position.z) - ball.radius > box.half_depth) {
+  if (std::abs(box_space_ball_position.x) - ball.radius > box.half_extents[0] ||
+      std::abs(box_space_ball_position.y) - ball.radius > box.half_extents[1] ||
+      std::abs(box_space_ball_position.z) - ball.radius > box.half_extents[2]) {
     return std::nullopt;
   }
-  auto const clamped_box_space_ball_position = math::Vec3f{
-      std::clamp(box_space_ball_position.x, -box.half_width, box.half_width),
-      std::clamp(box_space_ball_position.y, -box.half_height, box.half_height),
-      std::clamp(box_space_ball_position.z, -box.half_depth, box.half_depth)};
+  auto const clamped_box_space_ball_position =
+      math::Vec3f{std::clamp(box_space_ball_position.x, -box.half_extents[0],
+                             box.half_extents[0]),
+                  std::clamp(box_space_ball_position.y, -box.half_extents[1],
+                             box.half_extents[1]),
+                  std::clamp(box_space_ball_position.z, -box.half_extents[2],
+                             box.half_extents[2])};
   auto const displacement =
       box_space_ball_position - clamped_box_space_ball_position;
   auto const distance2 = math::length_squared(displacement);
@@ -451,9 +441,9 @@ ball_box_contact_geometry(Ball const &ball, math::Vec3f const &ball_position,
                                         .separation = distance - ball.radius};
   } else {
     auto const distances =
-        math::Vec3f{box.half_width - std::abs(box_space_ball_position.x),
-                    box.half_height - std::abs(box_space_ball_position.y),
-                    box.half_depth - std::abs(box_space_ball_position.z)};
+        math::Vec3f{box.half_extents[0] - std::abs(box_space_ball_position.x),
+                    box.half_extents[1] - std::abs(box_space_ball_position.y),
+                    box.half_extents[2] - std::abs(box_space_ball_position.z)};
     auto const axis = distances.x <= distances.y && distances.x <= distances.z
                           ? 0
                       : distances.y <= distances.z ? 1
@@ -474,9 +464,9 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
                          Box const &b2, math::Mat3x4f const &b2_transform) {
   auto const project_to_axis = [](Box const &b, math::Mat3x4f const &m,
                                   math::Vec3f const &v) {
-    return b.half_width * std::abs(math::dot(v, math::column(m, 0))) +
-           b.half_height * std::abs(math::dot(v, math::column(m, 1))) +
-           b.half_depth * std::abs(math::dot(v, math::column(m, 2)));
+    return b.half_extents[0] * std::abs(math::dot(v, math::column(m, 0))) +
+           b.half_extents[1] * std::abs(math::dot(v, math::column(m, 1))) +
+           b.half_extents[2] * std::abs(math::dot(v, math::column(m, 2)));
   };
   auto const center_displacement =
       math::column(b1_transform, 3) - math::column(b2_transform, 3);
@@ -570,12 +560,12 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
     auto const position =
         b2_transform *
         math::Vec4f{
-            math::dot(separating_axes[3], normal) >= 0.0f ? b2.half_width
-                                                          : -b2.half_width,
-            math::dot(separating_axes[4], normal) >= 0.0f ? b2.half_height
-                                                          : -b2.half_height,
-            math::dot(separating_axes[5], normal) >= 0.0f ? b2.half_depth
-                                                          : -b2.half_depth,
+            math::dot(separating_axes[3], normal) >= 0.0f ? b2.half_extents[0]
+                                                          : -b2.half_extents[0],
+            math::dot(separating_axes[4], normal) >= 0.0f ? b2.half_extents[1]
+                                                          : -b2.half_extents[1],
+            math::dot(separating_axes[5], normal) >= 0.0f ? b2.half_extents[2]
+                                                          : -b2.half_extents[2],
             1.0f};
     return Positionful_contact_geometry{
         .position = position, .normal = normal, .separation = best_separation};
@@ -586,12 +576,12 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
     auto const position =
         b1_transform *
         math::Vec4f{
-            math::dot(separating_axes[0], normal) >= 0.0f ? -b1.half_width
-                                                          : b1.half_width,
-            math::dot(separating_axes[1], normal) >= 0.0f ? -b1.half_height
-                                                          : b1.half_height,
-            math::dot(separating_axes[2], normal) >= 0.0f ? -b1.half_depth
-                                                          : b1.half_depth,
+            math::dot(separating_axes[0], normal) >= 0.0f ? -b1.half_extents[0]
+                                                          : b1.half_extents[0],
+            math::dot(separating_axes[1], normal) >= 0.0f ? -b1.half_extents[1]
+                                                          : b1.half_extents[1],
+            math::dot(separating_axes[2], normal) >= 0.0f ? -b1.half_extents[2]
+                                                          : b1.half_extents[2],
             1.0f};
     return Positionful_contact_geometry{
         .position = position, .normal = normal, .separation = best_separation};
@@ -602,7 +592,7 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
     auto const normal =
         math::dot(axis, center_displacement) < 0.0f ? -axis : axis;
     auto const b1_extents =
-        math::Vec3f{b1.half_width, b1.half_height, b1.half_depth};
+        math::Vec3f{b1.half_extents[0], b1.half_extents[1], b1.half_extents[2]};
     auto const on_b1_edge =
         b1_transform *
         math::Vec4f{math::Vec3f{[&](int axis_index) {
@@ -617,7 +607,7 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
                     }},
                     1.0f};
     auto const b2_extents =
-        math::Vec3f{b2.half_width, b2.half_height, b2.half_depth};
+        math::Vec3f{b2.half_extents[0], b2.half_extents[1], b2.half_extents[2]};
     auto const on_b2_edge =
         b2_transform *
         math::Vec4f{math::Vec3f{[&](int axis_index) {
