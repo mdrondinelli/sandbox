@@ -29,7 +29,7 @@ struct Positionless_contact_geometry {
   float separation;
 };
 
-struct Positioned_contact_geometry {
+struct Positionful_contact_geometry {
   math::Vec3f position;
   math::Vec3f normal;
   float separation;
@@ -50,13 +50,13 @@ public:
       Shape const &shape, math::Mat3x4f const &shape_transform,
       math::Mat3x4f const &shape_transform_inverse) noexcept;
 
-  friend std::optional<Positioned_contact_geometry>
-  particle_shape_positioned_contact_geometry(
+  friend std::optional<Positionful_contact_geometry>
+  particle_shape_positionful_contact_geometry(
       math::Vec3f const &particle_position, float particle_radius,
       Shape const &shape, math::Mat3x4f const &shape_transform,
       math::Mat3x4f const &shape_transform_inverse) noexcept;
 
-  friend std::optional<Positioned_contact_geometry>
+  friend std::optional<Positionful_contact_geometry>
   shape_shape_contact_geometry(
       Shape const &shape_a, math::Mat3x4f const &transform_a,
       math::Mat3x4f const &inverse_transform_a, Shape const &shape_b,
@@ -73,47 +73,13 @@ inline Aabb bounds(Ball const &ball, math::Vec3f const &position) {
 }
 
 inline Aabb bounds(Box const &box, math::Mat3x4f const &transform) noexcept {
-  auto const shape_space_points = std::array<math::Vec3f, 8>{
-      math::Vec3f{-box.half_width, -box.half_height, -box.half_depth},
-      math::Vec3f{-box.half_width, -box.half_height, box.half_depth},
-      math::Vec3f{-box.half_width, box.half_height, -box.half_depth},
-      math::Vec3f{-box.half_width, box.half_height, box.half_depth},
-      math::Vec3f{box.half_width, -box.half_height, -box.half_depth},
-      math::Vec3f{box.half_width, -box.half_height, box.half_depth},
-      math::Vec3f{box.half_width, box.half_height, -box.half_depth},
-      math::Vec3f{box.half_width, box.half_height, box.half_depth}};
-  auto world_space_points = std::array<math::Vec3f, 8>{};
-  for (auto i = 0; i < 8; ++i) {
-    auto const &shape_space_point = shape_space_points[i];
-    auto &world_space_point = world_space_points[i];
-    world_space_point.x = transform[0][0] * shape_space_point.x +
-                          transform[0][1] * shape_space_point.y +
-                          transform[0][2] * shape_space_point.z +
-                          transform[0][3];
-    world_space_point.y = transform[1][0] * shape_space_point.x +
-                          transform[1][1] * shape_space_point.y +
-                          transform[1][2] * shape_space_point.z +
-                          transform[1][3];
-    world_space_point.z = transform[2][0] * shape_space_point.x +
-                          transform[2][1] * shape_space_point.y +
-                          transform[2][2] * shape_space_point.z +
-                          transform[2][3];
-  }
-  auto bounds = Aabb{world_space_points[0], world_space_points[0]};
-  for (auto i = 1; i < 8; ++i) {
-    auto const &world_space_point = world_space_points[i];
-    bounds.min.x = std::min(bounds.min.x, world_space_point.x);
-    bounds.min.y = std::min(bounds.min.y, world_space_point.y);
-    bounds.min.z = std::min(bounds.min.z, world_space_point.z);
-    bounds.max.x = std::max(bounds.max.x, world_space_point.x);
-    bounds.max.y = std::max(bounds.max.y, world_space_point.y);
-    bounds.max.z = std::max(bounds.max.z, world_space_point.z);
-  }
-  return bounds;
-  // auto const radius = math::length(
-  //     math::Vec3f{box.half_width, box.half_height, box.half_depth});
-  // return {.min = math::column(transform, 3) - math::Vec3f::all(radius),
-  //         .max = math::column(transform, 3) + math::Vec3f::all(radius)};
+  auto const world_space_center = column(transform, 3);
+  auto const shape_space_half_extents =
+      math::Vec3f{box.half_width, box.half_height, box.half_depth};
+  auto const world_space_half_extents =
+      abs(transform) * math::Vec4f{shape_space_half_extents, 0.0f};
+  return Aabb{.min = world_space_center - world_space_half_extents,
+              .max = world_space_center + world_space_half_extents};
 }
 
 inline Aabb bounds(Shape const &shape,
@@ -283,7 +249,7 @@ particle_shape_positionless_contact_geometry(
       shape._v);
 }
 
-inline std::optional<Positioned_contact_geometry>
+inline std::optional<Positionful_contact_geometry>
 particle_ball_positioned_contact_geometry(
     math::Vec3f const &particle_position, float particle_radius,
     Ball const &ball, math::Vec3f const &ball_position) noexcept {
@@ -296,16 +262,16 @@ particle_ball_positioned_contact_geometry(
     auto const normal = displacement / distance;
     auto const position =
         ball_position + std::min(ball.radius, distance) * normal;
-    return Positioned_contact_geometry{.position = position,
-                                       .normal = normal,
-                                       .separation =
-                                           distance - contact_distance};
+    return Positionful_contact_geometry{.position = position,
+                                        .normal = normal,
+                                        .separation =
+                                            distance - contact_distance};
   } else {
     return std::nullopt;
   }
 }
 
-inline std::optional<Positioned_contact_geometry>
+inline std::optional<Positionful_contact_geometry>
 particle_box_positioned_contact_geometry(
     math::Vec3f const &particle_position, float particle_radius, Box const &box,
     math::Mat3x4f const &box_transform,
@@ -361,7 +327,7 @@ particle_box_positioned_contact_geometry(
     auto const distance = std::sqrt(distance2);
     auto const normal = (particle_position - position) / distance;
     auto const separation = distance - particle_radius;
-    return Positioned_contact_geometry{
+    return Positionful_contact_geometry{
         .position = position, .normal = normal, .separation = separation};
   } else {
     auto const face_distances = std::array<float, 6>{
@@ -402,13 +368,13 @@ particle_box_positioned_contact_geometry(
             box_transform[2][3]};
     auto const normal = face_normals[face_index];
     auto const separation = -face_distances[face_index] - particle_radius;
-    return Positioned_contact_geometry{
+    return Positionful_contact_geometry{
         .position = position, .normal = normal, .separation = separation};
   }
 }
 
-inline std::optional<Positioned_contact_geometry>
-particle_shape_positioned_contact_geometry(
+inline std::optional<Positionful_contact_geometry>
+particle_shape_positionful_contact_geometry(
     math::Vec3f const &particle_position, float particle_radius,
     Shape const &shape, math::Mat3x4f const &shape_transform,
     math::Mat3x4f const &shape_transform_inverse) noexcept {
@@ -430,7 +396,7 @@ particle_shape_positioned_contact_geometry(
       shape._v);
 }
 
-inline std::optional<Positioned_contact_geometry>
+inline std::optional<Positionful_contact_geometry>
 ball_ball_contact_geometry(Ball const &b1, math::Vec3f const &b1_position,
                            Ball const &b2, math::Vec3f const &b2_position) {
   auto const displacement = b1_position - b2_position;
@@ -444,18 +410,18 @@ ball_ball_contact_geometry(Ball const &b1, math::Vec3f const &b1_position,
     auto const normal = displacement / distance;
     auto const position =
         b1.radius < distance ? b1_position + normal * b1.radius : b2_position;
-    return Positioned_contact_geometry{.position = position,
-                                       .normal = normal,
-                                       .separation =
-                                           distance - contact_distance};
+    return Positionful_contact_geometry{.position = position,
+                                        .normal = normal,
+                                        .separation =
+                                            distance - contact_distance};
   } else {
-    return Positioned_contact_geometry{.position = b1_position,
-                                       .normal = math::Vec3f{1.0f, 0.0f, 0.0f},
-                                       .separation = -contact_distance};
+    return Positionful_contact_geometry{.position = b1_position,
+                                        .normal = math::Vec3f{1.0f, 0.0f, 0.0f},
+                                        .separation = -contact_distance};
   }
 }
 
-inline std::optional<Positioned_contact_geometry>
+inline std::optional<Positionful_contact_geometry>
 ball_box_contact_geometry(Ball const &ball, math::Vec3f const &ball_position,
                           Box const &box, math::Mat3x4f const &box_transform,
                           math::Mat3x4f const &inverse_box_transform) {
@@ -480,9 +446,9 @@ ball_box_contact_geometry(Ball const &ball, math::Vec3f const &ball_position,
     auto const position =
         box_transform * math::Vec4f{clamped_box_space_ball_position, 1.0f};
     auto const normal = (ball_position - position) / distance;
-    return Positioned_contact_geometry{.position = position,
-                                       .normal = normal,
-                                       .separation = distance - ball.radius};
+    return Positionful_contact_geometry{.position = position,
+                                        .normal = normal,
+                                        .separation = distance - ball.radius};
   } else {
     auto const distances =
         math::Vec3f{box.half_width - std::abs(box_space_ball_position.x),
@@ -496,14 +462,14 @@ ball_box_contact_geometry(Ball const &ball, math::Vec3f const &ball_position,
         (std::signbit(box_space_ball_position[axis]) ? -1.0f : 1.0f) *
         math::Vec3f{box_transform[0][axis], box_transform[1][axis],
                     box_transform[2][axis]};
-    return Positioned_contact_geometry{.position = ball_position,
-                                       .normal = normal,
-                                       .separation =
-                                           -distances[axis] - ball.radius};
+    return Positionful_contact_geometry{.position = ball_position,
+                                        .normal = normal,
+                                        .separation =
+                                            -distances[axis] - ball.radius};
   }
 }
 
-inline std::optional<Positioned_contact_geometry>
+inline std::optional<Positionful_contact_geometry>
 box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
                          Box const &b2, math::Mat3x4f const &b2_transform) {
   auto const project_to_axis = [](Box const &b, math::Mat3x4f const &m,
@@ -611,7 +577,7 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
             math::dot(separating_axes[5], normal) >= 0.0f ? b2.half_depth
                                                           : -b2.half_depth,
             1.0f};
-    return Positioned_contact_geometry{
+    return Positionful_contact_geometry{
         .position = position, .normal = normal, .separation = best_separation};
   } else if (best_separating_axis_index < 6) {
     // vertex of box one on face of box two
@@ -627,7 +593,7 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
             math::dot(separating_axes[2], normal) >= 0.0f ? -b1.half_depth
                                                           : b1.half_depth,
             1.0f};
-    return Positioned_contact_geometry{
+    return Positionful_contact_geometry{
         .position = position, .normal = normal, .separation = best_separation};
   } else {
     auto const b1_axis_index = (best_separating_axis_index - 6) / 3;
@@ -665,7 +631,7 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
                       }
                     }},
                     1.0f};
-    return Positioned_contact_geometry{
+    return Positionful_contact_geometry{
         .position = edge_edge_contact_position(
             on_b1_edge, separating_axes[b2_axis_index],
             b1_extents[b1_axis_index], on_b2_edge,
@@ -676,7 +642,7 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
   }
 }
 
-inline std::optional<Positioned_contact_geometry> shape_shape_contact_geometry(
+inline std::optional<Positionful_contact_geometry> shape_shape_contact_geometry(
     Shape const &shape_a, math::Mat3x4f const &transform_a,
     math::Mat3x4f const &inverse_transform_a, Shape const &shape_b,
     math::Mat3x4f const &transform_b,

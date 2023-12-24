@@ -414,7 +414,7 @@ constexpr Rvec<T, N> operator/(Rvec<T, N> const &v, T s) noexcept {
   if constexpr (std::is_floating_point_v<T>) {
     return v * (T(1) / s);
   } else {
-    return Rvec<T, N>([&](int i) { return v[i] / s; });
+    return Rvec<T, N>{[&](int i) { return v[i] / s; }};
   }
 }
 
@@ -430,6 +430,11 @@ constexpr T operator*(Rvec<T, N> const &a, Vec<T, N> const &b) noexcept {
     retval += a[i] * b[i];
   }
   return retval;
+}
+
+template <typename T, int N>
+constexpr Rvec<T, N> abs(Rvec<T, N> const &v) noexcept {
+  return Rvec<T, N>{[&](int i) { return std::abs(v[i]); }};
 }
 
 template <typename T, int N>
@@ -540,6 +545,15 @@ constexpr Rvec<T, M> row(Mat<T, N, M> const &m, int i) noexcept {
 template <typename T, int N, int M>
 constexpr Vec<T, N> column(Mat<T, N, M> const &m, int j) noexcept {
   return Vec<T, N>{[&](int i) { return m[i][j]; }};
+}
+
+template <typename T, int N, int M>
+constexpr Mat<T, N, M> abs(math::Mat<T, N, M> const &m) noexcept {
+  auto retval = Mat<T, N, M>::zero();
+  for (auto i = 0; i < N; ++i) {
+    retval[i] = abs(m[i]);
+  }
+  return retval;
 }
 
 template <typename T, int N, int M>

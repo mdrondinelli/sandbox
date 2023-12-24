@@ -973,7 +973,7 @@ private:
           math::Mat3x4f::rigid(body_data->position, body_data->orientation);
       auto const inverse_body_transform = math::rigid_inverse(body_transform);
       if (auto const contact_geometry =
-              particle_shape_positioned_contact_geometry(
+              particle_shape_positionful_contact_geometry(
                   particle_data->position, particle_data->radius,
                   body_data->shape, body_transform, inverse_body_transform)) {
         auto const body_relative_position =

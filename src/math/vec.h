@@ -271,6 +271,10 @@ constexpr auto &operator/=(Vec<T, N> &v, T s) noexcept {
   return v = (v / s);
 }
 
+template <typename T, int N> constexpr auto abs(Vec<T, N> const &v) noexcept {
+  return Vec<T, N>{[&](int i) { return std::abs(v[i]); }};
+}
+
 template <typename T, int N>
 constexpr auto length_squared(Vec<T, N> const &v) noexcept {
   auto retval = T(0);

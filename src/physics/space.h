@@ -20,6 +20,8 @@ struct Space_create_info {
   std::size_t max_rigid_body_static_body_contacts{10000};
   std::size_t max_island_object_count{1000};
   std::size_t max_island_contact_count{10000};
+  float min_contact_separation{-1.0f / 2048.0f};
+  float min_contact_separating_velocity{-1.0f / 2048.0f};
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 
