@@ -331,7 +331,7 @@ int main() {
                                   {0.0f, 0.0f, 100.0f, 0.0f}}});
   scene->add_surface(ground_surface.get());
   physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
-  physics::Material const physics_material{.static_friction_coefficient = 0.4f,
+  physics::Material const physics_material{.static_friction_coefficient = 0.5f,
                                            .dynamic_friction_coefficient = 0.4f,
                                            .restitution_coefficient = 0.1f};
   physics::Box ground_shape{{100.0f, 0.5f, 100.0f}};
@@ -377,7 +377,7 @@ int main() {
        .space = &space,
        .body_mass = 80.0f,
        .body_inertia_tensor =
-           80.0f * physics::solid_inerta_tensor(cotton_box_shape),
+           80.0f * physics::hollow_inertia_tensor(cotton_box_shape),
        .body_shape = cotton_box_shape,
        .body_material = {.static_friction_coefficient = 0.4f,
                          .dynamic_friction_coefficient = 0.3f,
