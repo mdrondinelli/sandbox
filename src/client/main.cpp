@@ -254,9 +254,9 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto loop =
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
-                                .physics_substep_count = 32,
-                                .max_physics_island_position_iterations = 64,
-                                .max_physics_island_velocity_iterations = 64}};
+                                .physics_substep_count = 64,
+                                .max_physics_island_position_iterations = 32,
+                                .max_physics_island_velocity_iterations = 32}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
   auto fps_frame_accumulator = 0;
@@ -337,7 +337,7 @@ int main() {
   physics::Box ground_shape{{100.0f, 0.5f, 100.0f}};
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{{1.0f, 1.0f, 1.0f}};
-  physics::Box cotton_box_shape{{0.3f, 0.88f, 0.3f}};
+  physics::Box cotton_box_shape{{0.3f, 0.88f, 0.3}};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},
@@ -377,7 +377,7 @@ int main() {
        .space = &space,
        .body_mass = 80.0f,
        .body_inertia_tensor =
-           80.0f * physics::hollow_inertia_tensor(cotton_box_shape),
+           80.0f * physics::solid_inertia_tensor(cotton_box_shape),
        .body_shape = cotton_box_shape,
        .body_material = {.static_friction_coefficient = 0.4f,
                          .dynamic_friction_coefficient = 0.3f,

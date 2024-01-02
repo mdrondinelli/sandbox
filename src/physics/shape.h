@@ -116,10 +116,22 @@ constexpr math::Mat3x3f solid_inertia_tensor(Ball const &ball) noexcept {
          math::Mat3x3f{{r2, 0.0f, 0.0f}, {0.0f, r2, 0.0f}, {0.0f, 0.0f, r2}};
 }
 
-constexpr math::Mat3x3f hollow_inertia_tensor(Ball const &ball) noexcept {
-  auto const r2 = ball.radius * ball.radius;
-  return 2.0f / 3.0f *
-         math::Mat3x3f{{r2, 0.0f, 0.0f}, {0.0f, r2, 0.0f}, {0.0f, 0.0f, r2}};
+constexpr math::Mat3x3f solid_inertia_tensor(Capsule const &capsule) noexcept {
+  auto const r = capsule.radius;
+  auto const r2 = r * r;
+  auto const r3 = r2 * r;
+  auto const h = capsule.half_height;
+  auto const h2 = h * h;
+  auto const h3 = h2 * h;
+  auto const numer_parallel = r2 * (30.0f * h + 16.0f * r);
+  auto const numer_perpendicular =
+      20.0f * h3 + 40.0f * h2 * r + 45.0f * h * r2 + 16.0f * r3;
+  auto const inverse_denom = 1.0f / (60.0f * h + 40.0f * r);
+  auto const parallel = numer_parallel * inverse_denom;
+  auto const perpendicular = numer_perpendicular * inverse_denom;
+  return math::Mat3x3f{{perpendicular, 0.0f, 0.0f},
+                       {0.0f, parallel, 0.0f},
+                       {0.0f, 0.0f, perpendicular}};
 }
 
 constexpr math::Mat3x3f solid_inertia_tensor(Box const &box) noexcept {
@@ -132,7 +144,13 @@ constexpr math::Mat3x3f solid_inertia_tensor(Box const &box) noexcept {
                        {0.0f, 0.0f, w2 + h2}};
 }
 
-constexpr math::Mat3x3f hollow_inertia_tensor(Box const &box) noexcept {
+constexpr math::Mat3x3f surface_inertia_tensor(Ball const &ball) noexcept {
+  auto const r2 = ball.radius * ball.radius;
+  return 2.0f / 3.0f *
+         math::Mat3x3f{{r2, 0.0f, 0.0f}, {0.0f, r2, 0.0f}, {0.0f, 0.0f, r2}};
+}
+
+constexpr math::Mat3x3f surface_inertia_tensor(Box const &box) noexcept {
   auto const w = box.half_extents[0];
   auto const h = box.half_extents[1];
   auto const d = box.half_extents[2];

@@ -561,7 +561,7 @@ private:
 };
 
 auto const damping_factor = 0.99f;
-auto const max_rotational_displacement_coefficient = 0.2f;
+auto const max_rotational_displacement_coefficient = 0.1f;
 } // namespace
 
 class Space::Impl {
@@ -638,6 +638,9 @@ public:
                        create_info.max_island_object_count},
         _island_contacts{island_contacts_begin,
                          create_info.max_island_contact_count},
+        _min_contact_separation{create_info.min_contact_separation},
+        _min_contact_separating_velocity{
+            create_info.min_contact_separating_velocity},
         _gravitational_acceleration{create_info.gravitational_acceleration} {}
 
   ~Impl() { free(_system_allocation); }
@@ -1318,7 +1321,8 @@ private:
                             float max_separating_velocity_for_bounce) {
     for (auto i = 0; i != max_position_iterations; ++i) {
       if (auto const contact =
-              _island_contacts.find_contact_of_least_separation(-0.001f)) {
+              _island_contacts.find_contact_of_least_separation(
+                  _min_contact_separation)) {
         std::visit([this](auto &&arg) { resolve_contact_position(arg); },
                    *contact);
       } else {
@@ -1328,7 +1332,7 @@ private:
     for (auto i = 0; i != max_velocity_iterations; ++i) {
       if (auto const contact =
               _island_contacts.find_contact_of_least_separating_velocity(
-                  -0.001f)) {
+                  _min_contact_separating_velocity)) {
         std::visit(
             [=, this](auto &&arg) {
               using T = std::decay_t<decltype(arg)>;
@@ -2339,6 +2343,8 @@ private:
       _rigid_body_static_body_contact_pointers;
   Object_stack _island_fringe;
   Contact_stack _island_contacts;
+  float _min_contact_separation;
+  float _min_contact_separating_velocity;
   math::Vec3f _gravitational_acceleration;
 };
 
