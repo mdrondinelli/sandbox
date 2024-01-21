@@ -16,6 +16,9 @@ public:
     return sizeof(T) * capacity;
   }
 
+  constexpr Stack() noexcept
+      : _begin{nullptr}, _stack_end{nullptr}, _buffer_end{nullptr} {}
+
   explicit Stack(Block block, std::size_t capacity) noexcept
       : Stack{block.begin, capacity} {}
 

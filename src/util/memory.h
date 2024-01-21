@@ -54,6 +54,8 @@ public:
     return result;
   }
 
+  constexpr Stack_allocator() noexcept : _block{}, _top{} {}
+
   explicit Stack_allocator(Block block) noexcept
       : _block{block}, _top{block.begin} {}
 
