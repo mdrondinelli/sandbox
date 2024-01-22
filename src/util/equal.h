@@ -4,7 +4,8 @@
 namespace marlon {
 namespace util {
 template <typename T> struct Equal {
-  constexpr bool operator()(T const &lhs, T const &rhs) const noexcept {
+  template <typename U>
+  constexpr bool operator()(T const &lhs, U const &rhs) const noexcept {
     return lhs == rhs;
   }
 };

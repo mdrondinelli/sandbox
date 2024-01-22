@@ -100,6 +100,9 @@ public:
   void resize(std::size_t count) {
     auto const stack_end = _stack_end;
     auto const new_stack_end = _begin + count;
+    if (new_stack_end > _buffer_end) {
+      throw Capacity_error{};
+    }
     if (new_stack_end < stack_end) {
       auto it = new_stack_end;
       do {
