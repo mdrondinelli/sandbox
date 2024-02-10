@@ -150,6 +150,24 @@ constexpr math::Mat3x3f surface_inertia_tensor(Ball const &ball) noexcept {
          math::Mat3x3f{{r2, 0.0f, 0.0f}, {0.0f, r2, 0.0f}, {0.0f, 0.0f, r2}};
 }
 
+constexpr math::Mat3x3f
+surface_inertia_tensor(Capsule const &capsule) noexcept {
+  auto const r = capsule.radius;
+  auto const r2 = r * r;
+  auto const r3 = r2 * r;
+  auto const h = capsule.half_height;
+  auto const h2 = h * h;
+  auto const h3 = h2 * h;
+  auto const parallel_numer = 2 * r2 * (3 * h + 2 * r);
+  auto const perpendicular_numer = 2 * h3 + 6 * h2 * r + 9 * h * r2 + 4 * r3;
+  auto const inverse_denom = 1 / (6 * (h + r));
+  auto const parallel = parallel_numer * inverse_denom;
+  auto const perpendicular = perpendicular_numer * inverse_denom;
+  return math::Mat3x3f{{perpendicular, 0.0f, 0.0f},
+                       {0.0f, parallel, 0.0f},
+                       {0.0f, 0.0f, perpendicular}};
+}
+
 constexpr math::Mat3x3f surface_inertia_tensor(Box const &box) noexcept {
   auto const w = box.half_extents[0];
   auto const h = box.half_extents[1];
@@ -183,25 +201,57 @@ particle_ball_positionless_contact_geometry(
     math::Vec3f const &particle_position, float particle_radius,
     Ball const &ball, math::Vec3f const &ball_position) noexcept {
   auto const displacement = particle_position - ball_position;
-  auto const distance2 = math::length_squared(displacement);
+  auto const distance2 = length_squared(displacement);
   auto const contact_distance = ball.radius + particle_radius;
   auto const contact_distance2 = contact_distance * contact_distance;
-  if (distance2 <= contact_distance2) {
-    auto const distance = std::sqrt(distance2);
-    auto const normal = displacement / distance;
-    return Positionless_contact_geometry{
-        .normal = normal, .separation = distance - contact_distance};
-  } else {
+  if (distance2 > contact_distance2) {
     return std::nullopt;
+  } else if (distance2 != 0.0f) {
+    auto const distance = std::sqrt(distance2);
+    return Positionless_contact_geometry{
+        .normal = displacement / distance,
+        .separation = distance - contact_distance,
+    };
+  } else {
+    return Positionless_contact_geometry{
+        .normal = math::Vec3f::x_axis(),
+        .separation = -contact_distance,
+    };
   }
 }
 
 inline std::optional<Positionless_contact_geometry>
-particle_capsule_positionless_contact_geometry(math::Vec3f const &, float,
-                                               Capsule const &,
-                                               math::Vec3f const &,
-                                               math::Vec3f const &) noexcept {
-  return std::nullopt;
+particle_capsule_positionless_contact_geometry(
+    math::Vec3f const &particle_position, float particle_radius,
+    Capsule const &capsule, math::Vec3f const &capsule_position,
+    math::Vec3f const &capsule_axis) noexcept {
+  auto const t =
+      std::clamp(dot(particle_position - capsule_position, capsule_axis),
+                 -capsule.half_height, capsule.half_height);
+  auto const p = capsule_position + t * capsule_axis;
+  auto const d = particle_position - p;
+  auto const distance_squared = length_squared(d);
+  auto const contact_distance = particle_radius + capsule.radius;
+  auto const contact_distance_squared = contact_distance * contact_distance;
+  if (distance_squared > contact_distance_squared) {
+    return std::nullopt;
+  } else if (distance_squared != 0.0f) {
+    auto const distance = std::sqrt(distance_squared);
+    return Positionless_contact_geometry{
+        .normal = d / distance,
+        .separation = distance - contact_distance,
+    };
+  } else {
+    auto const normal =
+        cross(std::abs(capsule_axis.x) < std::abs(capsule_axis.y)
+                  ? math::Vec3f::x_axis()
+                  : math::Vec3f::y_axis(),
+              capsule_axis);
+    return Positionless_contact_geometry{
+        .normal = normal,
+        .separation = -contact_distance,
+    };
+  }
 }
 
 inline std::optional<Positionless_contact_geometry>
