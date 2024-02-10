@@ -560,7 +560,7 @@ private:
   Impl _impl;
 };
 
-auto const damping_factor = 0.99f;
+auto const velocity_damping_factor = 0.99f;
 auto const max_rotational_displacement_coefficient = 0.1f;
 } // namespace
 
@@ -843,7 +843,7 @@ private:
   }
 
   void integrate(float h) {
-    auto const time_compensated_damping_factor = std::pow(damping_factor, h);
+    auto const time_compensated_damping_factor = std::pow(velocity_damping_factor, h);
     integrate_particles(h, time_compensated_damping_factor);
     integrate_dynamic_rigid_bodies(h, time_compensated_damping_factor);
   }

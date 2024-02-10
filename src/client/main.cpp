@@ -316,7 +316,7 @@ int main() {
   auto const scene = graphics->create_scene_unique({});
   auto const camera = graphics->create_camera_unique(
       {.zoom = math::Vec2f{9.0f / 16.0f, 1.0f} * 5.0f,
-       .near_plane_distance = 0.001f,
+       .near_plane_distance = 0.01f,
        .far_plane_distance = 1000.0f,
        .position = {-10.0f, 3.5f, 10.0f},
        .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
@@ -330,7 +330,9 @@ int main() {
                                   {0.0f, 100.0f, 0.0f, -100.0f},
                                   {0.0f, 0.0f, 100.0f, 0.0f}}});
   scene->add_surface(ground_surface.get());
-  physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
+  physics::Space space{{.min_contact_separation = -1.0f / 8192.0f,
+                        .min_contact_separating_velocity = -1.0f / 8192.0f,
+                        .gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
   physics::Material const physics_material{.static_friction_coefficient = 0.5f,
                                            .dynamic_friction_coefficient = 0.4f,
                                            .restitution_coefficient = 0.1f};

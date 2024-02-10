@@ -24,6 +24,10 @@ template <typename T> struct Vec<T, 2> {
 
   static constexpr auto all(T s) noexcept { return Vec<T, 2>{s, s}; }
 
+  static constexpr auto x_axis() noexcept { return Vec<T, 2>{T(1), T(0)}; }
+
+  static constexpr auto y_axis() noexcept { return Vec<T, 2>{T(0), T(1)}; }
+
   Vec() = default;
 
   constexpr Vec(T x, T y) : x{x}, y{y} {}
@@ -68,6 +72,18 @@ template <typename T> struct Vec<T, 3> {
   static constexpr auto zero() noexcept { return Vec<T, 3>{T(0), T(0), T(0)}; }
 
   static constexpr auto all(T s) noexcept { return Vec<T, 3>{s, s, s}; }
+
+  static constexpr auto x_axis() noexcept {
+    return Vec<T, 3>{T(1), T(0), T(0)};
+  }
+
+  static constexpr auto y_axis() noexcept {
+    return Vec<T, 3>{T(0), T(1), T(0)};
+  }
+
+  static constexpr auto z_axis() noexcept {
+    return Vec<T, 3>{T(0), T(0), T(1)};
+  }
 
   Vec() = default;
 
@@ -124,6 +140,22 @@ template <typename T> struct Vec<T, 4> {
   static auto zero() { return Vec<T, 4>{T(0), T(0), T(0), T(0)}; }
 
   static auto all(T s) { return Vec<T, 4>{s, s, s, s}; }
+
+  static constexpr auto x_axis() noexcept {
+    return Vec<T, 4>{T(1), T(0), T(0), T(0)};
+  }
+
+  static constexpr auto y_axis() noexcept {
+    return Vec<T, 4>{T(0), T(1), T(0), T(0)};
+  }
+
+  static constexpr auto z_axis() noexcept {
+    return Vec<T, 4>{T(0), T(0), T(1), T(0)};
+  }
+
+  static constexpr auto w_axis() noexcept {
+    return Vec<T, 4>{T(0), T(0), T(0), T(1)};
+  }
 
   Vec() = default;
 
