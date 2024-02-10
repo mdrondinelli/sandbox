@@ -571,7 +571,7 @@ public:
 
   explicit Impl(
       Space_create_info const &create_info, void *system_allocation,
-      void *potential_particle_particle_contacts_begin,
+      void *aabb_tree_block, void *potential_particle_particle_contacts_begin,
       void *potential_particle_dynamic_rigid_body_contacts_begin,
       void *potential_particle_static_rigid_body_contacts_begin,
       void *potential_dynamic_rigid_body_dynamic_rigid_body_contacts_begin,
@@ -588,6 +588,8 @@ public:
       void *dynamic_rigid_body_static_rigid_body_contact_pointers_begin,
       void *island_fringe_begin, void *island_contacts_begin)
       : _system_allocation{system_allocation},
+        _aabb_tree{aabb_tree_block, create_info.max_aabb_tree_leaf_nodes,
+                   create_info.max_aabb_tree_internal_nodes},
         _particles{create_info.max_particles},
         _static_rigid_bodies{create_info.max_static_rigid_bodies},
         _dynamic_rigid_bodies{create_info.max_dynamic_rigid_bodies},
@@ -844,7 +846,8 @@ private:
   }
 
   void integrate(float h) {
-    auto const time_compensated_damping_factor = std::pow(velocity_damping_factor, h);
+    auto const time_compensated_damping_factor =
+        std::pow(velocity_damping_factor, h);
     integrate_particles(h, time_compensated_damping_factor);
     integrate_dynamic_rigid_bodies(h, time_compensated_damping_factor);
   }
@@ -2351,6 +2354,10 @@ private:
 
 Space::Space(Space_create_info const &create_info)
     : _impl{[&]() {
+        auto const aabb_tree_memory_requirement =
+            decltype(Impl::_aabb_tree)::memory_requirement(
+                create_info.max_aabb_tree_leaf_nodes,
+                create_info.max_aabb_tree_internal_nodes);
         auto const close_particle_particle_pairs_memory_requirement =
             decltype(Impl::_close_particle_particle_pairs)::memory_requirement(
                 create_info.max_particle_particle_contacts);
@@ -2414,7 +2421,8 @@ Space::Space(Space_create_info const &create_info)
                 create_info.max_island_contact_count);
         auto const total_memory_requirement =
             Stack_allocator<>::memory_requirement(
-                {close_particle_particle_pairs_memory_requirement,
+                {aabb_tree_memory_requirement,
+                 close_particle_particle_pairs_memory_requirement,
                  close_particle_rigid_body_pairs_memory_requirement,
                  close_particle_static_body_pairs_memory_requirement,
                  close_rigid_body_rigid_body_pairs_memory_requirement,
@@ -2437,6 +2445,7 @@ Space::Space(Space_create_info const &create_info)
               make_block(system_allocation, total_memory_requirement)};
           return std::make_unique<Impl>(
               create_info, system_allocation,
+              allocator.alloc(aabb_tree_memory_requirement).begin,
               allocator.alloc(close_particle_particle_pairs_memory_requirement)
                   .begin,
               allocator

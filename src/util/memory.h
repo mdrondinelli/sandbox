@@ -157,6 +157,8 @@ private:
 
 class Unique_block {
 public:
+  constexpr Unique_block() noexcept : _block{}, _allocator{} {}
+
   Unique_block(Block block, Allocator *allocator)
       : _block{block}, _allocator{allocator} {}
 
@@ -169,6 +171,12 @@ public:
   Unique_block(Unique_block &&other) noexcept
       : _block{std::exchange(other._block, Block{})},
         _allocator{std::exchange(other._allocator, nullptr)} {}
+
+  Unique_block &operator=(Unique_block &&other) noexcept {
+    auto temp{std::move(other)};
+    swap(temp);
+    return *this;
+  }
 
   Block get() const noexcept { return _block; }
 
@@ -183,6 +191,11 @@ public:
   void *end() const noexcept { return _block.end; }
 
 private:
+  void swap(Unique_block &other) noexcept {
+    std::swap(_block, other._block);
+    std::swap(_allocator, other._allocator);
+  }
+
   Block _block;
   Allocator *_allocator;
 };

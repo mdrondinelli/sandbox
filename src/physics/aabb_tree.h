@@ -7,6 +7,8 @@
 #include <variant>
 #include <vector>
 
+#include "../util/memory.h"
+#include "../util/object_pool.h"
 #include "aabb.h"
 
 namespace marlon {
@@ -20,6 +22,34 @@ public:
     Aabb bounds;
     std::variant<std::array<Node *, 2>, Payload> payload;
   };
+
+  static constexpr std::size_t
+  memory_requirement(std::size_t leaf_node_capacity,
+                     std::size_t internal_node_capacity) {
+    return util::Stack_allocator<alignof(Node)>::memory_requirement(
+        {decltype(_leaf_node_pool)::memory_requirement(leaf_node_capacity),
+         decltype(_internal_node_pool)::memory_requirement(
+             internal_node_capacity)});
+  }
+
+  explicit Aabb_tree(util::Block block, std::size_t leaf_node_capacity,
+                     std::size_t internal_node_capacity)
+      : Aabb_tree{block.begin, leaf_node_capacity, internal_node_capacity} {}
+
+  explicit Aabb_tree(void *block, std::size_t leaf_node_capacity,
+                     std::size_t internal_node_capacity) {
+    auto allocator = util::Stack_allocator<alignof(Node)>{make_block(
+        block, memory_requirement(leaf_node_capacity, internal_node_capacity))};
+    using node_pool_t = decltype(_leaf_node_pool);
+    _leaf_node_pool = node_pool_t{
+        allocator.alloc(node_pool_t::memory_requirement(leaf_node_capacity)),
+        leaf_node_capacity};
+    using node_stack_t = decltype(_internal_node_pool);
+    _internal_node_pool =
+        node_stack_t{allocator.alloc(node_stack_t::memory_requirement(
+                         internal_node_capacity)),
+                     internal_node_capacity};
+  }
 
   Node *create_leaf(Aabb const &bounds, Payload const &payload) {
     auto const node = _leaf_node_pool.alloc();
@@ -47,7 +77,7 @@ public:
   void build() {
     if (_root_node != nullptr) {
       // free_internal_nodes(_root_node);
-      _internal_node_pool.free_all();
+      _internal_node_pool.clear();
       _root_node = nullptr;
     }
     if (_leaf_nodes.size() > 1) {
@@ -73,63 +103,11 @@ public:
   }
 
 private:
-  class Leaf_node_pool {
-  public:
-    Leaf_node_pool() {
-      // approximately 4MB of leaf nodes
-      auto const capacity = 4 * 1024 * 1024 / sizeof(Node);
-      _nodes.resize(capacity);
-      _free_indices.resize(capacity);
-      for (auto i = std::ptrdiff_t{}; i != capacity; ++i) {
-        _free_indices[i] = i;
-      }
-    }
-
-    Leaf_node_pool(const Leaf_node_pool &other) = delete;
-
-    Leaf_node_pool &operator=(const Leaf_node_pool &other) = delete;
-
-    Node *alloc() {
-      if (_free_indices.empty()) {
-        throw std::runtime_error{"Out of space for leaf aabb tree nodes"};
-      }
-      auto const index = _free_indices.back();
-      _free_indices.pop_back();
-      return _nodes.data() + index;
-    }
-
-    void free(Node *node) noexcept {
-      _free_indices.emplace_back(node - _nodes.data());
-    }
-
-  private:
-    std::vector<Node> _nodes;
-    std::vector<std::ptrdiff_t> _free_indices;
-  };
-
-  class Internal_node_pool {
-  public:
-    Internal_node_pool() : _nodes(4 * 1024 * 1024 / sizeof(Node)), _index{} {}
-
-    Node *alloc() {
-      if (static_cast<std::size_t>(_index) == _nodes.size()) {
-        throw std::runtime_error{"Out of space for internal aabb tree nodes"};
-      }
-      return _nodes.data() + _index++;
-    }
-
-    void free_all() noexcept { _index = 0; }
-
-  private:
-    std::vector<Node> _nodes;
-    std::ptrdiff_t _index;
-  };
-
   // TODO: handle exceptions here. for now just marking as noexcept so that
   // exceptions instantly kill the app
   Node *build_internal_node(std::span<Node *> leaf_nodes) noexcept {
     assert(leaf_nodes.size() > 1);
-    auto const node = _internal_node_pool.alloc();
+    auto const node = &_internal_node_pool.emplace_back();
     node->bounds = leaf_nodes[0]->bounds;
     for (auto it = leaf_nodes.begin() + 1; it != leaf_nodes.end(); ++it) {
       node->bounds = merge(node->bounds, (*it)->bounds);
@@ -187,7 +165,7 @@ private:
         node->payload = std::array<Node *, 2>{left_node, right_node};
         return node;
       } else {
-        auto const parent_node = _internal_node_pool.alloc();
+        auto const parent_node = &_internal_node_pool.emplace_back();
         parent_node->bounds = merge(left_node->bounds, right_node->bounds);
         parent_node->payload = std::array<Node *, 2>{left_node, right_node};
         left_node = parent_node;
@@ -271,8 +249,8 @@ private:
     }
   }
 
-  Leaf_node_pool _leaf_node_pool;
-  Internal_node_pool _internal_node_pool;
+  util::Object_pool<Node> _leaf_node_pool;
+  util::Stack<Node> _internal_node_pool;
   Node *_root_node{};
   ankerl::unordered_dense::set<Node *> _leaf_nodes;
   std::vector<Node *> _flattened_leaf_nodes;

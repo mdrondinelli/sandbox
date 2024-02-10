@@ -10,6 +10,8 @@
 namespace marlon {
 namespace physics {
 struct Space_create_info {
+  std::size_t max_aabb_tree_leaf_nodes{1000000};
+  std::size_t max_aabb_tree_internal_nodes{1000000};
   std::size_t max_particles{100000};
   std::size_t max_dynamic_rigid_bodies{100000};
   std::size_t max_static_rigid_bodies{100000};
