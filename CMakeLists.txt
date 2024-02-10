@@ -21,8 +21,10 @@ add_library(
 )
 add_executable(
   util_tests
+  "src/util/hash_tests.cpp"
   "src/util/map_tests.cpp"
   "src/util/memory_tests.cpp"
+  "src/util/set_tests.cpp"
   "src/util/stack_tests.cpp"
 )
 add_library(

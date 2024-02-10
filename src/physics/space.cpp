@@ -191,7 +191,8 @@ public:
   }
 
   Particle_data *data(Particle_handle handle) {
-    return reinterpret_cast<Particle_data *>(_data.get()) + handle.value;
+    return reinterpret_cast<Particle_data *>(
+        std::launder(_data.get() + sizeof(Particle_data) * handle.value));
   }
 
   template <typename F> void for_each(F &&f) {
@@ -241,8 +242,8 @@ public:
   }
 
   Dynamic_rigid_body_data *data(Dynamic_rigid_body_handle handle) {
-    return reinterpret_cast<Dynamic_rigid_body_data *>(_data.get()) +
-           handle.value;
+    return reinterpret_cast<Dynamic_rigid_body_data *>(std::launder(
+        _data.get() + sizeof(Dynamic_rigid_body_data) * handle.value));
   }
 
   template <typename F> void for_each(F &&f) {
@@ -293,8 +294,8 @@ public:
   }
 
   Static_rigid_body_data *data(Static_rigid_body_handle handle) {
-    return reinterpret_cast<Static_rigid_body_data *>(_data.get()) +
-           handle.value;
+    return reinterpret_cast<Static_rigid_body_data *>(std::launder(
+        _data.get() + sizeof(Static_rigid_body_data) * handle.value));
   }
 
   template <typename F> void for_each(F &&f) {

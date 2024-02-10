@@ -38,6 +38,8 @@ struct Positionful_contact_geometry {
   float separation;
 };
 
+template <typename T> struct Support_function;
+
 class Shape {
 public:
   Shape(Ball const &ball) noexcept : _v{ball} {}

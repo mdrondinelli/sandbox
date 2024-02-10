@@ -16,6 +16,9 @@ public:
     return sizeof(T) * capacity;
   }
 
+  constexpr Stack() noexcept
+      : _begin{nullptr}, _stack_end{nullptr}, _buffer_end{nullptr} {}
+
   explicit Stack(Block block, std::size_t capacity) noexcept
       : Stack{block.begin, capacity} {}
 
@@ -97,6 +100,9 @@ public:
   void resize(std::size_t count) {
     auto const stack_end = _stack_end;
     auto const new_stack_end = _begin + count;
+    if (new_stack_end > _buffer_end) {
+      throw Capacity_error{};
+    }
     if (new_stack_end < stack_end) {
       auto it = new_stack_end;
       do {
