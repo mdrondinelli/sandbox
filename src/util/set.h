@@ -410,7 +410,8 @@ public:
   template <typename K> std::size_t erase(K const &x) noexcept {
     auto const pos = find(x);
     if (pos != end()) {
-      erase(pos) return 1;
+      erase(pos);
+      return 1;
     } else {
       return 0;
     }
@@ -460,13 +461,9 @@ public:
     }
   }
 
-  std::size_t bucket_count() const noexcept {
-    return _buckets.size();
-  }
+  std::size_t bucket_count() const noexcept { return _buckets.size(); }
 
-  std::size_t max_bucket_count() const noexcept {
-    return _buckets.capacity();
-  }
+  std::size_t max_bucket_count() const noexcept { return _buckets.capacity(); }
 
   float load_factor() const noexcept {
     return static_cast<float>(_size) / static_cast<float>(_buckets.size());
