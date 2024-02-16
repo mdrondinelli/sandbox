@@ -31,8 +31,8 @@ public:
     return util::Stack_allocator<alignof(Node)>::memory_requirement({
         decltype(_leaf_node_pool)::memory_requirement(leaf_node_capacity),
         decltype(_leaf_node_set)::memory_requirement(leaf_node_capacity),
-        decltype(_leaf_node_stack)::memory_requirement(leaf_node_capacity),
-        decltype(_internal_node_stack)::memory_requirement(
+        decltype(_leaf_node_array)::memory_requirement(leaf_node_capacity),
+        decltype(_internal_nodes)::memory_requirement(
             internal_node_capacity),
     });
   }
@@ -52,9 +52,9 @@ public:
                          leaf_node_capacity};
     _leaf_node_set =
         util::make_set<Node *>(allocator, leaf_node_capacity).second;
-    _leaf_node_stack =
+    _leaf_node_array =
         util::make_stack<Node *>(allocator, leaf_node_capacity).second;
-    _internal_node_stack =
+    _internal_nodes =
         util::make_stack<Node>(allocator, internal_node_capacity).second;
   }
 
@@ -84,15 +84,15 @@ public:
   void build() {
     if (_root_node != nullptr) {
       // free_internal_nodes(_root_node);
-      _internal_node_stack.clear();
+      _internal_nodes.clear();
       _root_node = nullptr;
     }
     if (_leaf_node_set.size() > 1) {
-      _leaf_node_stack.clear();
+      _leaf_node_array.clear();
       for (auto const element : _leaf_node_set) {
-        _leaf_node_stack.emplace_back(element);
+        _leaf_node_array.emplace_back(element);
       }
-      _root_node = build_internal_node(_leaf_node_stack);
+      _root_node = build_internal_node(_leaf_node_array);
     } else if (_leaf_node_set.size() == 1) {
       for (auto const element : _leaf_node_set) {
         _root_node = element;
@@ -113,7 +113,7 @@ private:
   // exceptions instantly kill the app
   Node *build_internal_node(std::span<Node *> leaf_nodes) noexcept {
     assert(leaf_nodes.size() > 1);
-    auto const node = &_internal_node_stack.emplace_back();
+    auto const node = &_internal_nodes.emplace_back();
     node->bounds = leaf_nodes[0]->bounds;
     for (auto it = leaf_nodes.begin() + 1; it != leaf_nodes.end(); ++it) {
       node->bounds = merge(node->bounds, (*it)->bounds);
@@ -171,7 +171,7 @@ private:
         node->payload = std::array<Node *, 2>{left_node, right_node};
         return node;
       } else {
-        auto const parent_node = &_internal_node_stack.emplace_back();
+        auto const parent_node = &_internal_nodes.emplace_back();
         parent_node->bounds = merge(left_node->bounds, right_node->bounds);
         parent_node->payload = std::array<Node *, 2>{left_node, right_node};
         left_node = parent_node;
@@ -257,8 +257,8 @@ private:
 
   util::Object_pool<Node> _leaf_node_pool;
   util::Set<Node *> _leaf_node_set;
-  util::Stack<Node *> _leaf_node_stack;
-  util::Stack<Node> _internal_node_stack;
+  util::Array<Node *> _leaf_node_array;
+  util::Array<Node> _internal_nodes;
   Node *_root_node{};
 };
 } // namespace physics

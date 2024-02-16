@@ -15,7 +15,7 @@ using marlon::math::Vec3f;
 namespace marlon {
 namespace physics {
 using util::Block;
-using util::Stack;
+using util::Array;
 using util::Stack_allocator;
 
 using util::make_block;
@@ -325,22 +325,22 @@ public:
   static constexpr std::size_t
   memory_requirement(std::size_t capacity) noexcept {
     return Stack_allocator<>::memory_requirement(
-        {Stack<Object_type>::memory_requirement(capacity),
-         Stack<Object_handle_t>::memory_requirement(capacity)});
+        {Array<Object_type>::memory_requirement(capacity),
+         Array<Object_handle_t>::memory_requirement(capacity)});
   }
 
   explicit Object_stack(Block block, std::size_t capacity) noexcept
       : _impl{[&]() {
           auto allocator = Stack_allocator{block};
           auto const object_types_block =
-              allocator.alloc(Stack<Object_type>::memory_requirement(capacity));
+              allocator.alloc(Array<Object_type>::memory_requirement(capacity));
           auto const object_handles_block = allocator.alloc(
-              Stack<Object_handle_t>::memory_requirement(capacity));
+              Array<Object_handle_t>::memory_requirement(capacity));
           return Impl{
               .object_types =
-                  Stack<Object_type>{object_types_block.begin, capacity},
+                  Array<Object_type>{object_types_block.begin, capacity},
               .object_handles =
-                  Stack<Object_handle_t>{object_handles_block.begin, capacity}};
+                  Array<Object_handle_t>{object_handles_block.begin, capacity}};
         }()} {}
 
   explicit Object_stack(void *block_begin, std::size_t capacity) noexcept
@@ -377,8 +377,8 @@ public:
 
 private:
   struct Impl {
-    Stack<Object_type> object_types;
-    Stack<Object_handle_t> object_handles;
+    Array<Object_type> object_types;
+    Array<Object_handle_t> object_handles;
   };
 
   Impl _impl;
@@ -389,21 +389,21 @@ public:
   static constexpr std::size_t
   memory_requirement(std::size_t capacity) noexcept {
     return Stack_allocator<>::memory_requirement(
-        {Stack<Contact_type>::memory_requirement(capacity),
-         Stack<Contact *>::memory_requirement(capacity)});
+        {Array<Contact_type>::memory_requirement(capacity),
+         Array<Contact *>::memory_requirement(capacity)});
   }
 
   explicit Contact_stack(Block block, std::size_t const capacity) noexcept
       : _impl{[&]() {
           auto allocator = Stack_allocator{block};
           auto const contact_types_block = allocator.alloc(
-              Stack<Contact_type>::memory_requirement(capacity));
+              Array<Contact_type>::memory_requirement(capacity));
           auto const contacts_block =
-              allocator.alloc(Stack<Contact *>::memory_requirement(capacity));
+              allocator.alloc(Array<Contact *>::memory_requirement(capacity));
           return Impl{
               .contact_types =
-                  Stack<Contact_type>{contact_types_block.begin, capacity},
-              .contacts = Stack<Contact *>{contacts_block.begin, capacity}};
+                  Array<Contact_type>{contact_types_block.begin, capacity},
+              .contacts = Array<Contact *>{contacts_block.begin, capacity}};
         }()} {}
 
   explicit Contact_stack(void *block_begin, std::size_t const capacity) noexcept
@@ -554,8 +554,8 @@ public:
 
 private:
   struct Impl {
-    Stack<Contact_type> contact_types;
-    Stack<Contact *> contacts;
+    Array<Contact_type> contact_types;
+    Array<Contact *> contacts;
   };
 
   Impl _impl;
@@ -2319,31 +2319,31 @@ private:
   Particle_storage _particles;
   Static_rigid_body_storage _static_rigid_bodies;
   Dynamic_rigid_body_storage _dynamic_rigid_bodies;
-  Stack<std::pair<Particle_handle, Particle_handle>>
+  Array<std::pair<Particle_handle, Particle_handle>>
       _close_particle_particle_pairs;
-  Stack<std::pair<Particle_handle, Dynamic_rigid_body_handle>>
+  Array<std::pair<Particle_handle, Dynamic_rigid_body_handle>>
       _close_particle_rigid_body_pairs;
-  Stack<std::pair<Particle_handle, Static_rigid_body_handle>>
+  Array<std::pair<Particle_handle, Static_rigid_body_handle>>
       _close_particle_static_body_pairs;
-  Stack<std::pair<Dynamic_rigid_body_handle, Dynamic_rigid_body_handle>>
+  Array<std::pair<Dynamic_rigid_body_handle, Dynamic_rigid_body_handle>>
       _close_rigid_body_rigid_body_pairs;
-  Stack<std::pair<Dynamic_rigid_body_handle, Static_rigid_body_handle>>
+  Array<std::pair<Dynamic_rigid_body_handle, Static_rigid_body_handle>>
       _close_rigid_body_static_body_pairs;
-  Stack<Particle_particle_contact> _particle_particle_contacts;
-  Stack<Particle_dynamic_rigid_body_contact> _particle_rigid_body_contacts;
-  Stack<Particle_static_rigid_body_contact> _particle_static_body_contacts;
-  Stack<Dynamic_rigid_body_dynamic_rigid_body_contact>
+  Array<Particle_particle_contact> _particle_particle_contacts;
+  Array<Particle_dynamic_rigid_body_contact> _particle_rigid_body_contacts;
+  Array<Particle_static_rigid_body_contact> _particle_static_body_contacts;
+  Array<Dynamic_rigid_body_dynamic_rigid_body_contact>
       _rigid_body_rigid_body_contacts;
-  Stack<Dynamic_rigid_body_static_rigid_body_contact>
+  Array<Dynamic_rigid_body_static_rigid_body_contact>
       _rigid_body_static_body_contacts;
-  Stack<Particle_particle_contact *> _particle_particle_contact_pointers;
-  Stack<Particle_dynamic_rigid_body_contact *>
+  Array<Particle_particle_contact *> _particle_particle_contact_pointers;
+  Array<Particle_dynamic_rigid_body_contact *>
       _particle_rigid_body_contact_pointers;
-  Stack<Particle_static_rigid_body_contact *>
+  Array<Particle_static_rigid_body_contact *>
       _particle_static_body_contact_pointers;
-  Stack<Dynamic_rigid_body_dynamic_rigid_body_contact *>
+  Array<Dynamic_rigid_body_dynamic_rigid_body_contact *>
       _rigid_body_rigid_body_contact_pointers;
-  Stack<Dynamic_rigid_body_static_rigid_body_contact *>
+  Array<Dynamic_rigid_body_static_rigid_body_contact *>
       _rigid_body_static_body_contact_pointers;
   Object_stack _island_fringe;
   Contact_stack _island_contacts;

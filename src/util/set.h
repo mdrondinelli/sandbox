@@ -128,7 +128,7 @@ public:
                      std::size_t max_bucket_count) noexcept {
     assert(std::has_one_bit(max_bucket_count));
     return Stack_allocator<alignof(Node)>::memory_requirement({
-        Stack<Bucket>::memory_requirement(max_bucket_count),
+        Array<Bucket>::memory_requirement(max_bucket_count),
         Stack_allocator<alignof(Node)>::memory_requirement(
             {max_node_count * sizeof(Node)}),
     });
@@ -156,8 +156,8 @@ public:
     assert(std::has_one_bit(max_bucket_count));
     auto allocator = Stack_allocator<alignof(Node)>{make_block(
         block_begin, memory_requirement(max_bucket_count, max_node_count))};
-    _buckets = Stack<Bucket>{
-        allocator.alloc(Stack<Bucket>::memory_requirement(max_bucket_count)),
+    _buckets = Array<Bucket>{
+        allocator.alloc(Array<Bucket>::memory_requirement(max_bucket_count)),
         max_bucket_count};
     _buckets.resize(std::min(max_bucket_count, std::size_t{16}));
     _nodes = Free_list_allocator<Stack_allocator<alignof(Node)>, sizeof(Node),
@@ -526,7 +526,7 @@ public:
   }
 
 private:
-  Stack<Bucket> _buckets;
+  Array<Bucket> _buckets;
   Free_list_allocator<Stack_allocator<alignof(Node)>, sizeof(Node),
                       sizeof(Node)>
       _nodes;

@@ -6,7 +6,7 @@
 
 namespace marlon {
 namespace util {
-template <typename T> class Stack {
+template <typename T> class Array {
 public:
   using Const_iterator = T const *;
   using Iterator = T *;
@@ -16,17 +16,17 @@ public:
     return sizeof(T) * capacity;
   }
 
-  constexpr Stack() noexcept
+  constexpr Array() noexcept
       : _begin{nullptr}, _stack_end{nullptr}, _buffer_end{nullptr} {}
 
-  explicit Stack(Block block, std::size_t capacity) noexcept
-      : Stack{block.begin, capacity} {}
+  explicit Array(Block block, std::size_t capacity) noexcept
+      : Array{block.begin, capacity} {}
 
-  explicit Stack(void *block_begin, std::size_t capacity) noexcept
+  explicit Array(void *block_begin, std::size_t capacity) noexcept
       : _begin{static_cast<T *>(block_begin)}, _stack_end{_begin},
         _buffer_end{_begin + capacity} {}
 
-  ~Stack() { clear(); }
+  ~Array() { clear(); }
 
   T const &operator[](std::size_t index) const noexcept {
     return _begin[index];
@@ -62,7 +62,9 @@ public:
 
   std::size_t size() const noexcept { return _stack_end - _begin; }
 
-  std::size_t capacity() const noexcept { return _buffer_end - _begin; }
+  std::size_t max_size() const noexcept { return _buffer_end - _begin; }
+
+  std::size_t capacity() const noexcept { return max_size(); }
 
   void clear() {
     auto const begin = _begin;
@@ -127,10 +129,10 @@ private:
 };
 
 template <typename T, typename Allocator>
-std::pair<Block, Stack<T>> make_stack(Allocator &allocator,
+std::pair<Block, Array<T>> make_stack(Allocator &allocator,
                                       std::size_t max_size) {
-  auto const block = allocator.alloc(Stack<T>::memory_requirement(max_size));
-  return {block, Stack<T>{block, max_size}};
+  auto const block = allocator.alloc(Array<T>::memory_requirement(max_size));
+  return {block, Array<T>{block, max_size}};
 }
 } // namespace util
 } // namespace marlon
