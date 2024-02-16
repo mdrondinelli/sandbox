@@ -7,10 +7,10 @@
 #include <variant>
 #include <vector>
 
+#include "../util/array.h"
 #include "../util/memory.h"
 #include "../util/object_pool.h"
 #include "../util/set.h"
-#include "../util/stack.h"
 #include "aabb.h"
 
 namespace marlon {

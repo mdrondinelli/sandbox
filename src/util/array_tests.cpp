@@ -1,4 +1,4 @@
-#include "stack.h"
+#include "array.h"
 
 #include <array>
 
@@ -10,5 +10,5 @@ namespace util {
 //   alignas(16) std::array<std::byte, 1024> memory;
 //   make_block(memory.data(), memory.size());
 // }
-} // namespace math
+} // namespace util
 } // namespace marlon

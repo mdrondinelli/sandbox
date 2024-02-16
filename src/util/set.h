@@ -7,10 +7,10 @@
 #include <bit>
 #include <utility>
 
+#include "array.h"
 #include "equal.h"
 #include "hash.h"
 #include "memory.h"
-#include "stack.h"
 
 namespace marlon {
 namespace util {

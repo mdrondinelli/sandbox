@@ -4,9 +4,7 @@
 
 #include <iostream>
 
-#include <ankerl/unordered_dense.h>
-
-#include "../util/stack.h"
+#include "../util/array.h"
 #include "aabb_tree.h"
 
 using marlon::math::Mat3x3f;
