@@ -124,8 +124,8 @@ public:
   };
 
   static constexpr std::size_t
-  memory_requirement(std::size_t max_bucket_count,
-                     std::size_t max_node_count) noexcept {
+  memory_requirement(std::size_t max_node_count,
+                     std::size_t max_bucket_count) noexcept {
     assert(std::has_one_bit(max_bucket_count));
     return Stack_allocator<alignof(Node)>::memory_requirement({
         Stack<Bucket>::memory_requirement(max_bucket_count),
@@ -134,14 +134,25 @@ public:
     });
   }
 
+  static constexpr std::size_t
+  memory_requirement(std::size_t max_node_count) noexcept {
+    return memory_requirement(max_node_count, max_node_count);
+  }
+
   constexpr Set() noexcept = default;
 
-  explicit Set(Block block, std::size_t max_bucket_count,
-               std::size_t max_node_count) noexcept
-      : Set{block.begin, max_bucket_count, max_node_count} {}
+  explicit Set(Block block, std::size_t max_node_count) noexcept
+      : Set{block, max_node_count, max_node_count} {}
 
-  explicit Set(void *block_begin, std::size_t max_bucket_count,
-               std::size_t max_node_count) noexcept {
+  explicit Set(Block block, std::size_t max_node_count,
+               std::size_t max_bucket_count) noexcept
+      : Set{block.begin, max_node_count, max_bucket_count} {}
+
+  explicit Set(void *block_begin, std::size_t max_node_count) noexcept
+      : Set{block_begin, max_node_count, max_node_count} {}
+
+  explicit Set(void *block_begin, std::size_t max_node_count,
+               std::size_t max_bucket_count) noexcept {
     assert(std::has_one_bit(max_bucket_count));
     auto allocator = Stack_allocator<alignof(Node)>{make_block(
         block_begin, memory_requirement(max_bucket_count, max_node_count))};
@@ -523,6 +534,23 @@ private:
   std::size_t _size{};
   float _max_load_factor{1.0f};
 };
+
+template <typename T, typename Hash = Hash<T>, typename Equal = Equal<T>,
+          typename Allocator>
+std::pair<Block, Set<T, Hash, Equal>> make_set(Allocator &allocator,
+                                               std::size_t max_node_count,
+                                               std::size_t max_bucket_count) {
+  auto const block = allocator.alloc(Set<T, Hash, Equal>::memory_requirement(
+      max_node_count, max_bucket_count));
+  return {block, Set<T, Hash, Equal>{block, max_node_count, max_bucket_count}};
+}
+
+template <typename T, typename Hash = Hash<T>, typename Equal = Equal<T>,
+          typename Allocator>
+std::pair<Block, Set<T, Hash, Equal>> make_set(Allocator &allocator,
+                                               std::size_t max_node_count) {
+  return make_set<T, Hash, Equal, Allocator>(allocator, max_node_count, max_node_count);
+}
 } // namespace util
 } // namespace marlon
 

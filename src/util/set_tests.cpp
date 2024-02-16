@@ -16,8 +16,8 @@ TEST_CASE("marlon::util::Set") {
   auto const max_bucket_count = 64;
   auto const max_node_count = 64;
   auto const block = make_unique_block(
-      Set<int>::memory_requirement(max_bucket_count, max_node_count));
-  set = Set<int>{block.get(), max_bucket_count, max_node_count};
+      Set<int>::memory_requirement(max_node_count, max_bucket_count));
+  set = Set<int>{block.get(), max_node_count, max_bucket_count};
   for (auto j = 0; j < 2; ++j) {
     for (int i = 1; i <= 63; ++i) {
       auto const it = set.emplace(i);

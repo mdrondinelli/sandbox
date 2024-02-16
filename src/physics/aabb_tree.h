@@ -9,6 +9,8 @@
 
 #include "../util/memory.h"
 #include "../util/object_pool.h"
+#include "../util/set.h"
+#include "../util/stack.h"
 #include "aabb.h"
 
 namespace marlon {
@@ -26,10 +28,13 @@ public:
   static constexpr std::size_t
   memory_requirement(std::size_t leaf_node_capacity,
                      std::size_t internal_node_capacity) {
-    return util::Stack_allocator<alignof(Node)>::memory_requirement(
-        {decltype(_leaf_node_pool)::memory_requirement(leaf_node_capacity),
-         decltype(_internal_node_pool)::memory_requirement(
-             internal_node_capacity)});
+    return util::Stack_allocator<alignof(Node)>::memory_requirement({
+        decltype(_leaf_node_pool)::memory_requirement(leaf_node_capacity),
+        decltype(_leaf_node_set)::memory_requirement(leaf_node_capacity),
+        decltype(_leaf_node_stack)::memory_requirement(leaf_node_capacity),
+        decltype(_internal_node_stack)::memory_requirement(
+            internal_node_capacity),
+    });
   }
 
   explicit Aabb_tree(util::Block block, std::size_t leaf_node_capacity,
@@ -40,21 +45,23 @@ public:
                      std::size_t internal_node_capacity) {
     auto allocator = util::Stack_allocator<alignof(Node)>{make_block(
         block, memory_requirement(leaf_node_capacity, internal_node_capacity))};
-    using node_pool_t = decltype(_leaf_node_pool);
-    _leaf_node_pool = node_pool_t{
-        allocator.alloc(node_pool_t::memory_requirement(leaf_node_capacity)),
-        leaf_node_capacity};
-    using node_stack_t = decltype(_internal_node_pool);
-    _internal_node_pool =
-        node_stack_t{allocator.alloc(node_stack_t::memory_requirement(
-                         internal_node_capacity)),
-                     internal_node_capacity};
+    using leaf_node_pool_t = decltype(_leaf_node_pool);
+    _leaf_node_pool =
+        leaf_node_pool_t{allocator.alloc(leaf_node_pool_t::memory_requirement(
+                             leaf_node_capacity)),
+                         leaf_node_capacity};
+    _leaf_node_set =
+        util::make_set<Node *>(allocator, leaf_node_capacity).second;
+    _leaf_node_stack =
+        util::make_stack<Node *>(allocator, leaf_node_capacity).second;
+    _internal_node_stack =
+        util::make_stack<Node>(allocator, internal_node_capacity).second;
   }
 
   Node *create_leaf(Aabb const &bounds, Payload const &payload) {
     auto const node = _leaf_node_pool.alloc();
     try {
-      _leaf_nodes.emplace(node);
+      _leaf_node_set.emplace(node);
     } catch (...) {
       _leaf_node_pool.free(node);
       throw;
@@ -70,25 +77,24 @@ public:
       auto &parents_children = std::get<0>(node->parent->payload);
       parents_children[parents_children[0] == node ? 0 : 1] = nullptr;
     }
-    _leaf_nodes.erase(node);
+    _leaf_node_set.erase(node);
     _leaf_node_pool.free(node);
   }
 
   void build() {
     if (_root_node != nullptr) {
       // free_internal_nodes(_root_node);
-      _internal_node_pool.clear();
+      _internal_node_stack.clear();
       _root_node = nullptr;
     }
-    if (_leaf_nodes.size() > 1) {
-      _flattened_leaf_nodes.clear();
-      _flattened_leaf_nodes.reserve(_leaf_nodes.size());
-      for (auto const element : _leaf_nodes) {
-        _flattened_leaf_nodes.emplace_back(element);
+    if (_leaf_node_set.size() > 1) {
+      _leaf_node_stack.clear();
+      for (auto const element : _leaf_node_set) {
+        _leaf_node_stack.emplace_back(element);
       }
-      _root_node = build_internal_node(_flattened_leaf_nodes);
-    } else if (_leaf_nodes.size() == 1) {
-      for (auto const element : _leaf_nodes) {
+      _root_node = build_internal_node(_leaf_node_stack);
+    } else if (_leaf_node_set.size() == 1) {
+      for (auto const element : _leaf_node_set) {
         _root_node = element;
       }
     }
@@ -107,7 +113,7 @@ private:
   // exceptions instantly kill the app
   Node *build_internal_node(std::span<Node *> leaf_nodes) noexcept {
     assert(leaf_nodes.size() > 1);
-    auto const node = &_internal_node_pool.emplace_back();
+    auto const node = &_internal_node_stack.emplace_back();
     node->bounds = leaf_nodes[0]->bounds;
     for (auto it = leaf_nodes.begin() + 1; it != leaf_nodes.end(); ++it) {
       node->bounds = merge(node->bounds, (*it)->bounds);
@@ -165,7 +171,7 @@ private:
         node->payload = std::array<Node *, 2>{left_node, right_node};
         return node;
       } else {
-        auto const parent_node = &_internal_node_pool.emplace_back();
+        auto const parent_node = &_internal_node_stack.emplace_back();
         parent_node->bounds = merge(left_node->bounds, right_node->bounds);
         parent_node->payload = std::array<Node *, 2>{left_node, right_node};
         left_node = parent_node;
@@ -250,10 +256,10 @@ private:
   }
 
   util::Object_pool<Node> _leaf_node_pool;
-  util::Stack<Node> _internal_node_pool;
+  util::Set<Node *> _leaf_node_set;
+  util::Stack<Node *> _leaf_node_stack;
+  util::Stack<Node> _internal_node_stack;
   Node *_root_node{};
-  ankerl::unordered_dense::set<Node *> _leaf_nodes;
-  std::vector<Node *> _flattened_leaf_nodes;
 };
 } // namespace physics
 } // namespace marlon

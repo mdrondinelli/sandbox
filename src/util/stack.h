@@ -125,6 +125,13 @@ private:
   T *_stack_end;
   T *_buffer_end;
 };
+
+template <typename T, typename Allocator>
+std::pair<Block, Stack<T>> make_stack(Allocator &allocator,
+                                      std::size_t max_size) {
+  auto const block = allocator.alloc(Stack<T>::memory_requirement(max_size));
+  return {block, Stack<T>{block, max_size}};
+}
 } // namespace util
 } // namespace marlon
 
