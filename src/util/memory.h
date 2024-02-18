@@ -92,7 +92,7 @@ private:
   void *_top;
 };
 
-template <class Parent, std::size_t MinSize, std::size_t MaxSize>
+template <class Parent, std::size_t MinSize, std::size_t MaxSize = MinSize>
 class Free_list_allocator : public Allocator {
 public:
   Free_list_allocator() = default;
@@ -134,6 +134,35 @@ private:
 
   static_assert(MaxSize >= sizeof(Node));
 };
+
+template <std::size_t MinSize, std::size_t MaxSize = MinSize>
+class Pool_allocator : public Allocator {
+public:
+  static constexpr std::size_t memory_requirement(std::size_t max_blocks) {
+    return MaxSize * max_blocks;
+  }
+
+  Pool_allocator() noexcept = default;
+
+  explicit Pool_allocator(Block block) noexcept
+      : _impl{Stack_allocator<1>{block}} {}
+
+  Block alloc(std::size_t size) final { return _impl.alloc(size); }
+
+  void free(Block block) noexcept final { _impl.free(block); }
+
+private:
+  Free_list_allocator<Stack_allocator<1>, MinSize, MaxSize> _impl;
+};
+
+template <std::size_t MinSize, std::size_t MaxSize = MinSize,
+          typename Allocator>
+std::pair<Block, Pool_allocator<MinSize, MaxSize>>
+make_pool_allocator(Allocator &allocator, std::size_t max_blocks) {
+  auto const block = allocator.alloc(
+      Pool_allocator<MinSize, MaxSize>::memory_requirement(max_blocks));
+  return {block, Pool_allocator<MinSize, MaxSize>{block}};
+}
 
 class System_allocator : public Allocator {
 public:
