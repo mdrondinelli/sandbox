@@ -163,6 +163,18 @@ public:
         make_pool_allocator<sizeof(Node)>(allocator, max_node_count).second;
   }
 
+  Set(Set &&other) noexcept
+      : _buckets{std::move(other._buckets)}, _nodes{std::move(other._nodes)},
+        _head{std::exchange(other._head, nullptr)},
+        _size{std::exchange(other._size, 0)},
+        _max_load_factor{other._max_load_factor} {}
+
+  Set &operator=(Set &&other) noexcept {
+    auto temp{std::move(other)};
+    swap(temp);
+    return *this;
+  }
+
   ~Set() {
     auto node = _head;
     while (node) {
@@ -524,6 +536,14 @@ public:
   }
 
 private:
+  void swap(Set<T, Hash, Equal> &other) noexcept {
+    std::swap(_buckets, other._buckets);
+    std::swap(_nodes, other._nodes);
+    std::swap(_head, other._head);
+    std::swap(_size, other._size);
+    std::swap(_max_load_factor, other._max_load_factor);
+  }
+
   Array<Bucket> _buckets;
   Pool_allocator<sizeof(Node)> _nodes;
   Node *_head{};

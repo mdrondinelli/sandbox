@@ -184,6 +184,24 @@ private:
   static System_allocator _instance;
 };
 
+class Polymorphic_allocator : public Allocator {
+public:
+  Polymorphic_allocator() = default;
+
+  Polymorphic_allocator(Allocator *allocator) : _allocator{allocator} {}
+
+  Block alloc(std::size_t size) final {
+    return _allocator->alloc(size);
+  }
+
+  void free(Block block) noexcept final {
+    _allocator->free(block);
+  }
+
+private:
+  Allocator *_allocator{};
+};
+
 class Unique_block {
 public:
   constexpr Unique_block() noexcept : _block{}, _allocator{} {}
