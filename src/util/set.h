@@ -31,6 +31,8 @@ class Set {
     T &value() noexcept { return *reinterpret_cast<T *>(&storage); }
   };
 
+  static constexpr auto _alignment = std::max(alignof(Bucket), alignof(Node));
+
 public:
   class Iterator {
     friend class Set;
@@ -127,10 +129,9 @@ public:
   memory_requirement(std::size_t max_node_count,
                      std::size_t max_bucket_count) noexcept {
     assert(std::has_one_bit(max_bucket_count));
-    return Stack_allocator<alignof(Node)>::memory_requirement({
+    return Stack_allocator<_alignment>::memory_requirement({
         Array<Bucket>::memory_requirement(max_bucket_count),
-        Stack_allocator<alignof(Node)>::memory_requirement(
-            {max_node_count * sizeof(Node)}),
+        Pool_allocator<sizeof(Node)>::memory_requirement(max_node_count),
     });
   }
 
@@ -154,15 +155,12 @@ public:
   explicit Set(void *block_begin, std::size_t max_node_count,
                std::size_t max_bucket_count) noexcept {
     assert(std::has_one_bit(max_bucket_count));
-    auto allocator = Stack_allocator<alignof(Node)>{make_block(
+    auto allocator = Stack_allocator<_alignment>{make_block(
         block_begin, memory_requirement(max_bucket_count, max_node_count))};
-    _buckets = Array<Bucket>{
-        allocator.alloc(Array<Bucket>::memory_requirement(max_bucket_count)),
-        max_bucket_count};
+    _buckets = make_array<Bucket>(allocator, max_bucket_count).second;
     _buckets.resize(std::min(max_bucket_count, std::size_t{16}));
-    _nodes = Free_list_allocator<Stack_allocator<alignof(Node)>, sizeof(Node),
-                                 sizeof(Node)>{Stack_allocator<alignof(Node)>{
-        allocator.alloc(max_node_count * sizeof(Node))}};
+    _nodes =
+        make_pool_allocator<sizeof(Node)>(allocator, max_node_count).second;
   }
 
   ~Set() {
@@ -527,9 +525,7 @@ public:
 
 private:
   Array<Bucket> _buckets;
-  Free_list_allocator<Stack_allocator<alignof(Node)>, sizeof(Node),
-                      sizeof(Node)>
-      _nodes;
+  Pool_allocator<sizeof(Node)> _nodes;
   Node *_head{};
   std::size_t _size{};
   float _max_load_factor{1.0f};
@@ -549,7 +545,8 @@ template <typename T, typename Hash = Hash<T>, typename Equal = Equal<T>,
           typename Allocator>
 std::pair<Block, Set<T, Hash, Equal>> make_set(Allocator &allocator,
                                                std::size_t max_node_count) {
-  return make_set<T, Hash, Equal, Allocator>(allocator, max_node_count, max_node_count);
+  return make_set<T, Hash, Equal, Allocator>(allocator, max_node_count,
+                                             max_node_count);
 }
 } // namespace util
 } // namespace marlon
