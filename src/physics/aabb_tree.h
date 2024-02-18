@@ -9,7 +9,7 @@
 
 #include "../util/array.h"
 #include "../util/memory.h"
-#include "../util/object_pool.h"
+#include "../util/pool.h"
 #include "../util/set.h"
 #include "aabb.h"
 

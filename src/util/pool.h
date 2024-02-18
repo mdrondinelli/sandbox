@@ -1,5 +1,5 @@
-#ifndef MARLON_UTIL_OBJECT_POOL_H
-#define MARLON_UTIL_OBJECT_POOL_H
+#ifndef MARLON_UTIL_POOL_H
+#define MARLON_UTIL_POOL_H
 
 #include <algorithm>
 
