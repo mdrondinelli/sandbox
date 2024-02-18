@@ -255,7 +255,7 @@ private:
     }
   }
 
-  util::Object_pool<Node> _leaf_node_pool;
+  util::Pool<Node> _leaf_node_pool;
   util::Set<Node *> _leaf_node_set;
   util::Array<Node *> _leaf_node_array;
   util::Array<Node> _internal_nodes;

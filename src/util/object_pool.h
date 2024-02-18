@@ -7,29 +7,29 @@
 
 namespace marlon {
 namespace util {
-template <typename T> class Object_pool {
+template <typename T> class Pool {
 public:
   static constexpr std::size_t
-  memory_requirement(std::size_t capacity) noexcept {
-    return sizeof(T) * capacity;
+  memory_requirement(std::size_t max_objects) noexcept {
+    return sizeof(T) * max_objects;
   }
 
-  Object_pool() noexcept = default;
+  Pool() noexcept = default;
 
-  Object_pool(Object_pool<T> const &other) = delete;
+  Pool(Pool<T> const &other) = delete;
 
-  Object_pool &operator=(Object_pool<T> const &other) = delete;
+  Pool &operator=(Pool<T> const &other) = delete;
 
-  Object_pool(Object_pool<T> &&other) = default;
+  Pool(Pool<T> &&other) = default;
 
-  Object_pool &operator=(Object_pool<T> &&other) = default;
+  Pool &operator=(Pool<T> &&other) = default;
 
-  explicit Object_pool(Block block, std::size_t capacity) noexcept
-      : Object_pool{block.begin, capacity} {}
+  explicit Pool(Block block, std::size_t max_objects) noexcept
+      : Pool{block.begin, max_objects} {}
 
-  explicit Object_pool(void *block_begin, std::size_t capacity) noexcept
+  explicit Pool(void *block_begin, std::size_t max_objects) noexcept
       : _allocator{Stack_allocator<alignof(T)>{
-            make_block(block_begin, memory_requirement(capacity))}} {}
+            make_block(block_begin, memory_requirement(max_objects))}} {}
 
   template <typename... Args> T *alloc(Args &&...args) {
     return new (_allocator.alloc(sizeof(T)).begin)
@@ -46,6 +46,13 @@ private:
                       std::max(sizeof(T), sizeof(void *))>
       _allocator;
 };
+
+template <typename T, typename Allocator>
+std::pair<Block, Pool<T>> make_pool(Allocator &allocator,
+                                    std::size_t max_objects) {
+  auto const block = allocator.alloc(Pool<T>::memory_requirement(max_objects));
+  return {block, Pool<T>(block, max_objects)};
+}
 } // namespace util
 } // namespace marlon
 
