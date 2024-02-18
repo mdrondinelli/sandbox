@@ -53,9 +53,9 @@ public:
     _leaf_node_set =
         util::make_set<Node *>(allocator, leaf_node_capacity).second;
     _leaf_node_array =
-        util::make_stack<Node *>(allocator, leaf_node_capacity).second;
+        util::make_array<Node *>(allocator, leaf_node_capacity).second;
     _internal_nodes =
-        util::make_stack<Node>(allocator, internal_node_capacity).second;
+        util::make_array<Node>(allocator, internal_node_capacity).second;
   }
 
   Node *create_leaf(Aabb const &bounds, Payload const &payload) {

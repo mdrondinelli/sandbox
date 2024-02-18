@@ -129,7 +129,7 @@ private:
 };
 
 template <typename T, typename Allocator>
-std::pair<Block, Array<T>> make_stack(Allocator &allocator,
+std::pair<Block, Array<T>> make_array(Allocator &allocator,
                                       std::size_t max_size) {
   auto const block = allocator.alloc(Array<T>::memory_requirement(max_size));
   return {block, Array<T>{block, max_size}};
