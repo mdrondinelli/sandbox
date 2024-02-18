@@ -83,12 +83,6 @@ public:
     }
   }
 
-  // void push_back_n(T const &object, std::size_t n) {
-  //   for (auto i = std::size_t{}; i != n; ++i) {
-  //     push_back(object);
-  //   }
-  // }
-
   template <typename... Args> T &emplace_back(Args &&...args) {
     if (_stack_end != _buffer_end) {
       return *(new (_stack_end++) T(std::forward<Args>(args)...));
