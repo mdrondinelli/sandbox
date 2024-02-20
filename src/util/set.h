@@ -184,6 +184,10 @@ public:
     }
   }
 
+  void const *data() const noexcept { return _buckets.data(); }
+
+  void *data() noexcept { return _buckets.data(); }
+
   Iterator begin() noexcept { return Iterator{_head}; }
 
   Const_iterator begin() const noexcept { return Const_iterator{_head}; }
@@ -197,6 +201,8 @@ public:
   Const_iterator cend() const noexcept { return Const_iterator{nullptr}; }
 
   std::size_t size() const noexcept { return _size; }
+
+  std::size_t max_size() const noexcept { return _nodes.max_blocks(); }
 
   void clear() noexcept {
     for (auto &bucket : _buckets) {
@@ -497,7 +503,7 @@ public:
   void rehash(std::size_t count) noexcept {
     auto const n = std::min(
         std::bit_ceil(std::max(count, static_cast<std::size_t>(std::ceil(
-                                          _size * _max_load_factor)))),
+                                          _size / _max_load_factor)))),
         _buckets.capacity());
     if (_buckets.size() == n) {
       return;
