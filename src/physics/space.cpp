@@ -12,8 +12,8 @@ using marlon::math::Vec3f;
 
 namespace marlon {
 namespace physics {
-using util::Block;
 using util::Array;
+using util::Block;
 using util::Stack_allocator;
 
 using util::make_block;
@@ -568,8 +568,9 @@ public:
   friend class Space;
 
   explicit Impl(
-      Space_create_info const &create_info, void *system_allocation,
-      void *aabb_tree_block, void *potential_particle_particle_contacts_begin,
+      Space_create_info const &create_info,
+      std::unique_ptr<std::byte[]> system_allocation, void *aabb_tree_block,
+      void *potential_particle_particle_contacts_begin,
       void *potential_particle_dynamic_rigid_body_contacts_begin,
       void *potential_particle_static_rigid_body_contacts_begin,
       void *potential_dynamic_rigid_body_dynamic_rigid_body_contacts_begin,
@@ -585,7 +586,7 @@ public:
       void *dynamic_rigid_body_dynamic_rigid_body_contact_pointers_begin,
       void *dynamic_rigid_body_static_rigid_body_contact_pointers_begin,
       void *island_fringe_begin, void *island_contacts_begin)
-      : _system_allocation{system_allocation},
+      : _system_allocation{std::move(system_allocation)},
         _aabb_tree{aabb_tree_block, create_info.max_aabb_tree_leaf_nodes,
                    create_info.max_aabb_tree_internal_nodes},
         _particles{create_info.max_particles},
@@ -643,8 +644,6 @@ public:
         _min_contact_separating_velocity{
             create_info.min_contact_separating_velocity},
         _gravitational_acceleration{create_info.gravitational_acceleration} {}
-
-  ~Impl() { free(_system_allocation); }
 
   Particle_handle create_particle(Particle_create_info const &create_info) {
     auto const bounds =
@@ -2312,7 +2311,7 @@ private:
         });
   }
 
-  void *_system_allocation;
+  std::unique_ptr<std::byte[]> _system_allocation;
   Aabb_tree<Aabb_tree_payload_t> _aabb_tree;
   Particle_storage _particles;
   Static_rigid_body_storage _static_rigid_bodies;
@@ -2437,62 +2436,54 @@ Space::Space(Space_create_info const &create_info)
                  rigid_body_static_body_contact_pointers_memory_requirement,
                  island_fringe_memory_requirement,
                  island_contacts_memory_requirement});
-        auto const system_allocation = std::malloc(total_memory_requirement);
-        if (system_allocation) {
-          auto allocator = Stack_allocator{
-              make_block(system_allocation, total_memory_requirement)};
-          return std::make_unique<Impl>(
-              create_info, system_allocation,
-              allocator.alloc(aabb_tree_memory_requirement).begin,
-              allocator.alloc(close_particle_particle_pairs_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(close_particle_rigid_body_pairs_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(close_particle_static_body_pairs_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(close_rigid_body_rigid_body_pairs_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(close_rigid_body_static_body_pairs_memory_requirement)
-                  .begin,
-              allocator.alloc(particle_particle_contacts_memory_requirement)
-                  .begin,
-              allocator.alloc(particle_rigid_body_contacts_memory_requirement)
-                  .begin,
-              allocator.alloc(particle_static_body_contacts_memory_requirement)
-                  .begin,
-              allocator.alloc(rigid_body_rigid_body_contacts_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(rigid_body_static_body_contacts_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(particle_particle_contact_pointers_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(
-                      particle_rigid_body_contact_pointers_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(
-                      particle_static_body_contact_pointers_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(
-                      rigid_body_rigid_body_contact_pointers_memory_requirement)
-                  .begin,
-              allocator
-                  .alloc(
-                      rigid_body_static_body_contact_pointers_memory_requirement)
-                  .begin,
-              allocator.alloc(island_fringe_memory_requirement).begin,
-              allocator.alloc(island_contacts_memory_requirement).begin);
-        } else {
-          throw std::bad_alloc{};
-        }
+        auto system_allocation =
+            std::make_unique<std::byte[]>(total_memory_requirement);
+        auto allocator = Stack_allocator{
+            make_block(system_allocation.get(), total_memory_requirement)};
+        return std::make_unique<Impl>(
+            create_info, std::move(system_allocation),
+            allocator.alloc(aabb_tree_memory_requirement).begin,
+            allocator.alloc(close_particle_particle_pairs_memory_requirement)
+                .begin,
+            allocator.alloc(close_particle_rigid_body_pairs_memory_requirement)
+                .begin,
+            allocator.alloc(close_particle_static_body_pairs_memory_requirement)
+                .begin,
+            allocator
+                .alloc(close_rigid_body_rigid_body_pairs_memory_requirement)
+                .begin,
+            allocator
+                .alloc(close_rigid_body_static_body_pairs_memory_requirement)
+                .begin,
+            allocator.alloc(particle_particle_contacts_memory_requirement)
+                .begin,
+            allocator.alloc(particle_rigid_body_contacts_memory_requirement)
+                .begin,
+            allocator.alloc(particle_static_body_contacts_memory_requirement)
+                .begin,
+            allocator.alloc(rigid_body_rigid_body_contacts_memory_requirement)
+                .begin,
+            allocator.alloc(rigid_body_static_body_contacts_memory_requirement)
+                .begin,
+            allocator
+                .alloc(particle_particle_contact_pointers_memory_requirement)
+                .begin,
+            allocator
+                .alloc(particle_rigid_body_contact_pointers_memory_requirement)
+                .begin,
+            allocator
+                .alloc(particle_static_body_contact_pointers_memory_requirement)
+                .begin,
+            allocator
+                .alloc(
+                    rigid_body_rigid_body_contact_pointers_memory_requirement)
+                .begin,
+            allocator
+                .alloc(
+                    rigid_body_static_body_contact_pointers_memory_requirement)
+                .begin,
+            allocator.alloc(island_fringe_memory_requirement).begin,
+            allocator.alloc(island_contacts_memory_requirement).begin);
       }()} {}
 
 Space::~Space() {}

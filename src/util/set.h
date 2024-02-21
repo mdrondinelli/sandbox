@@ -128,9 +128,9 @@ public:
   static constexpr std::size_t
   memory_requirement(std::size_t max_node_count,
                      std::size_t max_bucket_count) noexcept {
-    assert(std::has_one_bit(max_bucket_count));
+    // assert(std::has_single_bit(max_bucket_count));
     return Stack_allocator<_alignment>::memory_requirement({
-        Array<Bucket>::memory_requirement(max_bucket_count),
+        Array<Bucket>::memory_requirement(std::bit_ceil(max_bucket_count)),
         Pool_allocator<sizeof(Node)>::memory_requirement(max_node_count),
     });
   }
@@ -154,11 +154,11 @@ public:
 
   explicit Set(void *block_begin, std::size_t max_node_count,
                std::size_t max_bucket_count) noexcept {
-    assert(std::has_one_bit(max_bucket_count));
+    max_bucket_count = std::bit_ceil(max_bucket_count);
     auto allocator = Stack_allocator<_alignment>{make_block(
-        block_begin, memory_requirement(max_bucket_count, max_node_count))};
+        block_begin, memory_requirement(max_node_count, max_bucket_count))};
     _buckets = make_array<Bucket>(allocator, max_bucket_count).second;
-    _buckets.resize(std::min(max_bucket_count, std::size_t{16}));
+    _buckets.resize(1);
     _nodes =
         make_pool_allocator<sizeof(Node)>(allocator, max_node_count).second;
   }
@@ -179,7 +179,6 @@ public:
     auto node = _head;
     while (node) {
       node->value().~T();
-      _nodes.free(make_block(node, sizeof(Node)));
       node = node->next;
     }
   }
@@ -212,8 +211,10 @@ public:
     _head = nullptr;
     while (node) {
       node->value().~T();
+      auto const next = node->next;
       _nodes.free(make_block(node, sizeof(Node)));
-      node = node->next;
+      node = next;
+      --_size;
     }
     _size = 0;
   }
@@ -574,6 +575,134 @@ std::pair<Block, Set<T, Hash, Equal>> make_set(Allocator &allocator,
   return make_set<T, Hash, Equal, Allocator>(allocator, max_node_count,
                                              max_node_count);
 }
+
+template <typename T, typename Hash = Hash<T>, typename Equal = Equal<T>,
+          typename Allocator = Polymorphic_allocator>
+class Dynamic_set {
+public:
+  using Iterator = Set<T, Hash, Equal>::Iterator;
+  using Const_iterator = Set<T, Hash, Equal>::Const_iterator;
+
+  Dynamic_set() { _impl.construct(); }
+
+  explicit Dynamic_set(Allocator const &allocator) : _allocator{allocator} {
+    _impl.construct();
+  }
+
+  ~Dynamic_set() {
+    if (_impl->max_size() != 0 || _impl->max_bucket_count() != 0) {
+      auto const block = make_block(
+          _impl->data(), Set<T, Hash, Equal>::memory_requirement(
+                             _impl->max_size(), _impl->max_bucket_count()));
+      _impl.destruct();
+      _allocator.free(block);
+    }
+  }
+
+  void const *data() const noexcept { return _impl->data(); }
+
+  void *data() noexcept { return _impl->data(); }
+
+  Iterator begin() noexcept { return _impl->begin(); }
+
+  Const_iterator begin() const noexcept { return _impl->begin(); }
+
+  Const_iterator cbegin() const noexcept { return _impl->cbegin(); }
+
+  Iterator end() noexcept { return _impl->end(); }
+
+  Const_iterator end() const noexcept { return _impl->end(); }
+
+  Const_iterator cend() const noexcept { return _impl->cend(); }
+
+  std::size_t size() const noexcept { return _impl->size(); }
+
+  std::size_t max_size() const noexcept {
+    return std::numeric_limits<std::ptrdiff_t>::max();
+  }
+
+  void clear() noexcept { _impl->clear(); }
+
+  template <typename K> std::pair<Iterator, bool> insert(K &&x) {
+    if (size() == _impl->max_size()) {
+      reserve(size() != 0 ? size() * 2 : 1);
+    }
+    return _impl->insert(std::forward<K>(x));
+  }
+
+  template <typename... Args>
+  std::pair<Iterator, bool> emplace(Args &&...args) {
+    if (size() == _impl->max_size()) {
+      reserve(size() != 0 ? size() * 2 : 1);
+    }
+    return _impl->emplace(std::forward<Args>(args)...);
+  }
+
+  Iterator erase(Iterator pos) noexcept { return _impl->erase(pos); }
+
+  Iterator erase(Const_iterator pos) noexcept { return _impl->erase(pos); }
+
+  template <typename K> std::size_t erase(K const &x) noexcept {
+    return _impl->erase(x);
+  }
+
+  template <typename K> Iterator find(K const &x) noexcept {
+    return _impl->find(x);
+  }
+
+  template <typename K> Const_iterator find(K const &x) const noexcept {
+    return _impl->find(x);
+  }
+
+  std::size_t bucket_count() const noexcept { return _impl->bucket_count(); }
+
+  std::size_t max_bucket_count() const noexcept {
+    return std::numeric_limits<std::ptrdiff_t>::max() ^
+           (std::numeric_limits<std::ptrdiff_t>::max() >> 1);
+  }
+
+  float load_factor() const noexcept { return _impl->load_factor(); }
+
+  float max_load_factor() const noexcept { return _impl->max_load_factor(); }
+
+  void max_load_factor(float ml) noexcept {}
+
+  void rehash(std::size_t count) noexcept {
+    auto const n = std::bit_ceil(std::max(
+        count,
+        static_cast<std::size_t>(std::ceil(size() / max_load_factor()))));
+    if (n > _impl->max_bucket_count()) {
+      auto temp =
+          make_set<T, Hash, Equal>(
+              _allocator, static_cast<std::size_t>(n * max_load_factor()), n)
+              .second;
+      temp.rehash(n);
+      for (auto &object : *_impl) {
+        temp.emplace(std::move(object));
+      }
+      if (_impl->max_bucket_count() > 0) {
+        auto const block = make_block(
+            _impl->data(), Set<T, Hash, Equal>::memory_requirement(
+                               _impl->max_size(), _impl->max_bucket_count()));
+        *_impl = std::move(temp);
+        _allocator.free(block);
+      } else {
+        *_impl = std::move(temp);
+      }
+    } else {
+      _impl->rehash(n);
+    }
+  }
+
+  void reserve(std::size_t count) {
+    rehash(std::bit_ceil(
+        static_cast<std::size_t>(std::ceil(count / max_load_factor()))));
+  }
+
+private:
+  Allocator _allocator;
+  Lifetime_box<Set<T, Hash, Equal>> _impl;
+};
 } // namespace util
 } // namespace marlon
 

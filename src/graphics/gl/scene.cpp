@@ -1,7 +1,5 @@
 #include "scene.h"
 
-#include <ankerl/unordered_dense.h>
-
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wlanguage-extension-token"
@@ -11,6 +9,7 @@
 #include <glad/glad.h>
 #endif
 
+#include "../../util/set.h"
 #include "material.h"
 #include "mesh.h"
 #include "surface.h"
@@ -62,7 +61,7 @@ struct Gl_scene::Impl {
     }
   }
 
-  ankerl::unordered_dense::set<Gl_surface *> surfaces;
+  util::Dynamic_set<Gl_surface *> surfaces{util::System_allocator::instance()};
 };
 
 Gl_scene::Gl_scene(Scene_create_info const &) noexcept

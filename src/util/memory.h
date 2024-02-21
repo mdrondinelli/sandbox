@@ -87,6 +87,8 @@ public:
     return block.begin >= _block.begin && block.begin < _block.end;
   }
 
+  Block block() const noexcept { return _block; }
+
 private:
   Block _block;
   void *_top;
@@ -124,6 +126,8 @@ public:
     }
   }
 
+  Parent const &parent() const noexcept { return _parent; }
+
 private:
   struct Node {
     Node *next;
@@ -150,6 +154,13 @@ public:
   Block alloc(std::size_t size) final { return _impl.alloc(size); }
 
   void free(Block block) noexcept final { _impl.free(block); }
+
+  Block block() const noexcept { return _impl.parent().block(); }
+
+  std::size_t max_blocks() const noexcept {
+    auto const blk = block();
+    return ptrdiff(blk.end, blk.begin) / MaxSize;
+  }
 
 private:
   Free_list_allocator<Stack_allocator<1>, MinSize, MaxSize> _impl;
@@ -190,13 +201,9 @@ public:
 
   Polymorphic_allocator(Allocator *allocator) : _allocator{allocator} {}
 
-  Block alloc(std::size_t size) final {
-    return _allocator->alloc(size);
-  }
+  Block alloc(std::size_t size) final { return _allocator->alloc(size); }
 
-  void free(Block block) noexcept final {
-    _allocator->free(block);
-  }
+  void free(Block block) noexcept final { _allocator->free(block); }
 
 private:
   Allocator *_allocator{};

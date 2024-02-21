@@ -155,7 +155,7 @@ public:
 
   Dynamic_array() : _allocator{} { _impl.construct(); }
 
-  Dynamic_array(const Allocator &allocator) : _allocator{allocator} {
+  explicit Dynamic_array(const Allocator &allocator) : _allocator{allocator} {
     _impl.construct();
   }
 
