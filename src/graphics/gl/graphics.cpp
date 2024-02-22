@@ -70,7 +70,7 @@ void main() {
   vec3 base_color = texture(base_color_texture, vertex_data.texcoord).rgb * base_color_tint;
   vec3 n = normalize(cross(dFdx(vertex_data.view_space_position), dFdy(vertex_data.view_space_position)));
   vec3 l = normalize(vec3(-1.0, 1.0, 1.0));
-  fragColor = vec4(base_color * (max(dot(n, l), 0.0) * 0.99 + 0.01), 1.0);
+  fragColor = vec4(base_color * (max(dot(n, l), 0.0) * 0.9 + 0.1), 1.0);
 }
 )";
 } // namespace
