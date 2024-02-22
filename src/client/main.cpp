@@ -252,7 +252,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto loop =
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
-                                .physics_substep_count = 64,
+                                .physics_substep_count = 1,
                                 .max_physics_island_position_iterations = 32,
                                 .max_physics_island_velocity_iterations = 32}};
   auto previous_time = glfwGetTime();
@@ -278,7 +278,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
       }
       box_spawn_timer += elapsed_time;
       if (box_spawn_timer > 1.0f) {
-        box_spawn_timer = 0.0f;
+        box_spawn_timer = -std::numeric_limits<double>::infinity();
         cotton_box_manager->create(
             {.position = math::Vec3f{0.0f, 20.0f, 0.0f},
              .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
@@ -390,12 +390,12 @@ int main() {
        .space = &space}};
   red_ball_manager.create({.position = {-1.5f, 0.5f, -1.5f}});
   red_ball_manager.create({.position = {1.5f, 0.5f, 1.5f}});
-  brick_box_manager.create(
-      {.position = {0.0f, 10.0f, 0.0f},
-       .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                              math::deg_to_rad(-45.0f)) *
-                      math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
-                                              math::deg_to_rad(45.0f))});
+  // brick_box_manager.create(
+  //     {.position = {0.0f, 10.0f, 0.0f},
+  //      .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+  //                                             math::deg_to_rad(-45.0f)) *
+  //                     math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
+  //                                             math::deg_to_rad(45.0f))});
   // cotton_box_manager.create(
   //     {.position = math::Vec3f{0.0f, 1.5f, 0.0f},
   //      .angular_velocity = math::Vec3f{0.0f, 10.0f, 0.0f}});
