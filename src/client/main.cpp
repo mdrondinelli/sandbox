@@ -51,7 +51,7 @@ client::Unique_glfw_window_ptr create_window() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  return client::make_unique_glfw_window(1280, 720, "title");
+  return client::make_unique_glfw_window(1600, 900, "title");
 }
 
 std::unique_ptr<graphics::Gl_graphics> create_graphics(GLFWwindow *window) {
@@ -314,7 +314,7 @@ int main() {
   auto const scene = graphics->create_scene_unique({});
   auto const camera = graphics->create_camera_unique(
       {.zoom = math::Vec2f{9.0f / 16.0f, 1.0f} * 3.0f,
-       .near_plane_distance = 0.001f,
+       .near_plane_distance = 0.01f,
        .far_plane_distance = 1000.0f,
        .position = {-10.0f, 3.5f, 10.0f},
        .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
