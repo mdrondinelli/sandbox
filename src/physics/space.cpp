@@ -560,7 +560,7 @@ private:
 };
 
 auto const velocity_damping_factor = 0.99f;
-auto const max_rotational_displacement_coefficient = 0.1f;
+auto const max_rotational_displacement_coefficient = 0.2f;
 } // namespace
 
 class Space::Impl {
