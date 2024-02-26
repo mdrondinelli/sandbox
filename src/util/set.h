@@ -130,7 +130,8 @@ public:
                      std::size_t max_bucket_count) noexcept {
     // assert(std::has_single_bit(max_bucket_count));
     return Stack_allocator<_alignment>::memory_requirement({
-        Array<Bucket>::memory_requirement(std::bit_ceil(max_bucket_count)),
+        Array<Bucket>::memory_requirement(
+            std::bit_ceil(std::max(max_bucket_count, std::size_t{2}))),
         Pool_allocator<sizeof(Node)>::memory_requirement(max_node_count),
     });
   }
@@ -154,11 +155,12 @@ public:
 
   explicit Set(void *block_begin, std::size_t max_node_count,
                std::size_t max_bucket_count) noexcept {
-    max_bucket_count = std::bit_ceil(max_bucket_count);
+    max_bucket_count =
+        std::bit_ceil(std::max(max_bucket_count, std::size_t{2}));
     auto allocator = Stack_allocator<_alignment>{make_block(
         block_begin, memory_requirement(max_node_count, max_bucket_count))};
     _buckets = make_array<Bucket>(allocator, max_bucket_count).second;
-    _buckets.resize(1);
+    _buckets.resize(2);
     _nodes =
         make_pool_allocator<sizeof(Node)>(allocator, max_node_count).second;
   }
@@ -221,7 +223,7 @@ public:
 
   template <typename K> std::pair<Iterator, bool> insert(K &&x) {
     auto const hash = Hash{}(x);
-    auto const index = hash & (_buckets.size() - 1);
+    auto const index = hash_index(hash);
     auto &bucket = _buckets[index];
     if (bucket.node == nullptr) {
       auto const block = [&]() {
@@ -282,7 +284,7 @@ public:
           } else {
             it = it->next;
           }
-        } else if ((it->hash & (_buckets.size() - 1)) == index) {
+        } else if ((hash_index(it->hash)) == index) {
           if (it->next == nullptr) {
             auto const block = [&]() {
               try {
@@ -355,7 +357,7 @@ public:
       throw;
     }
     auto const hash = Hash{}(node->value());
-    auto const index = hash & (_buckets.size() - 1);
+    auto const index = hash_index(hash);
     auto &bucket = _buckets[index];
     if (bucket.node == nullptr) {
       node->prev = nullptr;
@@ -391,7 +393,7 @@ public:
           } else {
             it = it->next;
           }
-        } else if ((it->hash & (_buckets.size() - 1)) == index) {
+        } else if ((hash_index(it->hash)) == index) {
           if (it->next == nullptr) {
             node->prev = it;
             node->next = nullptr;
@@ -447,7 +449,7 @@ public:
 
   template <typename K> Iterator find(K const &x) noexcept {
     auto const hash = Hash{}(x);
-    auto const index = hash & (_buckets.size() - 1);
+    auto const index = hash_index(hash);
     auto const &bucket = _buckets[index];
     auto it = bucket.node;
     for (;;) {
@@ -459,7 +461,7 @@ public:
         } else {
           it = it->next;
         }
-      } else if ((it->hash & (_buckets.size() - 1)) == index) {
+      } else if ((hash_index(it->hash)) == index) {
         it = it->next;
       } else {
         return end();
@@ -469,7 +471,7 @@ public:
 
   template <typename K> Const_iterator find(K const &x) const noexcept {
     auto const hash = Hash{}(x);
-    auto const index = hash & (_buckets.size() - 1);
+    auto const index = hash_index(hash);
     auto const &bucket = _buckets[index];
     auto it = bucket.node;
     for (;;) {
@@ -481,7 +483,7 @@ public:
         } else {
           it = it->next;
         }
-      } else if ((it->hash & (_buckets.size() - 1)) == index) {
+      } else if (hash_index(it->hash) == index) {
         it = it->next;
       } else {
         return end();
@@ -503,8 +505,9 @@ public:
 
   void rehash(std::size_t count) noexcept {
     auto const n = std::min(
-        std::bit_ceil(std::max(count, static_cast<std::size_t>(std::ceil(
-                                          _size / _max_load_factor)))),
+        std::bit_ceil(std::max(
+            {count, std::size_t{2},
+             static_cast<std::size_t>(std::ceil(_size / _max_load_factor))})),
         _buckets.capacity());
     if (_buckets.size() == n) {
       return;
@@ -517,7 +520,7 @@ public:
     _head = nullptr;
     while (node != nullptr) {
       auto const next = node->next;
-      auto const index = node->hash & (n - 1);
+      auto const index = hash_index(node->hash);
       auto &bucket = _buckets[index];
       if (bucket.node == nullptr) {
         node->prev = nullptr;
@@ -549,6 +552,16 @@ private:
     std::swap(_head, other._head);
     std::swap(_size, other._size);
     std::swap(_max_load_factor, other._max_load_factor);
+  }
+
+  std::size_t hash_index(std::size_t hash) const noexcept {
+    return hash_index(hash, _buckets.size());
+  }
+
+  std::size_t hash_index(std::size_t hash,
+                         std::size_t bucket_count) const noexcept {
+    return (hash * 11400714819323198485llu) >>
+           std::countl_zero(bucket_count - 1);
   }
 
   Array<Bucket> _buckets;
@@ -668,15 +681,17 @@ public:
   void max_load_factor(float ml) noexcept {}
 
   void rehash(std::size_t count) noexcept {
-    auto const n = std::bit_ceil(std::max(
-        count,
-        static_cast<std::size_t>(std::ceil(size() / max_load_factor()))));
-    if (n > _impl->max_bucket_count()) {
+    auto const max_bucket_count = std::bit_ceil(std::max(
+        {count,
+         static_cast<std::size_t>(std::ceil(size() / max_load_factor()))}));
+    auto const max_node_count =
+        static_cast<std::size_t>(max_bucket_count * max_load_factor());
+    if (max_bucket_count > _impl->max_bucket_count() ||
+        max_node_count > _impl->max_size()) {
       auto temp =
-          make_set<T, Hash, Equal>(
-              _allocator, static_cast<std::size_t>(n * max_load_factor()), n)
+          make_set<T, Hash, Equal>(_allocator, max_node_count, max_bucket_count)
               .second;
-      temp.rehash(n);
+      temp.rehash(max_bucket_count);
       for (auto &object : *_impl) {
         temp.emplace(std::move(object));
       }
@@ -690,7 +705,7 @@ public:
         *_impl = std::move(temp);
       }
     } else {
-      _impl->rehash(n);
+      _impl->rehash(max_bucket_count);
     }
   }
 
