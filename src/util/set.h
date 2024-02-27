@@ -132,7 +132,7 @@ public:
     return Stack_allocator<_alignment>::memory_requirement({
         Array<Bucket>::memory_requirement(
             std::bit_ceil(std::max(max_bucket_count, std::size_t{2}))),
-        Pool_allocator<sizeof(Node)>::memory_requirement(max_node_count),
+        Pool_allocator<sizeof(Node)>::memory_requirement(max_node_count + 1),
     });
   }
 
@@ -162,7 +162,7 @@ public:
     _buckets = make_array<Bucket>(allocator, max_bucket_count).second;
     _buckets.resize(2);
     _nodes =
-        make_pool_allocator<sizeof(Node)>(allocator, max_node_count).second;
+        make_pool_allocator<sizeof(Node)>(allocator, max_node_count + 1).second;
   }
 
   Set(Set &&other) noexcept
@@ -203,7 +203,9 @@ public:
 
   std::size_t size() const noexcept { return _size; }
 
-  std::size_t max_size() const noexcept { return _nodes.max_blocks(); }
+  std::size_t max_size() const noexcept {
+    return std::max(_nodes.max_blocks(), std::size_t{1}) - 1;
+  }
 
   void clear() noexcept {
     for (auto &bucket : _buckets) {
@@ -227,9 +229,9 @@ public:
     auto &bucket = _buckets[index];
     if (bucket.node == nullptr) {
       auto const block = [&]() {
-        try {
+        if (size() < max_size()) {
           return _nodes.alloc(sizeof(Node));
-        } catch (...) {
+        } else {
           throw Capacity_error{};
         }
       }();
@@ -260,9 +262,9 @@ public:
             return std::pair{Iterator{it}, false};
           } else if (it->next == nullptr) {
             auto const block = [&]() {
-              try {
+              if (size() < max_size()) {
                 return _nodes.alloc(sizeof(Node));
-              } catch (...) {
+              } else {
                 throw Capacity_error{};
               }
             }();
@@ -288,9 +290,9 @@ public:
         } else if ((hash_index(it->hash)) == index) {
           if (it->next == nullptr) {
             auto const block = [&]() {
-              try {
+              if (size() < max_size()) {
                 return _nodes.alloc(sizeof(Node));
-              } catch (...) {
+              } else {
                 throw Capacity_error{};
               }
             }();
@@ -315,9 +317,9 @@ public:
           }
         } else {
           auto const block = [&]() {
-            try {
+            if (size() < max_size()) {
               return _nodes.alloc(sizeof(Node));
-            } catch (...) {
+            } else {
               throw Capacity_error{};
             }
           }();
@@ -362,68 +364,86 @@ public:
     auto const hash = Hash{}(node->value());
     auto const index = hash_index(hash);
     auto &bucket = _buckets[index];
-    if (bucket.node == nullptr) {
-      node->prev = nullptr;
-      node->next = _head;
-      node->hash = hash;
-      if (_head != nullptr) {
-        _head->prev = node;
-      }
-      _head = node;
-      bucket.node = node;
-      if (++_size > _buckets.size() * static_cast<double>(_max_load_factor)) {
-        rehash(0);
-      }
-      return std::pair{Iterator{node}, true};
-    } else {
-      // check if there's an equal element. If not, emplace
-      auto it = bucket.node;
-      for (;;) {
-        if (it->hash == hash) {
-          if (Equal{}(it->value(), node->value())) {
-            node->value().~T();
-            _nodes.free(block);
-            return std::pair{Iterator{it}, false};
-          } else if (it->next == nullptr) {
-            node->prev = it;
-            node->next = nullptr;
+    try {
+      if (bucket.node == nullptr) {
+        if (size() == max_size()) {
+          throw Capacity_error{};
+        }
+        node->prev = nullptr;
+        node->next = _head;
+        node->hash = hash;
+        if (_head != nullptr) {
+          _head->prev = node;
+        }
+        _head = node;
+        bucket.node = node;
+        if (++_size > _buckets.size() * static_cast<double>(_max_load_factor)) {
+          rehash(0);
+        }
+        return std::pair{Iterator{node}, true};
+      } else {
+        // check if there's an equal element. If not, emplace
+        auto it = bucket.node;
+        for (;;) {
+          if (it->hash == hash) {
+            if (Equal{}(it->value(), node->value())) {
+              node->value().~T();
+              _nodes.free(block);
+              return std::pair{Iterator{it}, false};
+            } else if (it->next == nullptr) {
+              if (size() == max_size()) {
+                throw Capacity_error();
+              }
+              node->prev = it;
+              node->next = nullptr;
+              node->hash = hash;
+              it->next = node;
+              if (++_size >
+                  _buckets.size() * static_cast<double>(_max_load_factor)) {
+                rehash(0);
+              }
+              return std::pair{Iterator{node}, true};
+            } else {
+              it = it->next;
+            }
+          } else if ((hash_index(it->hash)) == index) {
+            if (it->next == nullptr) {
+              if (size() == max_size()) {
+                throw Capacity_error();
+              }
+              node->prev = it;
+              node->next = nullptr;
+              node->hash = hash;
+              it->next = node;
+              if (++_size >
+                  _buckets.size() * static_cast<double>(_max_load_factor)) {
+                rehash(0);
+              }
+              return std::pair{Iterator{node}, true};
+            } else {
+              it = it->next;
+            }
+          } else {
+            if (size() == max_size()) {
+              throw Capacity_error();
+            }
+            node->prev = it->prev;
+            node->next = it;
             node->hash = hash;
-            it->next = node;
+            it->prev->next = node;
+            it->prev = node;
             if (++_size >
                 _buckets.size() * static_cast<double>(_max_load_factor)) {
               rehash(0);
             }
             return std::pair{Iterator{node}, true};
-          } else {
-            it = it->next;
           }
-        } else if ((hash_index(it->hash)) == index) {
-          if (it->next == nullptr) {
-            node->prev = it;
-            node->next = nullptr;
-            node->hash = hash;
-            it->next = node;
-            if (++_size >
-                _buckets.size() * static_cast<double>(_max_load_factor)) {
-              rehash(0);
-            }
-            return std::pair{Iterator{node}, true};
-          } else {
-            it = it->next;
-          }
-        } else {
-          node->prev = it->prev;
-          node->next = it;
-          node->hash = hash;
-          it->prev->next = node;
-          it->prev = node;
-          if (++_size >
-              _buckets.size() * static_cast<double>(_max_load_factor)) {
-            rehash(0);
-          }
-          return std::pair{Iterator{node}, true};
         }
       }
+    } catch (...) {
+      node->value().~T();
+      _nodes.free(block);
+      throw;
     }
   }
 

@@ -42,6 +42,8 @@ TEST_CASE("marlon::util::Map") {
       auto const value = random_distribution(random_engine);
       REQUIRE(marlon_map.insert(std::pair{key, value}).second ==
               std_map.insert({key, value}).second);
+      REQUIRE(marlon_map.insert(std::pair{key, value}).second ==
+              std_map.insert({key, value}).second);
       REQUIRE(marlon_map.size() == std_map.size());
       for (auto const &p : marlon_map) {
         REQUIRE(marlon_map.at(p.first) == p.second);
@@ -56,6 +58,8 @@ TEST_CASE("marlon::util::Map") {
     for (int j = 0; j < i; ++j) {
       auto const key = random_distribution(random_engine);
       auto const value = random_distribution(random_engine);
+      REQUIRE(marlon_map.emplace(key, value).second ==
+              std_map.emplace(key, value).second);
       REQUIRE(marlon_map.emplace(key, value).second ==
               std_map.emplace(key, value).second);
       REQUIRE(marlon_map.size() == std_map.size());

@@ -35,7 +35,7 @@ TEST_CASE("marlon::util::Set") {
     }
     set.emplace(64);
     REQUIRE(set.size() == 64);
-    REQUIRE_THROWS([&]() { set.emplace(64); }());
+    REQUIRE_NOTHROW([&]() { set.emplace(64); }());
     set.insert(64);
     REQUIRE(set.size() == 64);
     set.clear();
