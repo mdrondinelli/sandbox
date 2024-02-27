@@ -248,7 +248,7 @@ public:
       }
       _head = node;
       bucket.node = node;
-      if (++_size > _buckets.size() * _max_load_factor) {
+      if (++_size > _buckets.size() * static_cast<double>(_max_load_factor)) {
         rehash(0);
       }
       return std::pair{Iterator{node}, true};
@@ -277,7 +277,8 @@ public:
               throw;
             }
             it->next = node;
-            if (++_size > _buckets.size() * _max_load_factor) {
+            if (++_size >
+                _buckets.size() * static_cast<double>(_max_load_factor)) {
               rehash(0);
             }
             return std::pair{Iterator{node}, true};
@@ -304,7 +305,8 @@ public:
               throw;
             }
             it->next = node;
-            if (++_size > _buckets.size() * _max_load_factor) {
+            if (++_size >
+                _buckets.size() * static_cast<double>(_max_load_factor)) {
               rehash(0);
             }
             return std::pair{Iterator{node}, true};
@@ -331,7 +333,8 @@ public:
           }
           it->prev->next = node;
           it->prev = node;
-          if (++_size > _buckets.size() * _max_load_factor) {
+          if (++_size >
+              _buckets.size() * static_cast<double>(_max_load_factor)) {
             rehash(0);
           }
           return std::pair{Iterator{node}, true};
@@ -368,7 +371,7 @@ public:
       }
       _head = node;
       bucket.node = node;
-      if (++_size > _buckets.size() * _max_load_factor) {
+      if (++_size > _buckets.size() * static_cast<double>(_max_load_factor)) {
         rehash(0);
       }
       return std::pair{Iterator{node}, true};
@@ -386,7 +389,8 @@ public:
             node->next = nullptr;
             node->hash = hash;
             it->next = node;
-            if (++_size > _buckets.size() * _max_load_factor) {
+            if (++_size >
+                _buckets.size() * static_cast<double>(_max_load_factor)) {
               rehash(0);
             }
             return std::pair{Iterator{node}, true};
@@ -399,7 +403,8 @@ public:
             node->next = nullptr;
             node->hash = hash;
             it->next = node;
-            if (++_size > _buckets.size() * _max_load_factor) {
+            if (++_size >
+                _buckets.size() * static_cast<double>(_max_load_factor)) {
               rehash(0);
             }
             return std::pair{Iterator{node}, true};
@@ -412,7 +417,8 @@ public:
           node->hash = hash;
           it->prev->next = node;
           it->prev = node;
-          if (++_size > _buckets.size() * _max_load_factor) {
+          if (++_size >
+              _buckets.size() * static_cast<double>(_max_load_factor)) {
             rehash(0);
           }
           return std::pair{Iterator{node}, true};
@@ -504,11 +510,12 @@ public:
   void max_load_factor(float ml) noexcept { _max_load_factor = ml; }
 
   void rehash(std::size_t count) noexcept {
-    auto const n = std::min(
-        std::bit_ceil(std::max(
-            {count, std::size_t{2},
-             static_cast<std::size_t>(std::ceil(_size / _max_load_factor))})),
-        _buckets.capacity());
+    auto const n =
+        std::min(std::bit_ceil(std::max(
+                     {count, std::size_t{2},
+                      static_cast<std::size_t>(std::ceil(
+                          _size / static_cast<double>(_max_load_factor)))})),
+                 _buckets.capacity());
     if (_buckets.size() == n) {
       return;
     }
@@ -682,10 +689,10 @@ public:
 
   void rehash(std::size_t count) noexcept {
     auto const max_bucket_count = std::bit_ceil(std::max(
-        {count,
-         static_cast<std::size_t>(std::ceil(size() / max_load_factor()))}));
-    auto const max_node_count =
-        static_cast<std::size_t>(max_bucket_count * max_load_factor());
+        {count, static_cast<std::size_t>(std::ceil(
+                    size() / static_cast<double>(max_load_factor())))}));
+    auto const max_node_count = static_cast<std::size_t>(
+        max_bucket_count * static_cast<double>(max_load_factor()));
     if (max_bucket_count > _impl->max_bucket_count() ||
         max_node_count > _impl->max_size()) {
       auto temp =
@@ -710,8 +717,8 @@ public:
   }
 
   void reserve(std::size_t count) {
-    rehash(std::bit_ceil(
-        static_cast<std::size_t>(std::ceil(count / max_load_factor()))));
+    rehash(std::bit_ceil(static_cast<std::size_t>(
+        std::ceil(count / static_cast<double>(max_load_factor())))));
   }
 
 private:
