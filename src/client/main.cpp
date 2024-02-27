@@ -252,7 +252,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto loop =
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
-                                .physics_substep_count = 1,
+                                .physics_substep_count = 2,
                                 .max_physics_island_position_iterations = 32,
                                 .max_physics_island_velocity_iterations = 32}};
   auto previous_time = glfwGetTime();

@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "../util/array.h"
+#include "../util/map.h"
 #include "aabb_tree.h"
 
 using marlon::math::Mat3x3f;
@@ -559,6 +560,40 @@ private:
   Impl _impl;
 };
 
+class Contact_cache {
+public:
+  void mark(Dynamic_rigid_body_handle dynamic_rigid_body,
+            Static_rigid_body_handle static_rigid_body) {
+    auto const handles =
+        (static_cast<std::uint64_t>(dynamic_rigid_body.value) << 32) |
+        static_cast<std::uint64_t>(static_rigid_body.value);
+    auto const it = _nodes.find(handles);
+    if (it != _nodes.end()) {
+      it->second.marked = true;
+    }
+  }
+
+  void unmark() {
+    auto it = _nodes.begin();
+    while (it != _nodes.end()) {
+      if (it->second.marked) {
+        it->second.marked = false;
+        ++it;
+      } else {
+        it = _nodes.erase(it);
+      }
+    }
+  }
+
+private:
+  struct Node {
+    std::array<Dynamic_rigid_body_static_rigid_body_contact, 4> contacts;
+    std::uint8_t size;
+    bool marked;
+  };
+  util::Map<std::uint64_t, Node> _nodes;
+};
+
 auto const velocity_damping_factor = 0.99f;
 auto const max_rotational_displacement_coefficient = 0.2f;
 } // namespace
@@ -1092,6 +1127,9 @@ private:
              separating_velocity, dynamic_body_handle, static_body_handle,
              dynamic_body_relative_contact_position});
         ++dynamic_body_data->static_rigid_body_contact_count;
+        if (contact_geometry->separation > -0.01f) {
+          std::cout << "cacheable contact\n";
+        }
       }
     }
   }
