@@ -20,6 +20,18 @@ template <> struct Hash<std::uint32_t> {
   }
 };
 
+template <> struct Hash<std::int64_t> {
+  constexpr std::size_t operator()(std::int64_t x) const noexcept {
+    return x;
+  }
+};
+
+template <> struct Hash<std::uint64_t> {
+  constexpr std::size_t operator()(std::uint64_t x) const noexcept {
+    return x;
+  }
+};
+
 template <> struct Hash<std::nullptr_t> {
   constexpr std::size_t operator()(std::nullptr_t) const noexcept { return 0; }
 };
