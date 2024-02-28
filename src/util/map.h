@@ -37,8 +37,8 @@ class Map {
   Set<std::pair<K, V>, PairHash, PairEqual> _impl;
 
 public:
-  using Iterator = decltype(_impl)::Iterator;
-  using Const_iterator = decltype(_impl)::Const_iterator;
+  using Iterator = typename decltype(_impl)::Iterator;
+  using Const_iterator = typename decltype(_impl)::Const_iterator;
 
   static constexpr std::size_t
   memory_requirement(std::size_t max_node_count) noexcept {

@@ -150,8 +150,8 @@ std::pair<Block, Array<T>> make_array(Allocator &allocator,
 template <typename T, typename Allocator = Polymorphic_allocator>
 class Dynamic_array {
 public:
-  using Iterator = Array<T>::Iterator;
-  using Const_iterator = Array<T>::Const_iterator;
+  using Iterator = typename Array<T>::Iterator;
+  using Const_iterator = typename Array<T>::Const_iterator;
 
   Dynamic_array() : _allocator{} { _impl.construct(); }
 
