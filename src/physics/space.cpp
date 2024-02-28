@@ -103,7 +103,7 @@ struct Dynamic_rigid_body_dynamic_rigid_body_contact : Contact {
 };
 
 struct Dynamic_rigid_body_static_rigid_body_contact : Contact {
-  Dynamic_rigid_body_handle dynamic_body;
+  Dynamic_rigid_body_handle rigid_body;
   Static_rigid_body_handle static_body;
   math::Vec3f relative_position;
 
@@ -115,7 +115,7 @@ struct Dynamic_rigid_body_static_rigid_body_contact : Contact {
       Static_rigid_body_handle static_body,
       math::Vec3f const &relative_position) noexcept
       : Contact{normal, separation, separating_velocity},
-        dynamic_body{dynamic_body}, static_body{static_body},
+        rigid_body{dynamic_body}, static_body{static_body},
         relative_position{relative_position} {}
 };
 
@@ -665,7 +665,7 @@ public:
 
   void cache(Dynamic_rigid_body_static_rigid_body_contact const &contact) {
     auto const handles =
-        (static_cast<std::uint64_t>(contact.dynamic_body.value) << 32) |
+        (static_cast<std::uint64_t>(contact.rigid_body.value) << 32) |
         (static_cast<std::uint64_t>(contact.static_body.value));
     auto const it = _nodes.find(handles);
     if (it != _nodes.end()) {
@@ -699,6 +699,20 @@ public:
   std::span<Dynamic_rigid_body_static_rigid_body_contact const>
   contacts(Dynamic_rigid_body_handle dynamic_body,
            Static_rigid_body_handle static_body) const {
+    auto const handles =
+        (static_cast<std::uint64_t>(dynamic_body.value) << 32) |
+        static_cast<std::uint64_t>(static_body.value);
+    auto const it = _nodes.find(handles);
+    if (it != _nodes.end()) {
+      return {it->second.contacts.data(), it->second.size};
+    } else {
+      return {};
+    }
+  }
+
+  std::span<Dynamic_rigid_body_static_rigid_body_contact>
+  contacts(Dynamic_rigid_body_handle dynamic_body,
+           Static_rigid_body_handle static_body) {
     auto const handles =
         (static_cast<std::uint64_t>(dynamic_body.value) << 32) |
         static_cast<std::uint64_t>(static_body.value);
@@ -756,8 +770,8 @@ public:
         _aabb_tree{aabb_tree_block, create_info.max_aabb_tree_leaf_nodes,
                    create_info.max_aabb_tree_internal_nodes},
         _particles{create_info.max_particles},
-        _static_rigid_bodies{create_info.max_static_rigid_bodies},
-        _dynamic_rigid_bodies{create_info.max_dynamic_rigid_bodies},
+        _static_bodies{create_info.max_static_rigid_bodies},
+        _rigid_bodies{create_info.max_dynamic_rigid_bodies},
         _close_particle_particle_pairs{
             close_particle_particle_pairs_begin,
             create_info.max_particle_particle_contacts},
@@ -844,9 +858,9 @@ public:
   create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info) {
     auto const transform =
         math::Mat3x4f::rigid(create_info.position, create_info.orientation);
-    auto const handle = _dynamic_rigid_bodies.alloc();
+    auto const handle = _rigid_bodies.alloc();
     auto const bounds = physics::bounds(create_info.shape, transform);
-    new (_dynamic_rigid_bodies.data(handle)) Dynamic_rigid_body_data{
+    new (_rigid_bodies.data(handle)) Dynamic_rigid_body_data{
         .broadphase_node = _aabb_tree.create_leaf(bounds, handle),
         .motion_callback = create_info.motion_callback,
         // .collision_flags = create_info.collision_flags,
@@ -867,9 +881,8 @@ public:
   }
 
   void destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle) {
-    _aabb_tree.destroy_leaf(
-        _dynamic_rigid_bodies.data(handle)->broadphase_node);
-    _dynamic_rigid_bodies.free(handle);
+    _aabb_tree.destroy_leaf(_rigid_bodies.data(handle)->broadphase_node);
+    _rigid_bodies.free(handle);
   }
 
   Static_rigid_body_handle
@@ -878,8 +891,8 @@ public:
         math::Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const transform_inverse = math::rigid_inverse(transform);
     // TODO: cleanup allocated handle if create_leaf fails
-    auto const handle = _static_rigid_bodies.alloc();
-    new (_static_rigid_bodies.data(handle)) Static_rigid_body_data{
+    auto const handle = _static_bodies.alloc();
+    new (_static_bodies.data(handle)) Static_rigid_body_data{
         .aabb_tree_node = _aabb_tree.create_leaf(
             physics::bounds(create_info.shape, transform), handle),
         // .collision_flags = create_info.collision_flags,
@@ -892,8 +905,8 @@ public:
   }
 
   void destroy_static_rigid_body(Static_rigid_body_handle handle) {
-    _aabb_tree.destroy_leaf(_static_rigid_bodies.data(handle)->aabb_tree_node);
-    _static_rigid_bodies.free(handle);
+    _aabb_tree.destroy_leaf(_static_bodies.data(handle)->aabb_tree_node);
+    _static_bodies.free(handle);
   }
 
   void simulate(Space_simulate_info const &simulate_info) {
@@ -926,8 +939,8 @@ private:
       data->aabb_tree_node->bounds = {data->position - half_extents,
                                       data->position + half_extents};
     });
-    _dynamic_rigid_bodies.for_each([&](Dynamic_rigid_body_handle,
-                                       Dynamic_rigid_body_data *data) {
+    _rigid_bodies.for_each([&](Dynamic_rigid_body_handle,
+                               Dynamic_rigid_body_data *data) {
       data->broadphase_node->bounds =
           expand(bounds(data->shape, math::Mat3x4f::rigid(data->position,
                                                           data->orientation)),
@@ -1014,7 +1027,7 @@ private:
     auto const time_compensated_damping_factor =
         std::pow(velocity_damping_factor, h);
     integrate_particles(h, time_compensated_damping_factor);
-    integrate_dynamic_rigid_bodies(h, time_compensated_damping_factor);
+    integrate_rigid_bodies(h, time_compensated_damping_factor);
   }
 
   void integrate_particles(float h, float time_compensated_damping_factor) {
@@ -1026,9 +1039,8 @@ private:
     });
   }
 
-  void integrate_dynamic_rigid_bodies(float h,
-                                      float time_compensated_damping_factor) {
-    _dynamic_rigid_bodies.for_each(
+  void integrate_rigid_bodies(float h, float time_compensated_damping_factor) {
+    _rigid_bodies.for_each(
         [&](Dynamic_rigid_body_handle, Dynamic_rigid_body_data *data) {
           data->previous_position = data->position;
           data->velocity += h * _gravitational_acceleration;
@@ -1045,16 +1057,19 @@ private:
 
   void find_contacts() {
     reset_contact_counts();
-    find_and_count_contacts();
+    find_new_contacts();
+    _contact_cache.update(_rigid_bodies, _static_bodies);
+    cache_new_contacts();
+    count_contacts();
     reset_contact_pointer_storage();
     allocate_particle_contact_pointers();
-    allocate_dynamic_rigid_body_contact_pointers();
+    allocate_rigid_body_contact_pointers();
     reset_contact_counts();
     assign_and_count_particle_particle_contact_pointers();
-    assign_and_count_particle_dynamic_rigid_body_contact_pointers();
-    assign_and_count_particle_static_rigid_body_contact_pointers();
-    assign_and_count_dynamic_rigid_body_dynamic_rigid_body_contact_pointers();
-    assign_and_count_dynamic_rigid_body_static_rigid_body_contact_pointers();
+    assign_and_count_particle_rigid_body_contact_pointers();
+    assign_and_count_particle_static_body_contact_pointers();
+    assign_and_count_rigid_body_rigid_body_contact_pointers();
+    assign_and_count_rigid_body_static_body_contact_pointers();
   }
 
   void reset_contact_counts() {
@@ -1071,7 +1086,7 @@ private:
   }
 
   void reset_dynamic_rigid_body_contact_counts() {
-    _dynamic_rigid_bodies.for_each(
+    _rigid_bodies.for_each(
         [](Dynamic_rigid_body_handle, Dynamic_rigid_body_data *data) {
           data->particle_contact_count = 0;
           data->dynamic_rigid_body_contact_count = 0;
@@ -1079,23 +1094,15 @@ private:
         });
   }
 
-  void find_and_count_contacts() {
-    find_and_count_particle_particle_contacts();
-    find_and_count_particle_static_rigid_body_contacts();
-    find_and_count_particle_dynamic_rigid_body_contacts();
-    find_and_count_dynamic_rigid_body_static_rigid_body_contacts();
-    find_and_count_dynamic_rigid_body_dynamic_rigid_body_contacts();
+  void find_new_contacts() {
+    find_new_particle_particle_contacts();
+    find_new_particle_rigid_body_contacts();
+    find_new_particle_static_body_contacts();
+    find_new_rigid_body_rigid_body_contacts();
+    find_new_rigid_body_static_body_contacts();
   }
 
-  void reset_contact_pointer_storage() {
-    _particle_particle_contact_pointers.clear();
-    _particle_rigid_body_contact_pointers.clear();
-    _particle_static_body_contact_pointers.clear();
-    _rigid_body_rigid_body_contact_pointers.clear();
-    _rigid_body_static_body_contact_pointers.clear();
-  }
-
-  void find_and_count_particle_particle_contacts() {
+  void find_new_particle_particle_contacts() {
     _particle_particle_contacts.clear();
     for (auto const &particle_handles : _close_particle_particle_pairs) {
       auto const particle_datas = std::array<Particle_data *, 2>{
@@ -1135,12 +1142,12 @@ private:
     }
   }
 
-  void find_and_count_particle_dynamic_rigid_body_contacts() {
+  void find_new_particle_rigid_body_contacts() {
     _particle_rigid_body_contacts.clear();
     for (auto [particle_handle, body_handle] :
          _close_particle_rigid_body_pairs) {
       auto const particle_data = _particles.data(particle_handle);
-      auto const body_data = _dynamic_rigid_bodies.data(body_handle);
+      auto const body_data = _rigid_bodies.data(body_handle);
       auto const body_transform =
           math::Mat3x4f::rigid(body_data->position, body_data->orientation);
       auto const inverse_body_transform = math::rigid_inverse(body_transform);
@@ -1166,12 +1173,12 @@ private:
     }
   }
 
-  void find_and_count_particle_static_rigid_body_contacts() {
+  void find_new_particle_static_body_contacts() {
     _particle_static_body_contacts.clear();
     for (auto [particle_handle, body_handle] :
          _close_particle_static_body_pairs) {
       auto const particle_data = _particles.data(particle_handle);
-      auto const body_data = _static_rigid_bodies.data(body_handle);
+      auto const body_data = _static_bodies.data(body_handle);
       if (auto const contact_geometry =
               particle_shape_positionless_contact_geometry(
                   particle_data->position, particle_data->radius,
@@ -1187,12 +1194,12 @@ private:
     }
   }
 
-  void find_and_count_dynamic_rigid_body_dynamic_rigid_body_contacts() {
+  void find_new_rigid_body_rigid_body_contacts() {
     _rigid_body_rigid_body_contacts.clear();
     for (auto const &body_handles : _close_rigid_body_rigid_body_pairs) {
       auto const body_datas = std::array<Dynamic_rigid_body_data *, 2>{
-          _dynamic_rigid_bodies.data(body_handles.first),
-          _dynamic_rigid_bodies.data(body_handles.second)};
+          _rigid_bodies.data(body_handles.first),
+          _rigid_bodies.data(body_handles.second)};
       auto const body_transforms = std::array<math::Mat3x4f, 2>{
           math::Mat3x4f::rigid(body_datas[0]->position,
                                body_datas[0]->orientation),
@@ -1230,41 +1237,63 @@ private:
     }
   }
 
-  void find_and_count_dynamic_rigid_body_static_rigid_body_contacts() {
+  void find_new_rigid_body_static_body_contacts() {
     _rigid_body_static_body_contacts.clear();
-    for (auto [dynamic_body_handle, static_body_handle] :
+    for (auto [rigid_body_handle, static_body_handle] :
          _close_rigid_body_static_body_pairs) {
-      auto const dynamic_body_data =
-          _dynamic_rigid_bodies.data(dynamic_body_handle);
-      auto const dynamic_body_transform = math::Mat3x4f::rigid(
-          dynamic_body_data->position, dynamic_body_data->orientation);
-      auto const dynamic_body_inverse_transform =
-          math::rigid_inverse(dynamic_body_transform);
-      auto const static_body_data =
-          _static_rigid_bodies.data(static_body_handle);
+      auto const rigid_body_data = _rigid_bodies.data(rigid_body_handle);
+      auto const rigid_body_transform = math::Mat3x4f::rigid(
+          rigid_body_data->position, rigid_body_data->orientation);
+      auto const rigid_body_inverse_transform =
+          math::rigid_inverse(rigid_body_transform);
+      auto const static_body_data = _static_bodies.data(static_body_handle);
       if (auto const contact_geometry = shape_shape_contact_geometry(
-              dynamic_body_data->shape, dynamic_body_transform,
-              dynamic_body_inverse_transform, static_body_data->shape,
+              rigid_body_data->shape, rigid_body_transform,
+              rigid_body_inverse_transform, static_body_data->shape,
               static_body_data->transform,
               static_body_data->inverse_transform)) {
-        auto const dynamic_body_relative_contact_position =
-            contact_geometry->position - dynamic_body_data->position;
+        auto const rigid_body_relative_contact_position =
+            contact_geometry->position - rigid_body_data->position;
         auto const relative_velocity =
-            dynamic_body_data->velocity +
-            math::cross(dynamic_body_data->angular_velocity,
-                        dynamic_body_relative_contact_position);
+            rigid_body_data->velocity +
+            math::cross(rigid_body_data->angular_velocity,
+                        rigid_body_relative_contact_position);
         auto const separating_velocity =
             math::dot(relative_velocity, contact_geometry->normal);
+        // ++dynamic_body_data->static_rigid_body_contact_count;
         _rigid_body_static_body_contacts.push_back(
             {contact_geometry->normal, contact_geometry->separation,
-             separating_velocity, dynamic_body_handle, static_body_handle,
-             dynamic_body_relative_contact_position});
-        ++dynamic_body_data->static_rigid_body_contact_count;
+             separating_velocity, rigid_body_handle, static_body_handle,
+             rigid_body_relative_contact_position});
+        _contact_cache.mark(rigid_body_handle, static_body_handle);
         // if (contact_geometry->separation > -0.01f) {
         //   std::cout << "cacheable contact\n";
         // }
       }
     }
+  }
+
+  void cache_new_contacts() {
+    for (auto const &contact : _rigid_body_static_body_contacts) {
+      _contact_cache.cache(contact);
+    }
+  }
+
+  void count_contacts() {
+    for (auto const &contact : _rigid_body_static_body_contacts) {
+      auto const rigid_body_data = _rigid_bodies.data(contact.rigid_body);
+      rigid_body_data->static_rigid_body_contact_count +=
+          _contact_cache.contacts(contact.rigid_body, contact.static_body)
+              .size();
+    }
+  }
+
+  void reset_contact_pointer_storage() {
+    _particle_particle_contact_pointers.clear();
+    _particle_rigid_body_contact_pointers.clear();
+    _particle_static_body_contact_pointers.clear();
+    _rigid_body_rigid_body_contact_pointers.clear();
+    _rigid_body_static_body_contact_pointers.clear();
   }
 
   void allocate_particle_contact_pointers() {
@@ -1286,8 +1315,8 @@ private:
     });
   }
 
-  void allocate_dynamic_rigid_body_contact_pointers() {
-    _dynamic_rigid_bodies.for_each(
+  void allocate_rigid_body_contact_pointers() {
+    _rigid_bodies.for_each(
         [this](Dynamic_rigid_body_handle, Dynamic_rigid_body_data *data) {
           data->particle_contacts = _particle_rigid_body_contact_pointers.end();
           data->dynamic_rigid_body_contacts =
@@ -1319,11 +1348,10 @@ private:
     }
   }
 
-  void assign_and_count_particle_dynamic_rigid_body_contact_pointers() {
+  void assign_and_count_particle_rigid_body_contact_pointers() {
     for (auto &contact : _particle_rigid_body_contacts) {
       auto const particle_data = _particles.data(contact.particle);
-      auto const dynamic_rigid_body_data =
-          _dynamic_rigid_bodies.data(contact.body);
+      auto const dynamic_rigid_body_data = _rigid_bodies.data(contact.body);
       particle_data->dynamic_rigid_body_contacts
           [particle_data->dynamic_rigid_body_contact_count++] = &contact;
       dynamic_rigid_body_data->particle_contacts
@@ -1331,7 +1359,7 @@ private:
     }
   }
 
-  void assign_and_count_particle_static_rigid_body_contact_pointers() {
+  void assign_and_count_particle_static_body_contact_pointers() {
     for (auto &contact : _particle_static_body_contacts) {
       auto const particle_data = _particles.data(contact.particle);
       particle_data->static_rigid_body_contacts
@@ -1339,12 +1367,11 @@ private:
     }
   }
 
-  void
-  assign_and_count_dynamic_rigid_body_dynamic_rigid_body_contact_pointers() {
+  void assign_and_count_rigid_body_rigid_body_contact_pointers() {
     for (auto &contact : _rigid_body_rigid_body_contacts) {
       auto const body_datas = std::array<Dynamic_rigid_body_data *, 2>{
-          _dynamic_rigid_bodies.data(contact.bodies[0]),
-          _dynamic_rigid_bodies.data(contact.bodies[1])};
+          _rigid_bodies.data(contact.bodies[0]),
+          _rigid_bodies.data(contact.bodies[1])};
       for (auto i = 0; i != 2; ++i) {
         body_datas[i]->dynamic_rigid_body_contacts
             [body_datas[i]->dynamic_rigid_body_contact_count++] = &contact;
@@ -1352,13 +1379,16 @@ private:
     }
   }
 
-  void
-  assign_and_count_dynamic_rigid_body_static_rigid_body_contact_pointers() {
-    for (auto &contact : _rigid_body_static_body_contacts) {
-      auto const dynamic_body_data =
-          _dynamic_rigid_bodies.data(contact.dynamic_body);
-      dynamic_body_data->static_rigid_body_contacts
-          [dynamic_body_data->static_rigid_body_contact_count++] = &contact;
+  void assign_and_count_rigid_body_static_body_contact_pointers() {
+    for (auto &new_contact : _rigid_body_static_body_contacts) {
+      auto const rigid_body_data = _rigid_bodies.data(new_contact.rigid_body);
+      auto const cached_contacts = _contact_cache.contacts(
+          new_contact.rigid_body, new_contact.static_body);
+      for (auto &cached_contact : cached_contacts) {
+        rigid_body_data->static_rigid_body_contacts
+            [rigid_body_data->static_rigid_body_contact_count++] =
+            &cached_contact;
+      }
     }
   }
 
@@ -1392,7 +1422,7 @@ private:
              std::span{data->dynamic_rigid_body_contacts,
                        data->dynamic_rigid_body_contact_count}) {
           auto const other_handle = contact->body;
-          auto const other_data = _dynamic_rigid_bodies.data(other_handle);
+          auto const other_data = _rigid_bodies.data(other_handle);
           if (!other_data->marked) {
             other_data->marked = true;
             _island_fringe.push_back(other_handle);
@@ -1408,7 +1438,7 @@ private:
         }
       } else if constexpr (std::is_same_v<T, Dynamic_rigid_body_handle>) {
         // std::cout << "visiting dynamic rigid body" << std::endl;
-        auto const data = _dynamic_rigid_bodies.data(handle);
+        auto const data = _rigid_bodies.data(handle);
         data->visited = true;
         for (auto const contact :
              std::span{data->particle_contacts, data->particle_contact_count}) {
@@ -1427,7 +1457,7 @@ private:
                        data->dynamic_rigid_body_contact_count}) {
           auto const other_handle =
               contact->bodies[contact->bodies[0] == handle ? 1 : 0];
-          auto const other_data = _dynamic_rigid_bodies.data(other_handle);
+          auto const other_data = _rigid_bodies.data(other_handle);
           if (!other_data->marked) {
             other_data->marked = true;
             _island_fringe.push_back(other_handle);
@@ -1456,8 +1486,8 @@ private:
             gravitational_velocity_delta, max_separating_velocity_for_bounce);
       }
     });
-    _dynamic_rigid_bodies.for_each([&, this](Dynamic_rigid_body_handle handle,
-                                             Dynamic_rigid_body_data *data) {
+    _rigid_bodies.for_each([&, this](Dynamic_rigid_body_handle handle,
+                                     Dynamic_rigid_body_data *data) {
       if (!data->marked) {
         data->marked = true;
         _island_fringe.push_back(handle);
@@ -1480,7 +1510,7 @@ private:
   }
 
   void unmark_dynamic_rigid_bodies() {
-    _dynamic_rigid_bodies.for_each(
+    _rigid_bodies.for_each(
         [](Dynamic_rigid_body_handle, Dynamic_rigid_body_data *data) {
           data->marked = false;
           data->visited = false;
@@ -1651,7 +1681,7 @@ private:
   apply_positional_correction(Dynamic_rigid_body_handle body_handle,
                               math::Vec3f const &delta_position,
                               math::Vec3f const &delta_orientation) noexcept {
-    auto const body_data = _dynamic_rigid_bodies.data(body_handle);
+    auto const body_data = _rigid_bodies.data(body_handle);
     body_data->position += delta_position;
     body_data->orientation +=
         0.5f * math::Quatf{0.0f, delta_orientation} * body_data->orientation;
@@ -1680,7 +1710,7 @@ private:
 
   void resolve_contact_position(Particle_dynamic_rigid_body_contact *contact) {
     auto const particle_data = _particles.data(contact->particle);
-    auto const body_data = _dynamic_rigid_bodies.data(contact->body);
+    auto const body_data = _rigid_bodies.data(contact->body);
     auto const rotation = Mat3x3f::rotation(body_data->orientation);
     auto const inverse_rotation = transpose(rotation);
     auto const inverse_inertia_tensor =
@@ -1734,7 +1764,7 @@ private:
 
   void resolve_contact_position(Particle_static_rigid_body_contact *contact) {
     auto const particle_data = _particles.data(contact->particle);
-    auto const body_data = _static_rigid_bodies.data(contact->body);
+    auto const body_data = _static_bodies.data(contact->body);
     auto const separation_solution = solve_positional_constraint({
         .direction = contact->normal,
         .distance = -contact->separation,
@@ -1773,8 +1803,8 @@ private:
   void resolve_contact_position(
       Dynamic_rigid_body_dynamic_rigid_body_contact *contact) {
     auto const data = std::array<Dynamic_rigid_body_data *, 2>{
-        _dynamic_rigid_bodies.data(contact->bodies[0]),
-        _dynamic_rigid_bodies.data(contact->bodies[1])};
+        _rigid_bodies.data(contact->bodies[0]),
+        _rigid_bodies.data(contact->bodies[1])};
     auto const rotation =
         std::array<Mat3x3f, 2>{Mat3x3f::rotation(data[0]->orientation),
                                Mat3x3f::rotation(data[1]->orientation)};
@@ -1834,10 +1864,8 @@ private:
 
   void resolve_contact_position(
       Dynamic_rigid_body_static_rigid_body_contact *contact) {
-    auto const dynamic_body_data =
-        _dynamic_rigid_bodies.data(contact->dynamic_body);
-    auto const static_body_data =
-        _static_rigid_bodies.data(contact->static_body);
+    auto const dynamic_body_data = _rigid_bodies.data(contact->rigid_body);
+    auto const static_body_data = _static_bodies.data(contact->static_body);
     auto const rotation = Mat3x3f::rotation(dynamic_body_data->orientation);
     auto const inverse_rotation = transpose(rotation);
     auto const inverse_inertia_tensor =
@@ -1877,9 +1905,9 @@ private:
         delta_orientation += friction_solution.delta_orientation[0];
       }
     }
-    apply_positional_correction(contact->dynamic_body, delta_position,
+    apply_positional_correction(contact->rigid_body, delta_position,
                                 delta_orientation);
-    update_contact_separations(contact->dynamic_body, delta_position,
+    update_contact_separations(contact->rigid_body, delta_position,
                                delta_orientation);
   }
 
@@ -1912,7 +1940,7 @@ private:
   void update_contact_separations(Dynamic_rigid_body_handle body,
                                   math::Vec3f const &position_delta,
                                   math::Vec3f const &orientation_delta) {
-    auto const data = _dynamic_rigid_bodies.data(body);
+    auto const data = _rigid_bodies.data(body);
     auto const particle_contacts =
         std::span{data->particle_contacts, data->particle_contact_count};
     auto const dynamic_rigid_body_contacts =
@@ -2021,7 +2049,7 @@ private:
     auto const particle = contact->particle;
     auto const particle_data = _particles.data(particle);
     auto const body = contact->body;
-    auto const body_data = _dynamic_rigid_bodies.data(body);
+    auto const body_data = _rigid_bodies.data(body);
     auto const body_relative_contact_position = contact->relative_position;
     auto const normal = contact->normal;
     auto const separating_velocity = contact->separating_velocity;
@@ -2119,7 +2147,7 @@ private:
     auto const particle = contact->particle;
     auto const particle_data = _particles.data(particle);
     auto const body = contact->body;
-    auto const body_data = _static_rigid_bodies.data(body);
+    auto const body_data = _static_bodies.data(body);
     auto const normal = contact->normal;
     auto const separating_velocity = contact->separating_velocity;
     auto const restitution_coefficient =
@@ -2172,8 +2200,7 @@ private:
       float max_separating_velocity_for_bounce) {
     auto const bodies = contact->bodies;
     auto const body_datas = std::array<Dynamic_rigid_body_data *, 2>{
-        _dynamic_rigid_bodies.data(bodies[0]),
-        _dynamic_rigid_bodies.data(bodies[1])};
+        _rigid_bodies.data(bodies[0]), _rigid_bodies.data(bodies[1])};
     auto const relative_contact_positions = contact->relative_positions;
     auto const normal = contact->normal;
     auto const separating_velocity = contact->separating_velocity;
@@ -2294,10 +2321,10 @@ private:
       Dynamic_rigid_body_static_rigid_body_contact *contact,
       math::Vec3f const &gravitational_velocity_delta,
       float max_separating_velocity_for_bounce) {
-    auto const dynamic_body = contact->dynamic_body;
-    auto const dynamic_body_data = _dynamic_rigid_bodies.data(dynamic_body);
+    auto const dynamic_body = contact->rigid_body;
+    auto const dynamic_body_data = _rigid_bodies.data(dynamic_body);
     auto const static_body = contact->static_body;
-    auto const static_body_data = _static_rigid_bodies.data(static_body);
+    auto const static_body_data = _static_bodies.data(static_body);
     auto const dynamic_body_relative_contact_position =
         contact->relative_position;
     auto const normal = contact->normal;
@@ -2424,7 +2451,7 @@ private:
   void update_dynamic_rigid_body_contact_separating_velocities(
       Dynamic_rigid_body_handle body, math::Vec3f const &velocity_delta,
       math::Vec3f const &angular_velocity_delta) {
-    auto const data = _dynamic_rigid_bodies.data(body);
+    auto const data = _rigid_bodies.data(body);
     auto const particle_contacts =
         std::span{data->particle_contacts, data->particle_contact_count};
     auto const dynamic_rigid_body_contacts =
@@ -2473,7 +2500,7 @@ private:
   }
 
   void call_dynamic_rigid_body_motion_callbacks() {
-    _dynamic_rigid_bodies.for_each(
+    _rigid_bodies.for_each(
         [&](Dynamic_rigid_body_handle handle, Dynamic_rigid_body_data *data) {
           if (data->motion_callback != nullptr) {
             data->motion_callback->on_dynamic_rigid_body_motion(
@@ -2485,8 +2512,8 @@ private:
   std::unique_ptr<std::byte[]> _system_allocation;
   Aabb_tree<Aabb_tree_payload_t> _aabb_tree;
   Particle_storage _particles;
-  Static_rigid_body_storage _static_rigid_bodies;
-  Dynamic_rigid_body_storage _dynamic_rigid_bodies;
+  Static_rigid_body_storage _static_bodies;
+  Dynamic_rigid_body_storage _rigid_bodies;
   Array<std::pair<Particle_handle, Particle_handle>>
       _close_particle_particle_pairs;
   Array<std::pair<Particle_handle, Dynamic_rigid_body_handle>>

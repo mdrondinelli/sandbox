@@ -252,7 +252,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto loop =
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
-                                .physics_substep_count = 2,
+                                .physics_substep_count = 8,
                                 .max_physics_island_position_iterations = 32,
                                 .max_physics_island_velocity_iterations = 32}};
   auto previous_time = glfwGetTime();
@@ -278,7 +278,7 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
       }
       box_spawn_timer += elapsed_time;
       if (box_spawn_timer > 1.0f) {
-        box_spawn_timer = -std::numeric_limits<double>::infinity();
+        box_spawn_timer = 0.0f;
         cotton_box_manager->create(
             {.position = math::Vec3f{0.0f, 20.0f, 0.0f},
              .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
