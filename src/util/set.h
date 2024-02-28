@@ -24,10 +24,21 @@ class Set {
   };
 
   struct Node {
-    Node *prev;
-    Node *next;
+  private:
+    Node *_prev{};
+    Node *_next{};
+
+  public:
     std::size_t hash;
     alignas(alignof(T)) std::array<std::byte, sizeof(T)> storage;
+
+    Node *prev() const noexcept { return _prev; }
+
+    void prev(Node *prev) noexcept { _prev = prev; }
+
+    Node *next() const noexcept { return _next; }
+
+    void next(Node *next) noexcept { _next = next; }
 
     T &value() noexcept { return *reinterpret_cast<T *>(&storage); }
   };
@@ -46,7 +57,7 @@ public:
 
     Iterator &operator++() noexcept {
       if (_node) {
-        _node = _node->next;
+        _node = _node->next();
       }
       return *this;
     }
@@ -59,7 +70,7 @@ public:
 
     Iterator &operator--() noexcept {
       if (_node) {
-        _node = _node->prev;
+        _node = _node->prev();
       }
       return *this;
     }
@@ -92,7 +103,7 @@ public:
 
     Const_iterator &operator++() noexcept {
       if (_node) {
-        _node = _node->next;
+        _node = _node->next();
       }
       return *this;
     }
@@ -105,7 +116,7 @@ public:
 
     Const_iterator &operator--() noexcept {
       if (_node) {
-        _node = _node->prev;
+        _node = _node->prev();
       }
       return *this;
     }
@@ -182,7 +193,7 @@ public:
     auto node = _head;
     while (node) {
       node->value().~T();
-      node = node->next;
+      node = node->next();
     }
   }
 
@@ -237,8 +248,8 @@ public:
         }
       }();
       auto const node = new (block.begin) Node;
-      node->prev = nullptr;
-      node->next = _head;
+      node->prev(nullptr);
+      node->next(_head);
       node->hash = hash;
       try {
         new (&node->storage) T(std::forward<K>(x));
@@ -247,7 +258,7 @@ public:
         throw;
       }
       if (_head != nullptr) {
-        _head->prev = node;
+        _head->prev(node);
       }
       _head = node;
       bucket.node = node;
@@ -270,8 +281,8 @@ public:
               }
             }();
             auto const node = new (block.begin) Node;
-            node->prev = it;
-            node->next = nullptr;
+            node->prev(it);
+            node->next(nullptr);
             node->hash = hash;
             try {
               new (&node->storage) T(std::forward<K>(x));
@@ -279,14 +290,14 @@ public:
               _nodes.free(block);
               throw;
             }
-            it->next = node;
+            it->next(node);
             if (++_size >
                 _buckets.size() * static_cast<double>(_max_load_factor)) {
               rehash(0);
             }
             return std::pair{Iterator{node}, true};
           } else {
-            it = it->next;
+            it = it->next();
           }
         } else if ((hash_index(it->hash)) == index) {
           if (it->next == nullptr) {
@@ -298,8 +309,8 @@ public:
               }
             }();
             auto const node = new (block.begin) Node;
-            node->prev = it;
-            node->next = nullptr;
+            node->prev(it);
+            node->next(nullptr);
             node->hash = hash;
             try {
               new (&node->storage) T(std::forward<K>(x));
@@ -307,14 +318,14 @@ public:
               _nodes.free(block);
               throw;
             }
-            it->next = node;
+            it->next(node);
             if (++_size >
                 _buckets.size() * static_cast<double>(_max_load_factor)) {
               rehash(0);
             }
             return std::pair{Iterator{node}, true};
           } else {
-            it = it->next;
+            it = it->next();
           }
         } else {
           auto const block = [&]() {
@@ -325,8 +336,8 @@ public:
             }
           }();
           auto const node = new (block.begin) Node;
-          node->prev = it->prev;
-          node->next = it;
+          node->prev(it->prev());
+          node->next(it);
           node->hash = hash;
           try {
             new (&node->storage) T(std::forward<K>(x));
@@ -334,8 +345,8 @@ public:
             _nodes.free(block);
             throw;
           }
-          it->prev->next = node;
-          it->prev = node;
+          it->prev()->next(node);
+          it->prev(node);
           if (++_size >
               _buckets.size() * static_cast<double>(_max_load_factor)) {
             rehash(0);
@@ -370,11 +381,11 @@ public:
         if (size() == max_size()) {
           throw Capacity_error{};
         }
-        node->prev = nullptr;
-        node->next = _head;
+        node->prev(nullptr);
+        node->next(_head);
         node->hash = hash;
         if (_head != nullptr) {
-          _head->prev = node;
+          _head->prev(node);
         }
         _head = node;
         bucket.node = node;
@@ -391,48 +402,48 @@ public:
               node->value().~T();
               _nodes.free(block);
               return std::pair{Iterator{it}, false};
-            } else if (it->next == nullptr) {
+            } else if (it->next() == nullptr) {
               if (size() == max_size()) {
                 throw Capacity_error();
               }
-              node->prev = it;
-              node->next = nullptr;
+              node->prev(it);
+              node->next(nullptr);
               node->hash = hash;
-              it->next = node;
+              it->next(node);
               if (++_size >
                   _buckets.size() * static_cast<double>(_max_load_factor)) {
                 rehash(0);
               }
               return std::pair{Iterator{node}, true};
             } else {
-              it = it->next;
+              it = it->next();
             }
-          } else if ((hash_index(it->hash)) == index) {
-            if (it->next == nullptr) {
+          } else if (hash_index(it->hash) == index) {
+            if (it->next() == nullptr) {
               if (size() == max_size()) {
                 throw Capacity_error();
               }
-              node->prev = it;
-              node->next = nullptr;
+              node->prev(it);
+              node->next(nullptr);
               node->hash = hash;
-              it->next = node;
+              it->next(node);
               if (++_size >
                   _buckets.size() * static_cast<double>(_max_load_factor)) {
                 rehash(0);
               }
               return std::pair{Iterator{node}, true};
             } else {
-              it = it->next;
+              it = it->next();
             }
           } else {
             if (size() == max_size()) {
               throw Capacity_error();
             }
-            node->prev = it->prev;
-            node->next = it;
+            node->prev(it->prev());
+            node->next(it);
             node->hash = hash;
-            it->prev->next = node;
-            it->prev = node;
+            it->prev()->next(node);
+            it->prev(node);
             if (++_size >
                 _buckets.size() * static_cast<double>(_max_load_factor)) {
               rehash(0);
@@ -452,13 +463,24 @@ public:
 
   Iterator erase(Const_iterator pos) noexcept {
     pos._node->value().~T();
-    if (pos._node->prev) {
-      pos._node->prev->next = pos._node->next;
+    auto const index = hash_index(pos._node->hash);
+    auto &bucket = _buckets[index];
+    if (bucket.node == pos._node) {
+      if (pos._node->next() && hash_index(pos._node->next()->hash) == index) {
+        bucket.node = pos._node->next();
+      } else {
+        bucket.node = nullptr;
+      }
     }
-    if (pos._node->next) {
-      pos._node->next->prev = pos._node->prev;
+    if (pos._node->prev()) {
+      pos._node->prev()->next(pos._node->next());
+    } else {
+      _head = pos._node->next();
     }
-    auto result = Iterator{pos._node->next};
+    if (pos._node->next()) {
+      pos._node->next()->prev(pos._node->prev());
+    }
+    auto result = Iterator{pos._node->next()};
     _nodes.free(make_block(pos._node, sizeof(Node)));
     --_size;
     return result;
@@ -486,10 +508,10 @@ public:
         if (Equal{}(it->value(), x)) {
           return Iterator{it};
         } else {
-          it = it->next;
+          it = it->next();
         }
       } else if ((hash_index(it->hash)) == index) {
-        it = it->next;
+        it = it->next();
       } else {
         return end();
       }
@@ -508,10 +530,10 @@ public:
         if (Equal{}(it->value(), x)) {
           return Iterator{it};
         } else {
-          it = it->next;
+          it = it->next();
         }
       } else if (hash_index(it->hash) == index) {
-        it = it->next;
+        it = it->next();
       } else {
         return end();
       }
@@ -547,26 +569,26 @@ public:
     auto node = _head;
     _head = nullptr;
     while (node != nullptr) {
-      auto const next = node->next;
+      auto const next = node->next();
       auto const index = hash_index(node->hash);
       auto &bucket = _buckets[index];
       if (bucket.node == nullptr) {
-        node->prev = nullptr;
-        node->next = _head;
+        node->prev(nullptr);
+        node->next(_head);
         if (_head != nullptr) {
-          _head->prev = node;
+          _head->prev(node);
         }
         _head = node;
       } else if (bucket.node == _head) {
-        node->prev = nullptr;
-        node->next = _head;
-        _head->prev = node;
+        node->prev(nullptr);
+        node->next(_head);
+        _head->prev(node);
         _head = node;
       } else {
-        node->prev = bucket.node->prev;
-        node->next = bucket.node;
-        bucket.node->prev->next = node;
-        bucket.node->prev = node;
+        node->prev(bucket.node->prev());
+        node->next(bucket.node);
+        bucket.node->prev()->next(node);
+        bucket.node->prev(node);
       }
       bucket.node = node;
       node = next;
