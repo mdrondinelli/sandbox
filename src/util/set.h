@@ -3,6 +3,7 @@
 
 #include <cassert>
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <utility>
@@ -620,8 +621,8 @@ template <typename T, typename Hash = Hash<T>, typename Equal = Equal<T>,
           typename Allocator = Polymorphic_allocator>
 class Dynamic_set {
 public:
-  using Iterator = Set<T, Hash, Equal>::Iterator;
-  using Const_iterator = Set<T, Hash, Equal>::Const_iterator;
+  using Iterator = typename Set<T, Hash, Equal>::Iterator;
+  using Const_iterator = typename Set<T, Hash, Equal>::Const_iterator;
 
   Dynamic_set() { _impl.construct(); }
 
@@ -708,9 +709,9 @@ public:
   void max_load_factor(float ml) noexcept {}
 
   void rehash(std::size_t count) noexcept {
-    auto const max_bucket_count = std::bit_ceil(std::max(
-        {count, static_cast<std::size_t>(std::ceil(
-                    size() / static_cast<double>(max_load_factor())))}));
+    auto const max_bucket_count = std::bit_ceil(
+        std::max(count, static_cast<std::size_t>(std::ceil(
+                            size() / static_cast<double>(max_load_factor())))));
     auto const max_node_count = static_cast<std::size_t>(
         max_bucket_count * static_cast<double>(max_load_factor()));
     if (max_bucket_count > _impl->max_bucket_count() ||
