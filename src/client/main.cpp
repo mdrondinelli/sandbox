@@ -252,8 +252,8 @@ void run_game_loop(GLFWwindow *window, graphics::Graphics *graphics,
   auto loop =
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
-                                .physics_substep_count = 8,
-                                .max_physics_island_position_iterations = 32,
+                                .physics_substep_count = 16,
+                                .max_physics_island_position_iterations = 64,
                                 .max_physics_island_velocity_iterations = 32}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
@@ -313,7 +313,7 @@ int main() {
   auto const resources = create_resources(graphics.get());
   auto const scene = graphics->create_scene_unique({});
   auto const camera = graphics->create_camera_unique(
-      {.zoom = math::Vec2f{9.0f / 16.0f, 1.0f} * 3.0f,
+      {.zoom = math::Vec2f{9.0f / 16.0f, 1.0f} * 5.0f,
        .near_plane_distance = 0.01f,
        .far_plane_distance = 1000.0f,
        .position = {-10.0f, 3.5f, 10.0f},
@@ -337,7 +337,7 @@ int main() {
   physics::Box ground_shape{{100.0f, 0.5f, 100.0f}};
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{{1.0f, 1.0f, 1.0f}};
-  physics::Box cotton_box_shape{{0.3f, 0.88f, 0.3}};
+  physics::Box cotton_box_shape{{0.1f, 0.88f, 0.1f}};
   space.create_static_rigid_body({.collision_flags = 1,
                                   .collision_mask = 1,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f},

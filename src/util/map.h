@@ -115,9 +115,7 @@ public:
     return _impl.find(x);
   }
 
-  template <typename T> V &at(T const &k) noexcept {
-    return find(k)->second;
-  }
+  template <typename T> V &at(T const &k) noexcept { return find(k)->second; }
 
   template <typename T> V const &at(T const &k) const noexcept {
     return find(k)->second;
@@ -137,6 +135,25 @@ public:
 
   void rehash(std::size_t count) noexcept { _impl.rehash(count); }
 };
+
+template <typename K, typename V, typename KeyHash = Hash<K>,
+          typename KeyEqual = Equal<K>, typename Allocator>
+std::pair<Block, Map<K, V, KeyHash, KeyEqual>>
+make_map(Allocator &allocator, std::size_t max_size) {
+  return make_map<K, V, KeyHash, KeyEqual, Allocator>(allocator, max_size, max_size);
+}
+
+template <typename K, typename V, typename KeyHash = Hash<K>,
+          typename KeyEqual = Equal<K>, typename Allocator>
+std::pair<Block, Map<K, V, KeyHash, KeyEqual>>
+make_map(Allocator &allocator, std::size_t max_size,
+         std::size_t max_bucket_count) {
+  auto const block =
+      allocator.alloc(Map<K, V, KeyHash, KeyEqual>::memory_requirement(
+          max_size, max_bucket_count));
+  return {block,
+          Map<K, V, KeyHash, KeyEqual>{block, max_size, max_bucket_count}};
+}
 } // namespace util
 } // namespace marlon
 
