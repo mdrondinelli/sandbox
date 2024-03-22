@@ -22,16 +22,18 @@ struct Space_create_info {
   std::size_t max_rigid_body_static_body_contacts{10000};
   std::size_t max_island_object_count{1000};
   std::size_t max_island_contact_count{10000};
-  float min_contact_separation{-1.0f / 2048.0f};
-  float min_contact_separating_velocity{-1.0f / 2048.0f};
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 
 struct Space_simulate_info {
   float delta_time;
   int substep_count{32};
-  int max_island_position_iterations{64};
-  int max_island_velocity_iterations{64};
+  int min_position_iterations_per_contact{1};
+  int max_position_iterations_per_contact{4};
+  int min_velocity_iterations_per_contact{1};
+  int max_velocity_iterations_per_contact{4};
+  float early_out_contact_separation{-1.0f / 1024.0f};
+  float early_out_contact_separating_velocity{-1.0f / 1024.0f};
 };
 
 class Space {

@@ -26,9 +26,9 @@ bool Application_loop::run_once(double delta_time) {
     _accumulated_time -= _physics_step_duration;
     _space->simulate({.delta_time = _physics_step_duration,
                       .substep_count = _physics_substep_count,
-                      .max_island_position_iterations =
+                      .max_position_iterations_per_contact =
                           _max_physics_island_position_iterations,
-                      .max_island_velocity_iterations =
+                      .max_velocity_iterations_per_contact =
                           _max_physics_island_velocity_iterations});
     retval = true;
   }
