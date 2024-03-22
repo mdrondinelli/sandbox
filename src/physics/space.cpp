@@ -374,6 +374,15 @@ public:
       : Object_stack{make_block(block_begin, memory_requirement(capacity)),
                      capacity} {}
 
+  bool empty() const noexcept { return _impl.object_types.empty(); }
+
+  std::size_t size() const noexcept { return _impl.object_types.size(); }
+
+  void clear() noexcept {
+    _impl.object_types.clear();
+    _impl.object_handles.clear();
+  }
+
   void push_back(Particle_handle h) {
     _impl.object_types.push_back(Object_type::particle);
     _impl.object_handles.push_back(h.value);
@@ -400,7 +409,19 @@ public:
     }
   }
 
-  bool empty() const noexcept { return _impl.object_types.empty(); }
+  std::variant<Particle_handle, Dynamic_rigid_body_handle> at(std::size_t i) {
+    auto const object_type = _impl.object_types[i];
+    auto const object_handle_value = _impl.object_handles[i];
+    switch (object_type) {
+    case Object_type::particle:
+      return Particle_handle{object_handle_value};
+    case Object_type::dynamic_rigid_body:
+      return Dynamic_rigid_body_handle{object_handle_value};
+    case Object_type::static_rigid_body:
+    default:
+      math::unreachable();
+    }
+  }
 
 private:
   struct Impl {
@@ -1829,8 +1850,7 @@ private:
     _particles.for_each([&, this](Particle_handle handle, Particle_data *data) {
       if (!data->marked) {
         data->marked = true;
-        _island_fringe.push_back(handle);
-        _island_contacts.clear();
+        initialize_island(handle);
         do {
           std::visit(island_object_visitor, _island_fringe.pop_back());
         } while (!_island_fringe.empty());
@@ -1848,8 +1868,7 @@ private:
                                      Dynamic_rigid_body_data *data) {
       if (!data->marked) {
         data->marked = true;
-        _island_fringe.push_back(handle);
-        _island_contacts.clear();
+        initialize_island(handle);
         do {
           std::visit(island_object_visitor, _island_fringe.pop_back());
         } while (!_island_fringe.empty());
@@ -1878,6 +1897,18 @@ private:
           data->marked = false;
           data->visited = false;
         });
+  }
+
+  void initialize_island(Particle_handle handle) {
+    assert(_island_fringe.empty());
+    _island_fringe.push_back(handle);
+    _island_contacts.clear();
+  }
+
+  void initialize_island(Dynamic_rigid_body_handle handle) {
+    assert(_island_fringe.empty());
+    _island_fringe.push_back(handle);
+    _island_contacts.clear();
   }
 
   void solve_current_island(int min_position_iterations_per_contact,
@@ -1963,38 +1994,6 @@ private:
         break;
       }
     }
-    // for (auto i = std::size_t{}; i != _position_iterations_multiplier; ++i) {
-    //   for (auto j = std::size_t{}; j != contact_count; ++j) {
-    //     std::visit(
-    //         [this](auto &&arg) {
-    //           if (arg->separation < 0.0f) {
-    //             resolve_contact_position(arg);
-    //           }
-    //         },
-    //         _island_contacts.at(j));
-    //   }
-    // }
-    // for (auto i = std::size_t{}; i != _velocity_iterations_multiplier; ++i) {
-    //   for (auto j = std::size_t{}; j != contact_count; ++j) {
-    //     std::visit(
-    //         [=, this](auto &&arg) {
-    //           using T = std::decay_t<decltype(arg)>;
-    //           if (arg->separating_velocity < 0.0f) {
-    //             if constexpr (
-    //                 std::is_same_v<T, Particle_static_rigid_body_contact *>
-    //                 || std::is_same_v<
-    //                     T, Dynamic_rigid_body_static_rigid_body_contact *>) {
-    //               resolve_contact_velocity(arg, gravitational_velocity_delta,
-    //                                        max_separating_velocity_for_bounce);
-    //             } else {
-    //               resolve_contact_velocity(arg,
-    //                                        max_separating_velocity_for_bounce);
-    //             }
-    //           }
-    //         },
-    //         _island_contacts.at(j));
-    //   }
-    // }
   }
 
   struct Positional_constraint_problem {
@@ -2613,27 +2612,24 @@ private:
         math::Mat3x3f::rotation(body_datas[0]->orientation),
         math::Mat3x3f::rotation(body_datas[1]->orientation)};
     auto const inverse_rotations = std::array<math::Mat3x3f, 2>{
-        math::transpose(rotations[0]), math::transpose(rotations[1])};
+        transpose(rotations[0]), transpose(rotations[1])};
     auto const inverse_inertia_tensors = std::array<math::Mat3x3f, 2>{
         rotations[0] * body_datas[0]->inverse_inertia_tensor *
             inverse_rotations[0],
         rotations[1] * body_datas[1]->inverse_inertia_tensor *
             inverse_rotations[1]};
     auto const angular_impulses_per_separating_impulse =
-        std::array<math::Vec3f, 2>{
-            math::cross(relative_contact_positions[0], normal),
-            math::cross(relative_contact_positions[1], normal)};
-    auto const angular_velocities_per_separating_impulse =
-        std::array<math::Vec3f, 2>{
-            inverse_inertia_tensors[0] *
-                angular_impulses_per_separating_impulse[0],
+        std::array<Vec3f, 2>{cross(relative_contact_positions[0], normal),
+                             cross(relative_contact_positions[1], normal)};
+    auto const angular_velocities_per_separating_impulse = std::array<Vec3f, 2>{
+        inverse_inertia_tensors[0] * angular_impulses_per_separating_impulse[0],
             inverse_inertia_tensors[1] *
                 angular_impulses_per_separating_impulse[1]};
     auto const separating_velocity_per_separating_impulse =
         body_datas[0]->inverse_mass + body_datas[1]->inverse_mass +
-        math::dot(math::cross(angular_velocities_per_separating_impulse[0],
+        dot(cross(angular_velocities_per_separating_impulse[0],
                               relative_contact_positions[0]) +
-                      math::cross(angular_velocities_per_separating_impulse[1],
+                cross(angular_velocities_per_separating_impulse[1],
                                   relative_contact_positions[1]),
                   normal);
     auto const separating_impulse_per_separating_velocity =
@@ -2658,28 +2654,27 @@ private:
                        relative_contact_positions[1]));
       auto const sliding_velocity =
           relative_velocity - separating_velocity * normal;
-      auto const sliding_speed_squared = math::length_squared(sliding_velocity);
+      auto const sliding_speed_squared = length_squared(sliding_velocity);
       if (sliding_speed_squared != 0.0f) {
         auto const sliding_speed = std::sqrt(sliding_speed_squared);
         auto const sliding_direction = sliding_velocity / sliding_speed;
         auto const frictional_impulse_direction = -sliding_direction;
         auto const angular_impulses_per_frictional_impulse =
-            std::array<math::Vec3f, 2>{
-                math::cross(relative_contact_positions[0],
+            std::array<Vec3f, 2>{cross(relative_contact_positions[0],
                             frictional_impulse_direction),
-                math::cross(relative_contact_positions[1],
+                                 cross(relative_contact_positions[1],
                             frictional_impulse_direction)};
         auto const angular_velocities_per_frictional_impulse =
-            std::array<math::Vec3f, 2>{
+            std::array<Vec3f, 2>{
                 inverse_inertia_tensors[0] *
                     angular_impulses_per_frictional_impulse[0],
                 inverse_inertia_tensors[1] *
                     angular_impulses_per_frictional_impulse[1]};
         auto const sliding_velocity_per_frictional_impulse =
             body_datas[0]->inverse_mass + body_datas[1]->inverse_mass +
-            math::dot(math::cross(angular_velocities_per_frictional_impulse[0],
+            dot(cross(angular_velocities_per_frictional_impulse[0],
                                   relative_contact_positions[0]),
-                      math::cross(angular_velocities_per_frictional_impulse[1],
+                cross(angular_velocities_per_frictional_impulse[1],
                                   relative_contact_positions[1]));
         auto const frictional_impulse_per_sliding_velocity =
             1.0f / sliding_velocity_per_frictional_impulse;
@@ -2702,18 +2697,18 @@ private:
                  frictional_impulse_direction;
         }
       } else {
-        return math::Vec3f::zero();
+        return Vec3f::zero();
       }
     }();
     auto const impulse = separating_impulse + frictional_impulse;
     auto const body_velocity_deltas =
-        std::array<math::Vec3f, 2>{impulse * body_datas[0]->inverse_mass,
+        std::array<Vec3f, 2>{impulse * body_datas[0]->inverse_mass,
                                    -impulse * body_datas[1]->inverse_mass};
-    auto const body_angular_velocity_deltas = std::array<math::Vec3f, 2>{
+    auto const body_angular_velocity_deltas = std::array<Vec3f, 2>{
         inverse_inertia_tensors[0] *
-            math::cross(relative_contact_positions[0], impulse),
+            cross(relative_contact_positions[0], impulse),
         inverse_inertia_tensors[1] *
-            math::cross(relative_contact_positions[1], -impulse)};
+            cross(relative_contact_positions[1], -impulse)};
     for (auto i = 0; i != 2; ++i) {
       body_datas[i]->velocity += body_velocity_deltas[i];
       body_datas[i]->angular_velocity += body_angular_velocity_deltas[i];
@@ -2735,19 +2730,18 @@ private:
     auto const separating_velocity = contact->separating_velocity;
     auto const dynamic_body_rotation =
         math::Mat3x3f::rotation(dynamic_body_data->orientation);
-    auto const dynamic_body_inverse_rotation =
-        math::transpose(dynamic_body_rotation);
+    auto const dynamic_body_inverse_rotation = transpose(dynamic_body_rotation);
     auto const dynamic_body_inverse_inertia_tensor =
         dynamic_body_rotation * dynamic_body_data->inverse_inertia_tensor *
         dynamic_body_inverse_rotation;
     auto const angular_impulse_per_separating_impulse =
-        math::cross(dynamic_body_relative_contact_position, normal);
+        cross(dynamic_body_relative_contact_position, normal);
     auto const angular_velocity_per_separating_impulse =
         dynamic_body_inverse_inertia_tensor *
         angular_impulse_per_separating_impulse;
     auto const separating_velocity_per_separating_impulse =
         dynamic_body_data->inverse_mass +
-        math::dot(math::cross(angular_velocity_per_separating_impulse,
+        dot(cross(angular_velocity_per_separating_impulse,
                               dynamic_body_relative_contact_position),
                   normal);
     auto const separating_impulse_per_separating_velocity =
@@ -2760,7 +2754,7 @@ private:
     auto const delta_separating_velocity =
         -separating_velocity -
         std::min(separating_velocity -
-                     math::dot(gravitational_velocity_delta, normal),
+                     dot(gravitational_velocity_delta, normal),
                  0.0f) *
             restitution_coefficient;
     auto const separating_impulse_length =
@@ -2773,20 +2767,20 @@ private:
                       dynamic_body_relative_contact_position);
       auto const sliding_velocity =
           relative_velocity - separating_velocity * normal;
-      auto const sliding_speed_squared = math::length_squared(sliding_velocity);
+      auto const sliding_speed_squared = length_squared(sliding_velocity);
       if (sliding_speed_squared != 0.0f) {
         auto const sliding_speed = std::sqrt(sliding_speed_squared);
         auto const sliding_direction = sliding_velocity / sliding_speed;
         auto const frictional_impulse_direction = -sliding_direction;
         auto const angular_impulse_per_frictional_impulse =
-            math::cross(dynamic_body_relative_contact_position,
+            cross(dynamic_body_relative_contact_position,
                         frictional_impulse_direction);
         auto const angular_velocity_per_frictional_impulse =
             dynamic_body_inverse_inertia_tensor *
             angular_impulse_per_frictional_impulse;
         auto const sliding_velocity_per_frictional_impulse =
             dynamic_body_data->inverse_mass +
-            math::dot(math::cross(angular_velocity_per_frictional_impulse,
+            dot(cross(angular_velocity_per_frictional_impulse,
                                   dynamic_body_relative_contact_position),
                       frictional_impulse_direction);
         auto const frictional_impulse_per_sliding_velocity =
@@ -2810,7 +2804,7 @@ private:
                  frictional_impulse_direction;
         }
       } else {
-        return math::Vec3f::zero();
+        return Vec3f::zero();
       }
     }();
     auto const impulse = separating_impulse + frictional_impulse;
