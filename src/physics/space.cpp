@@ -1416,7 +1416,7 @@ private:
           data->awake = false;
           data->velocity = Vec3f::zero();
           data->angular_velocity = Vec3f::zero();
-          std::cout << "sleeping object\n";
+          // std::cout << "sleeping object\n";
         } else {
           data->previous_position = data->position;
           data->velocity += h * _gravitational_acceleration;
