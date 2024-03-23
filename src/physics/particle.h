@@ -20,14 +20,12 @@ struct Particle_handle {
 };
 
 struct Particle_create_info {
-  Particle_motion_callback *motion_callback{nullptr};
-  std::uint64_t collision_flags{0};
-  std::uint64_t collision_mask{0};
+  Particle_motion_callback *motion_callback{};
+  float radius{0.0f};
+  float mass{1.0f};
+  Material material;
   math::Vec3f position{math::Vec3f::zero()};
   math::Vec3f velocity{math::Vec3f::zero()};
-  float mass{1.0f};
-  float radius{0.0f};
-  Material material;
 };
 
 struct Particle_motion_event {

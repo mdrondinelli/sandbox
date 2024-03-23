@@ -40,25 +40,21 @@ math::Vec3f sample_ball(Random_number_engine &random_number_engine) {
 
 Test_entity_handle
 Test_entity_manager::create_entity(Test_entity_create_info const &) {
-  auto const collision_flags_array =
-      std::array<std::uint64_t, 3>{0b01u, 0b01u, 0b01u};
-  auto const collision_masks =
-      std::array<std::uint64_t, 3>{0b01u, 0b01u, 0b11u};
-  auto const centers = std::array<math::Vec3f, 3>{
-      math::Vec3f{-3.0f, 0.5f, -3.0f}, math::Vec3f{0.0f, 5.5f, 0.0f},
-      math::Vec3f{3.0f, 0.5f, 3.0f}};
+  auto const centers =
+      std::array<math::Vec3f, 3>{math::Vec3f{-3.0f, 0.5f, -3.0f},
+                                 math::Vec3f{0.0f, 5.5f, 0.0f},
+                                 math::Vec3f{3.0f, 0.5f, 3.0f}};
   auto const radii = std::array<float, 3>{0.1f, 0.5f, 0.1f};
-  auto const velocities = std::array<math::Vec3f, 3>{
-      math::Vec3f{0.0f, 9.0f, 0.0f}, math::Vec3f{0.0f, 0.0f, 0.0f},
-      math::Vec3f{0.0f, 9.0f, 0.0f}};
+  auto const velocities =
+      std::array<math::Vec3f, 3>{math::Vec3f{0.0f, 9.0f, 0.0f},
+                                 math::Vec3f{0.0f, 0.0f, 0.0f},
+                                 math::Vec3f{0.0f, 9.0f, 0.0f}};
   auto const velocity_jitter_factors = std::array<float, 3>{0.0f, 0.0f, 0.0f};
   auto const densities = std::array<float, 3>{500.0f, 500.0f, 500.0f};
   std::uniform_int_distribution index_distribution{0, 5};
   auto const index = [](int n) {
     return n >= 3 ? 1 : n;
   }(index_distribution(_random_number_engine));
-  auto const collision_flags = collision_flags_array[index];
-  auto const collision_mask = collision_masks[index];
   auto const position =
       radii[index] * sample_ball(_random_number_engine) + centers[index];
   auto const velocity =
@@ -78,15 +74,13 @@ Test_entity_manager::create_entity(Test_entity_create_info const &) {
   _scene->add_surface(value.surface);
   value.particle = _space->create_particle(
       {.motion_callback = &value,
-       .collision_flags = collision_flags,
-       .collision_mask = collision_mask,
-       .position = position,
-       .velocity = velocity,
-       .mass = density * 4.0f / 3.0f * 3.14f * scale * scale * scale,
        .radius = scale,
+       .mass = density * 4.0f / 3.0f * 3.14f * scale * scale * scale,
        .material = {.static_friction_coefficient = 0.3f,
                     .dynamic_friction_coefficient = 0.2f,
-                    .restitution_coefficient = 0.1f}});
+                    .restitution_coefficient = 0.1f},
+       .position = position,
+       .velocity = velocity});
   return {_next_entity_reference_value++};
 }
 

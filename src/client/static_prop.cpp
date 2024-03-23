@@ -20,21 +20,19 @@ Static_prop_manager::create(Static_prop_create_info const &create_info) {
   auto const surface_pretransform_4x4 =
       math::Mat4x4f{_surface_pretransform_3x4, {0.0f, 0.0f, 0.0f, 1.0f}};
   auto const surface_transform_4x4 = prop_transform * surface_pretransform_4x4;
-  auto const surface_transform_3x4 =
-      math::Mat3x4f{surface_transform_4x4[0], surface_transform_4x4[1],
-                    surface_transform_4x4[2]};
+  auto const surface_transform_3x4 = math::Mat3x4f{surface_transform_4x4[0],
+                                                   surface_transform_4x4[1],
+                                                   surface_transform_4x4[2]};
   value.surface =
       _graphics->create_surface({.mesh = _surface_mesh,
                                  .material = _surface_material,
                                  .transform = surface_transform_3x4});
   _scene->add_surface(value.surface);
-  value.body =
-      _space->create_static_rigid_body({.collision_flags = 1,
-                                        .collision_mask = 1,
-                                        .position = create_info.position,
-                                        .orientation = create_info.orientation,
-                                        .shape = _body_shape,
-                                        .material = _body_material});
+  value.body = _space->create_static_rigid_body(
+      {.shape = _body_shape,
+       .material = _body_material,
+       .position = create_info.position,
+       .orientation = create_info.orientation});
   return {_next_entity_handle_value++};
 }
 

@@ -24,9 +24,9 @@ Dynamic_prop_manager::create(Dynamic_prop_create_info const &create_info) {
   auto const surface_pretransform_4x4 =
       math::Mat4x4f{_surface_pretransform_3x4, {0.0f, 0.0f, 0.0f, 1.0}};
   auto const surface_transform_4x4 = prop_transform * surface_pretransform_4x4;
-  auto const surface_transform_3x4 =
-      math::Mat3x4f{surface_transform_4x4[0], surface_transform_4x4[1],
-                    surface_transform_4x4[2]};
+  auto const surface_transform_3x4 = math::Mat3x4f{surface_transform_4x4[0],
+                                                   surface_transform_4x4[1],
+                                                   surface_transform_4x4[2]};
   value.surface =
       _graphics->create_surface({.mesh = _surface_mesh,
                                  .material = _surface_material,
@@ -34,16 +34,14 @@ Dynamic_prop_manager::create(Dynamic_prop_create_info const &create_info) {
   try {
     value.body = _space->create_dynamic_rigid_body(
         {.motion_callback = &value,
-         .collision_flags = 1,
-         .collision_mask = 1,
+         .shape = _body_shape,
+         .mass = _body_mass,
+         .inertia_tensor = _body_inertia_tensor,
+         .material = _body_material,
          .position = create_info.position,
          .velocity = create_info.velocity,
          .orientation = create_info.orientation,
-         .angular_velocity = create_info.angular_velocity,
-         .mass = _body_mass,
-         .inertia_tensor = _body_inertia_tensor,
-         .shape = _body_shape,
-         .material = _body_material});
+         .angular_velocity = create_info.angular_velocity});
   } catch (...) {
     _graphics->destroy_surface(value.surface);
     throw;
@@ -72,12 +70,12 @@ void Dynamic_prop_manager::Entity::on_dynamic_rigid_body_motion(
   auto const prop_transform =
       math::Mat4x4f::rigid(event.position, event.orientation);
   auto const &surface_pretransform_3x4 = manager->_surface_pretransform_3x4;
-  auto const surface_pretransform_4x4 = math::Mat4x4f{
-      surface_pretransform_3x4, {0.0f, 0.0f, 0.0f, 1.0}};
+  auto const surface_pretransform_4x4 =
+      math::Mat4x4f{surface_pretransform_3x4, {0.0f, 0.0f, 0.0f, 1.0}};
   auto const surface_transform_4x4 = prop_transform * surface_pretransform_4x4;
-  auto const surface_transform_3x4 =
-      math::Mat3x4f{surface_transform_4x4[0], surface_transform_4x4[1],
-                    surface_transform_4x4[2]};
+  auto const surface_transform_3x4 = math::Mat3x4f{surface_transform_4x4[0],
+                                                   surface_transform_4x4[1],
+                                                   surface_transform_4x4[2]};
   surface->set_transform(surface_transform_3x4);
 }
 } // namespace client

@@ -294,6 +294,9 @@ void run_game_loop(GLFWwindow *window,
           height += 0.6f;
         }
         ++count;
+        if (count == 2) {
+          box_spawn_timer = -1000.0f;
+        }
         std::cout << "box count: " << count << "\n";
         // if (count >= 3) {
         //   direction = 1 - direction;
@@ -367,12 +370,9 @@ int main() {
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{{1.0f, 1.0f, 1.0f}};
   physics::Box cotton_box_shape{{0.3f, 0.3f, 0.3f}};
-  space.create_static_rigid_body({.collision_flags = 1,
-                                  .collision_mask = 1,
-                                  .position = math::Vec3f{0.0f, -0.5f, 0.0f},
-                                  // .orientation = math::Quatf::identity(),
-                                  .shape = ground_shape,
-                                  .material = physics_material});
+  space.create_static_rigid_body({.shape = ground_shape,
+                                  .material = physics_material,
+                                  .position = math::Vec3f{0.0f, -0.5f, 0.0f}});
   client::Static_prop_manager red_ball_manager{
       {.graphics = graphics.get(),
        .scene = scene.get(),

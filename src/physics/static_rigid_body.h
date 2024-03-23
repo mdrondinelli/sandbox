@@ -16,12 +16,10 @@ struct Static_rigid_body_handle {
 };
 
 struct Static_rigid_body_create_info {
-  std::uint64_t collision_flags{};
-  std::uint64_t collision_mask{};
-  math::Vec3f position{math::Vec3f::zero()};
-  math::Quatf orientation{math::Quatf::identity()};
   Shape shape;
   Material material;
+  math::Vec3f position{math::Vec3f::zero()};
+  math::Quatf orientation{math::Quatf::identity()};
 };
 
 constexpr bool operator==(Static_rigid_body_handle lhs,
