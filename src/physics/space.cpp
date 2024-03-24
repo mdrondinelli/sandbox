@@ -668,9 +668,9 @@ public:
     }
   }
 
-  void update(Rigid_body_storage &dynamic_bodies, Static_rigid_body_storage &) {
-    _update_rigid_body_rigid_body_pairs(dynamic_bodies);
-    _update_rigid_body_static_body_pairs(dynamic_bodies);
+  void update(Rigid_body_storage const &rigid_bodies) {
+    _update_rigid_body_rigid_body_pairs(rigid_bodies);
+    _update_rigid_body_static_body_pairs(rigid_bodies);
   }
 
   void cache(Rigid_body_rigid_body_contact const &contact,
