@@ -1321,7 +1321,7 @@ public:
 
 private:
   void build_aabb_tree(float delta_time) {
-    auto const constant_safety_term = 0.1f;
+    auto const constant_safety_term = 1.0f / 16.0f;
     auto const velocity_safety_factor = 2.0f;
     auto const gravity_safety_factor = 2.0f;
     auto const gravity_safety_term = gravity_safety_factor *
