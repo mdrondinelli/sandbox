@@ -1432,22 +1432,6 @@ private:
                              (length_squared(data->velocity) +
                               length_squared(data->angular_velocity)),
                      waking_motion_limit);
-        if (data->waking_motion < waking_motion_epsilon) {
-          data->awake = false;
-          data->velocity = Vec3f::zero();
-          data->angular_velocity = Vec3f::zero();
-          // std::cout << "sleeping object\n";
-        } else {
-          data->previous_position = data->position;
-          data->velocity += h * _gravitational_acceleration;
-          data->velocity *= time_compensated_damping_factor;
-          data->position += h * data->velocity;
-          data->previous_orientation = data->orientation;
-          data->angular_velocity *= time_compensated_damping_factor;
-          data->orientation += Quatf{0.0f, 0.5f * h * data->angular_velocity} *
-                               data->orientation;
-          data->orientation = normalize(data->orientation);
-        }
       }
     });
   }
