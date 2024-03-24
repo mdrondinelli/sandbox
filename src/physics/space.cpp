@@ -1018,7 +1018,11 @@ private:
         }
       }
       if (_size < max_cached_contacts_per_object_pair) {
-        _contacts[_size++] = contact;
+        _contacts[_size] = contact;
+        _contact_positions[_size] =
+            rigid_body_position + contact.relative_position;
+        _contact_body_orientations[_size] = rigid_body_orientation;
+        ++_size;
       } else {
         auto const min_it = std::min_element(
             _contacts.begin(),
