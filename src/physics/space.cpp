@@ -1086,13 +1086,6 @@ private:
       _rigid_body_static_body_pairs;
 };
 
-// integration constants
-auto constexpr velocity_damping_factor = 0.99f;
-auto constexpr waking_motion_epsilon = 1.0f / 8.0f;
-auto constexpr waking_motion_initializer = 2.0f * waking_motion_epsilon;
-auto constexpr waking_motion_limit = 8.0f * waking_motion_epsilon;
-auto constexpr waking_motion_smoothing_factor = 15.0f / 16.0f;
-
 // solving constants
 auto constexpr max_rotational_displacement_factor = 0.2f;
 } // namespace
