@@ -707,6 +707,49 @@ public:
     }
   }
 
+  void count_contacts(Rigid_body_storage &rigid_bodies) {
+    for (auto const &[key, pair] : _rigid_body_rigid_body_pairs) {
+      auto const handle_1 =
+          Dynamic_rigid_body_handle{static_cast<std::uint32_t>(key >> 32)};
+      auto const handle_2 =
+          Dynamic_rigid_body_handle{static_cast<std::uint32_t>(key)};
+      auto const count = pair.get_contacts().size();
+      rigid_bodies.data(handle_1)->rigid_body_contact_count += count;
+      rigid_bodies.data(handle_2)->rigid_body_contact_count += count;
+    }
+    for (auto const &[key, pair] : _rigid_body_static_body_pairs) {
+      auto const handle =
+          Dynamic_rigid_body_handle{static_cast<std::uint32_t>(key >> 32)};
+      auto const count = pair.get_contacts().size();
+      rigid_bodies.data(handle)->static_body_contact_count += count;
+    }
+  }
+
+  void assign_contacts(Rigid_body_storage &rigid_bodies) {
+    for (auto &[key, pair] : _rigid_body_rigid_body_pairs) {
+      auto const handles = std::array<Dynamic_rigid_body_handle, 2>{
+          Dynamic_rigid_body_handle{static_cast<std::uint32_t>(key >> 32)},
+          Dynamic_rigid_body_handle{static_cast<std::uint32_t>(key)}};
+      auto const datas = std::array<Rigid_body_data *, 2>{
+          rigid_bodies.data(handles[0]), rigid_bodies.data(handles[1])};
+      for (auto i = 0; i < 2; ++i) {
+        for (auto &contact : pair.get_contacts()) {
+          datas[i]->rigid_body_contacts[datas[i]->rigid_body_contact_count++] =
+              &contact;
+        }
+      }
+    }
+    for (auto &[key, pair] : _rigid_body_static_body_pairs) {
+      auto const handle =
+          Dynamic_rigid_body_handle{static_cast<std::uint32_t>(key >> 32)};
+      auto const data = rigid_bodies.data(handle);
+      for (auto &contact : pair.get_contacts()) {
+        data->static_body_contacts[data->static_body_contact_count++] =
+            &contact;
+      }
+    }
+  }
+
   std::span<Rigid_body_rigid_body_contact const>
   contacts(Dynamic_rigid_body_handle rigid_body_1,
            Dynamic_rigid_body_handle rigid_body_2) const {
@@ -1435,16 +1478,15 @@ private:
     find_new_contacts();
     _contact_cache.update(_rigid_bodies);
     cache_new_contacts();
-    count_contacts();
+    _contact_cache.count_contacts(_rigid_bodies);
     reset_contact_pointer_storage();
     allocate_particle_contact_pointers();
     allocate_rigid_body_contact_pointers();
     reset_contact_counts();
-    assign_and_count_particle_particle_contact_pointers();
-    assign_and_count_particle_rigid_body_contact_pointers();
-    assign_and_count_particle_static_body_contact_pointers();
-    assign_and_count_rigid_body_rigid_body_contact_pointers();
-    assign_and_count_rigid_body_static_body_contact_pointers();
+    assign_particle_particle_contacts();
+    assign_particle_rigid_body_contacts();
+    assign_particle_static_body_contacts();
+    _contact_cache.assign_contacts(_rigid_bodies);
   }
 
   void reset_contact_counts() {
@@ -1671,24 +1713,6 @@ private:
     }
   }
 
-  void count_contacts() {
-    for (auto const &new_contact : _rigid_body_rigid_body_contacts) {
-      auto const datas = std::array<Rigid_body_data *, 2>{
-          _rigid_bodies.data(new_contact.bodies[0]),
-          _rigid_bodies.data(new_contact.bodies[1])};
-      auto const cached_contacts =
-          _contact_cache.contacts(new_contact.bodies[0], new_contact.bodies[1]);
-      datas[0]->rigid_body_contact_count += cached_contacts.size();
-      datas[1]->rigid_body_contact_count += cached_contacts.size();
-    }
-    for (auto const &contact : _rigid_body_static_body_contacts) {
-      auto const rigid_body_data = _rigid_bodies.data(contact.rigid_body);
-      rigid_body_data->static_body_contact_count +=
-          _contact_cache.contacts(contact.rigid_body, contact.static_body)
-              .size();
-    }
-  }
-
   void reset_contact_pointer_storage() {
     _particle_particle_contact_pointers.clear();
     _particle_rigid_body_contact_pointers.clear();
@@ -1733,7 +1757,7 @@ private:
     });
   }
 
-  void assign_and_count_particle_particle_contact_pointers() {
+  void assign_particle_particle_contacts() {
     for (auto &contact : _particle_particle_contacts) {
       auto const particle_datas =
           std::array<Particle_data *, 2>{_particles.data(contact.particles[0]),
@@ -1746,7 +1770,7 @@ private:
     }
   }
 
-  void assign_and_count_particle_rigid_body_contact_pointers() {
+  void assign_particle_rigid_body_contacts() {
     for (auto &contact : _particle_rigid_body_contacts) {
       auto const particle_data = _particles.data(contact.particle);
       auto const dynamic_rigid_body_data = _rigid_bodies.data(contact.body);
@@ -1758,40 +1782,12 @@ private:
     }
   }
 
-  void assign_and_count_particle_static_body_contact_pointers() {
+  void assign_particle_static_body_contacts() {
     for (auto &contact : _particle_static_body_contacts) {
       auto const particle_data = _particles.data(contact.particle);
       particle_data
           ->static_body_contacts[particle_data->static_body_contact_count++] =
           &contact;
-    }
-  }
-
-  void assign_and_count_rigid_body_rigid_body_contact_pointers() {
-    for (auto &new_contact : _rigid_body_rigid_body_contacts) {
-      auto const datas = std::array<Rigid_body_data *, 2>{
-          _rigid_bodies.data(new_contact.bodies[0]),
-          _rigid_bodies.data(new_contact.bodies[1])};
-      auto const cached_contacts =
-          _contact_cache.contacts(new_contact.bodies[0], new_contact.bodies[1]);
-      for (auto &cached_contact : cached_contacts) {
-        for (auto i = 0; i != 2; ++i) {
-          datas[i]->rigid_body_contacts[datas[i]->rigid_body_contact_count++] =
-              &cached_contact;
-        }
-      }
-    }
-  }
-
-  void assign_and_count_rigid_body_static_body_contact_pointers() {
-    for (auto &new_contact : _rigid_body_static_body_contacts) {
-      auto const rigid_body_data = _rigid_bodies.data(new_contact.rigid_body);
-      auto const cached_contacts = _contact_cache.contacts(
-          new_contact.rigid_body, new_contact.static_body);
-      for (auto &cached_contact : cached_contacts) {
-        rigid_body_data->static_body_contacts
-            [rigid_body_data->static_body_contact_count++] = &cached_contact;
-      }
     }
   }
 
