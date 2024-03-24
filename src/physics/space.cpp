@@ -1621,9 +1621,6 @@ private:
              {body_handles.first, body_handles.second},
              body_relative_contact_positions});
         _contact_cache.mark(body_handles.first, body_handles.second);
-        // for (auto i = 0; i != 2; ++i) {
-        //   ++body_datas[i]->dynamic_rigid_body_contact_count;
-        // }
       }
     }
   }
