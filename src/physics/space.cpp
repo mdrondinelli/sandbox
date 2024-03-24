@@ -2299,10 +2299,6 @@ private:
       }
     }
     for (auto i = 0; i != 2; ++i) {
-      if (!data[i]->awake) {
-        data[i]->waking_motion = waking_motion_initializer;
-        data[i]->awake = true;
-      }
       apply_positional_correction(
           contact->bodies[i], delta_position[i], delta_orientation[i]);
       update_separations(
