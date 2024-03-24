@@ -306,7 +306,7 @@ void run_game_loop(GLFWwindow *window,
         height += 0.6f;
       }
       ++count;
-      if (count == 10) {
+      if (count == 12) {
         box_spawn_timer = -1000.0f;
       }
       std::cout << "box count: " << count << "\n";
