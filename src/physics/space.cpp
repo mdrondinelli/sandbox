@@ -144,11 +144,13 @@ struct Particle_data {
   Vec3f previous_position;
   Vec3f position;
   Vec3f velocity;
+  float waking_motion;
   std::uint16_t particle_contact_count;
   std::uint16_t static_body_contact_count;
   std::uint16_t rigid_body_contact_count;
   bool marked;
   bool visited;
+  bool awake;
 };
 
 struct Rigid_body_data {
@@ -1234,8 +1236,10 @@ public:
                       .previous_position = create_info.position,
                       .position = create_info.position,
                       .velocity = create_info.velocity,
+                      .waking_motion = waking_motion_initializer,
                       .marked = false,
-                      .visited = false};
+                      .visited = false,
+                      .awake = true};
     return handle;
   }
 
@@ -1431,18 +1435,31 @@ private:
         std::pow(velocity_damping_factor, h);
     auto const time_compensating_waking_motion_smoothing_factor =
         1.0f - std::pow(1.0f - waking_motion_smoothing_factor, h);
-    integrate_particles(h, time_compensated_damping_factor);
+    integrate_particles(h,
+                        time_compensated_damping_factor,
+                        time_compensating_waking_motion_smoothing_factor);
     integrate_rigid_bodies(h,
                            time_compensated_damping_factor,
                            time_compensating_waking_motion_smoothing_factor);
   }
 
-  void integrate_particles(float h, float time_compensated_damping_factor) {
+  void
+  integrate_particles(float h,
+                      float time_compensated_damping_factor,
+                      float time_compensated_waking_motion_smoothing_factor) {
     _particles.for_each([&](Particle_handle, Particle_data *data) {
-      data->previous_position = data->position;
-      data->velocity += h * _gravitational_acceleration;
-      data->velocity *= time_compensated_damping_factor;
-      data->position += h * data->velocity;
+      if (data->awake) {
+        data->previous_position = data->position;
+        data->velocity += h * _gravitational_acceleration;
+        data->velocity *= time_compensated_damping_factor;
+        data->position += h * data->velocity;
+        data->waking_motion =
+            std::min((1.0f - time_compensated_waking_motion_smoothing_factor) *
+                             data->waking_motion +
+                         time_compensated_waking_motion_smoothing_factor *
+                             length_squared(data->velocity),
+                     waking_motion_limit);
+      }
     });
   }
 
