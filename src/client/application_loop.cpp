@@ -9,10 +9,14 @@ Application_loop::Application_loop(
     : _space{create_info.space},
       _physics_step_duration{create_info.physics_step_duration},
       _physics_substep_count{create_info.physics_substep_count},
-      _max_physics_island_position_iterations{
-          create_info.max_physics_island_position_iterations},
-      _max_physics_island_velocity_iterations{
-          create_info.max_physics_island_velocity_iterations},
+      _min_position_iterations_per_contact{
+          create_info.min_position_iterations_per_contact},
+      _max_position_iterations_per_contact{
+          create_info.max_position_iterations_per_contact},
+      _min_velocity_iterations_per_contact{
+          create_info.min_velocity_iterations_per_contact},
+      _max_velocity_iterations_per_contact{
+          create_info.max_velocity_iterations_per_contact},
       _accumulated_time{0.0} {
   assert(create_info.space != nullptr);
   assert(create_info.physics_step_duration > 0.0f);
@@ -26,10 +30,14 @@ bool Application_loop::run_once(double delta_time) {
     _accumulated_time -= _physics_step_duration;
     _space->simulate({.delta_time = _physics_step_duration,
                       .substep_count = _physics_substep_count,
+                      .min_position_iterations_per_contact =
+                          _min_position_iterations_per_contact,
                       .max_position_iterations_per_contact =
-                          _max_physics_island_position_iterations,
+                          _max_position_iterations_per_contact,
+                      .min_velocity_iterations_per_contact =
+                          _min_velocity_iterations_per_contact,
                       .max_velocity_iterations_per_contact =
-                          _max_physics_island_velocity_iterations});
+                          _max_velocity_iterations_per_contact});
     retval = true;
   }
   return retval;

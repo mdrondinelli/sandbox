@@ -255,8 +255,10 @@ void run_game_loop(GLFWwindow *window,
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
                                 .physics_substep_count = 16,
-                                .max_physics_island_position_iterations = 4,
-                                .max_physics_island_velocity_iterations = 4}};
+                                .min_position_iterations_per_contact = 2,
+                                .max_position_iterations_per_contact = 4,
+                                .min_velocity_iterations_per_contact = 2,
+                                .max_velocity_iterations_per_contact = 4}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
   auto fps_frame_accumulator = 0;
@@ -267,6 +269,7 @@ void run_game_loop(GLFWwindow *window,
   auto count = 0;
   auto offsetX = 0.0f;
   auto offsetZ = 0.0f;
+  auto spawn_debounce = 0.0f;
   for (;;) {
     glfwPollEvents();
     if (glfwWindowShouldClose(window)) {
@@ -275,51 +278,59 @@ void run_game_loop(GLFWwindow *window,
     auto const current_time = glfwGetTime();
     auto const elapsed_time = current_time - previous_time;
     previous_time = current_time;
-    if (glfwGetKey(window, GLFW_KEY_SPACE) ||
-        !glfwGetKey(window, GLFW_KEY_SPACE)) {
-      if (loop.run_once(elapsed_time)) {
-        test_entity_manager->tick(tick_duration);
-        for (auto i = 0; i < 0; ++i) {
-          test_entity_manager->create_entity({});
-        }
+    if (loop.run_once(elapsed_time)) {
+      test_entity_manager->tick(tick_duration);
+      for (auto i = 0; i < 0; ++i) {
+        test_entity_manager->create_entity({});
       }
-      box_spawn_timer += elapsed_time;
-      if (box_spawn_timer > 1.5f) {
-        box_spawn_timer = 0.0f;
-        if (height > 8.0f) {
-          height = 2.0f;
-          offsetX = 10 * (rand() / (float)RAND_MAX) - 5;
-          offsetZ = 10 * (rand() / (float)RAND_MAX) - 5;
-        } else {
-          height += 0.6f;
-        }
-        ++count;
-        if (count == 2) {
-          box_spawn_timer = -1000.0f;
-        }
-        std::cout << "box count: " << count << "\n";
-        // if (count >= 3) {
-        //   direction = 1 - direction;
-        //   count = 0;
-        //   height += 0.25f;
-        // }
-        // cotton_box_manager->create(
-        //     {.position = math::Vec3f{direction == 0 ? 0.0f : -0.65f * count +
-        //     0.65f, height, direction == 0 ? 0.65f * count : 0.65f},
-        //      .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-        //      .orientation = math::Quatf::axis_angle(
-        //          math::Vec3f{0.0f, 1.0f, 0.0f},
-        //          math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
-        //      .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
+      if (glfwGetKey(window, GLFW_KEY_SPACE) && spawn_debounce >= 0.0f) {
+        spawn_debounce = -0.5f;
         cotton_box_manager->create(
-            {.position = math::Vec3f{offsetX, height, offsetZ},
-             .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+            {.position = math::Vec3f{10.0f, height + 2.0f, 10.0f},
+             .velocity = math::Vec3f{-10.0f, 0.0f, -10.0f},
              .orientation = math::Quatf::axis_angle(
                  math::Vec3f{0.0f, 1.0f, 0.0f},
                  math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
              .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
-        // count += 1;
       }
+    }
+    spawn_debounce += elapsed_time;
+    box_spawn_timer += elapsed_time;
+    if (box_spawn_timer > 1.25f) {
+      box_spawn_timer = 0.0f;
+      if (height > 8.0f) {
+        height = 2.0f;
+        offsetX = 10 * (rand() / (float)RAND_MAX) - 5;
+        offsetZ = 10 * (rand() / (float)RAND_MAX) - 5;
+      } else {
+        height += 0.6f;
+      }
+      ++count;
+      if (count == 10) {
+        box_spawn_timer = -1000.0f;
+      }
+      std::cout << "box count: " << count << "\n";
+      // if (count >= 3) {
+      //   direction = 1 - direction;
+      //   count = 0;
+      //   height += 0.25f;
+      // }
+      // cotton_box_manager->create(
+      //     {.position = math::Vec3f{direction == 0 ? 0.0f : -0.65f * count +
+      //     0.65f, height, direction == 0 ? 0.65f * count : 0.65f},
+      //      .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+      //      .orientation = math::Quatf::axis_angle(
+      //          math::Vec3f{0.0f, 1.0f, 0.0f},
+      //          math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
+      //      .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
+      cotton_box_manager->create(
+          {.position = math::Vec3f{offsetX, height, offsetZ},
+           .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+           .orientation = math::Quatf::axis_angle(
+               math::Vec3f{0.0f, 1.0f, 0.0f},
+               math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
+           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
+      // count += 1;
     }
     graphics->render(scene, camera, render_target);
     glfwSwapBuffers(window);
