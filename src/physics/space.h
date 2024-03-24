@@ -27,7 +27,7 @@ struct Space_create_info {
 
 struct Space_simulate_info {
   float delta_time;
-  int substep_count{32};
+  int substep_count{16};
   int min_position_iterations_per_contact{1};
   int max_position_iterations_per_contact{4};
   int min_velocity_iterations_per_contact{1};
