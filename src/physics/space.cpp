@@ -2736,10 +2736,6 @@ private:
         inverse_inertia_tensors[0] * cross(relative_positions[0], impulse),
         inverse_inertia_tensors[1] * cross(relative_positions[1], -impulse)};
     for (auto i = 0; i != 2; ++i) {
-      if (!datas[i]->awake) {
-        datas[i]->waking_motion = waking_motion_initializer;
-        datas[i]->awake = true;
-      }
       datas[i]->velocity += body_velocity_deltas[i];
       datas[i]->angular_velocity += body_angular_velocity_deltas[i];
       update_separating_velocities(
