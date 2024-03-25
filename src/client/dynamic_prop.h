@@ -50,7 +50,7 @@ private:
   struct Entity : public physics::Dynamic_rigid_body_motion_callback {
     Dynamic_prop_manager *manager;
     graphics::Surface *surface;
-    physics::Dynamic_rigid_body_handle body;
+    physics::Rigid_body_handle body;
 
     void on_dynamic_rigid_body_motion(
         physics::Dynamic_rigid_body_motion_event const &event) final;

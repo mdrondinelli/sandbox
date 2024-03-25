@@ -13,8 +13,8 @@ namespace marlon {
 namespace physics {
 class Dynamic_rigid_body_motion_callback;
 
-struct Dynamic_rigid_body_handle {
-  Object_handle_t value;
+struct Rigid_body_handle {
+  Object_handle value;
 };
 
 struct Dynamic_rigid_body_create_info {
@@ -30,7 +30,7 @@ struct Dynamic_rigid_body_create_info {
 };
 
 struct Dynamic_rigid_body_motion_event {
-  Dynamic_rigid_body_handle handle;
+  Rigid_body_handle handle;
   math::Vec3f position;
   math::Quatf orientation;
 };
@@ -43,17 +43,17 @@ public:
       Dynamic_rigid_body_motion_event const &event) = 0;
 };
 
-constexpr bool operator==(Dynamic_rigid_body_handle lhs,
-                          Dynamic_rigid_body_handle rhs) noexcept {
+constexpr bool operator==(Rigid_body_handle lhs,
+                          Rigid_body_handle rhs) noexcept {
   return lhs.value == rhs.value;
 }
 } // namespace physics
 } // namespace marlon
 
 namespace std {
-template <> struct hash<marlon::physics::Dynamic_rigid_body_handle> {
+template <> struct hash<marlon::physics::Rigid_body_handle> {
   std::size_t operator()(
-      marlon::physics::Dynamic_rigid_body_handle reference) const noexcept {
+      marlon::physics::Rigid_body_handle reference) const noexcept {
     return hash<std::size_t>{}(reference.value);
   }
 };

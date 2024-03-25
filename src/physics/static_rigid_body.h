@@ -11,8 +11,8 @@
 
 namespace marlon {
 namespace physics {
-struct Static_rigid_body_handle {
-  Object_handle_t value;
+struct Static_body_handle {
+  Object_handle value;
 };
 
 struct Static_rigid_body_create_info {
@@ -22,17 +22,17 @@ struct Static_rigid_body_create_info {
   math::Quatf orientation{math::Quatf::identity()};
 };
 
-constexpr bool operator==(Static_rigid_body_handle lhs,
-                          Static_rigid_body_handle rhs) noexcept {
+constexpr bool operator==(Static_body_handle lhs,
+                          Static_body_handle rhs) noexcept {
   return lhs.value == rhs.value;
 }
 } // namespace physics
 } // namespace marlon
 
 namespace std {
-template <> struct hash<marlon::physics::Static_rigid_body_handle> {
+template <> struct hash<marlon::physics::Static_body_handle> {
   std::size_t operator()(
-      marlon::physics::Static_rigid_body_handle reference) const noexcept {
+      marlon::physics::Static_body_handle reference) const noexcept {
     return hash<std::size_t>{}(reference.value);
   }
 };

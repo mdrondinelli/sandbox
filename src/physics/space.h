@@ -46,15 +46,15 @@ public:
 
   void destroy_particle(Particle_handle handle);
 
-  Static_rigid_body_handle
+  Static_body_handle
   create_static_rigid_body(Static_rigid_body_create_info const &create_info);
 
-  void destroy_static_rigid_body(Static_rigid_body_handle handle);
+  void destroy_static_rigid_body(Static_body_handle handle);
 
-  Dynamic_rigid_body_handle
+  Rigid_body_handle
   create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info);
 
-  void destroy_dynamic_rigid_body(Dynamic_rigid_body_handle handle);
+  void destroy_dynamic_rigid_body(Rigid_body_handle handle);
 
   void simulate(Space_simulate_info const &simulate_info);
 

@@ -38,7 +38,7 @@ public:
 private:
   struct Entity {
     graphics::Surface *surface{};
-    physics::Static_rigid_body_handle body{};
+    physics::Static_body_handle body{};
   };
 
   graphics::Graphics *_graphics;

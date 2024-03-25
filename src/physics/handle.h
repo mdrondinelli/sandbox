@@ -5,7 +5,7 @@
 
 namespace marlon {
 namespace physics {
-  using Object_handle_t = std::uint32_t;
+  using Object_handle = std::uint32_t;
 }
 } // namespace marlon
 
