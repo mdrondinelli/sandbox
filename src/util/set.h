@@ -8,9 +8,9 @@
 #include <bit>
 #include <utility>
 
-#include "array.h"
 #include "equal.h"
 #include "hash.h"
+#include "list.h"
 #include "memory.h"
 
 namespace marlon {
@@ -142,7 +142,7 @@ public:
                      std::size_t max_bucket_count) noexcept {
     // assert(std::has_single_bit(max_bucket_count));
     return Stack_allocator<_alignment>::memory_requirement({
-        Array<Bucket>::memory_requirement(
+        List<Bucket>::memory_requirement(
             std::bit_ceil(std::max(max_bucket_count, std::size_t{2}))),
         Pool_allocator<sizeof(Node)>::memory_requirement(max_node_count + 1),
     });
@@ -171,7 +171,7 @@ public:
         std::bit_ceil(std::max(max_bucket_count, std::size_t{2}));
     auto allocator = Stack_allocator<_alignment>{make_block(
         block_begin, memory_requirement(max_node_count, max_bucket_count))};
-    _buckets = make_array<Bucket>(allocator, max_bucket_count).second;
+    _buckets = make_list<Bucket>(allocator, max_bucket_count).second;
     _buckets.resize(2);
     _nodes =
         make_pool_allocator<sizeof(Node)>(allocator, max_node_count + 1).second;
@@ -614,7 +614,7 @@ private:
            std::countl_zero(bucket_count - 1);
   }
 
-  Array<Bucket> _buckets;
+  List<Bucket> _buckets;
   Pool_allocator<sizeof(Node)> _nodes;
   Node *_head{};
   std::size_t _size{};

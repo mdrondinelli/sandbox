@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-#include "../util/array.h"
+#include "../util/list.h"
 #include "../util/map.h"
 #include "aabb_tree.h"
 
@@ -15,8 +15,8 @@ using marlon::math::Vec3f;
 
 namespace marlon {
 namespace physics {
-using util::Array;
 using util::Block;
+using util::List;
 using util::Map;
 using util::Stack_allocator;
 
@@ -351,121 +351,178 @@ private:
   std::vector<bool> _occupancy_bits;
 };
 
-// class Neighbor_group_storage {
-// public:
-//   std::size_t group_count() const noexcept;
+class Dynamic_object_list {
+  using Allocator = Stack_allocator<>;
 
-//   std::size_t group_begin(std::size_t group_index) const noexcept;
-
-//   std::size_t group_end(std::size_t group_index) const noexcept;
-
-//   std::variant<Particle_handle, Rigid_body_handle>
-//   at(std::size_t object_index) {
-
-//   }
-
-//   void clear() noexcept;
-
-//   void begin_group();
-
-//   void add_to_group(Particle_handle object);
-
-//   void add_to_group(Rigid_body_handle object);
-
-// private:
-//   struct Group {
-//     std::uint32_t begin;
-//     std::uint32_t end;
-//   };
-
-//   Array<Object_type> _object_types;
-//   Array<Object_handle> _object_handles;
-//   Array<Group> _groups;
-// };
-
-class Object_stack {
 public:
   static constexpr std::size_t
-  memory_requirement(std::size_t capacity) noexcept {
-    return Stack_allocator<>::memory_requirement(
-        {Array<Object_type>::memory_requirement(capacity),
-         Array<Object_handle>::memory_requirement(capacity)});
+  memory_requirement(std::size_t max_size) noexcept {
+    return Allocator::memory_requirement(
+        {decltype(_object_types)::memory_requirement(max_size),
+         decltype(_object_handles)::memory_requirement(max_size)});
   }
 
-  explicit Object_stack(Block block, std::size_t capacity) noexcept
-      : _impl{[&]() {
-          auto allocator = Stack_allocator{block};
-          auto const object_types_block =
-              allocator.alloc(Array<Object_type>::memory_requirement(capacity));
-          auto const object_handles_block = allocator.alloc(
-              Array<Object_handle>::memory_requirement(capacity));
-          return Impl{
-              .object_types =
-                  Array<Object_type>{object_types_block.begin, capacity},
-              .object_handles =
-                  Array<Object_handle>{object_handles_block.begin, capacity}};
-        }()} {}
+  constexpr Dynamic_object_list() noexcept = default;
 
-  explicit Object_stack(void *block_begin, std::size_t capacity) noexcept
-      : Object_stack{make_block(block_begin, memory_requirement(capacity)),
-                     capacity} {}
+  explicit Dynamic_object_list(Block block, std::size_t max_size) noexcept
+      : Dynamic_object_list{block.begin, max_size} {}
 
-  bool empty() const noexcept { return _impl.object_types.empty(); }
+  explicit Dynamic_object_list(void *block_begin,
+                               std::size_t max_size) noexcept {
+    auto allocator =
+        Allocator{make_block(block_begin, memory_requirement(max_size))};
+    _object_types = make_list<Object_type>(allocator, max_size).second;
+    _object_handles = make_list<Object_handle>(allocator, max_size).second;
+  }
 
-  std::size_t size() const noexcept { return _impl.object_types.size(); }
+  std::variant<Particle_handle, Rigid_body_handle>
+  at(std::size_t i) const noexcept {
+    auto const object_type = _object_types[i];
+    auto const object_handle = _object_handles[i];
+    switch (object_type) {
+    case Object_type::particle:
+      return Particle_handle{object_handle};
+    case Object_type::rigid_body:
+      return Rigid_body_handle{object_handle};
+    case Object_type::static_body:
+    default:
+      math::unreachable();
+    }
+  }
+
+  std::variant<Particle_handle, Rigid_body_handle> front() const noexcept {
+    assert(!empty());
+    return at(0);
+  }
+
+  std::variant<Particle_handle, Rigid_body_handle> back() const noexcept {
+    // assert(!empty());
+    // assert(_object_types.size() === _object_handles.size());
+    assert(&_object_types.back() == &_object_types[size() - 1]);
+    return at(size() - 1);
+  }
+
+  bool empty() const noexcept { return _object_types.empty(); }
+
+  std::size_t size() const noexcept { return _object_types.size(); }
+
+  std::size_t max_size() const noexcept { return _object_types.max_size(); }
+
+  std::size_t capacity() const noexcept { return _object_types.capacity(); }
 
   void clear() noexcept {
-    _impl.object_types.clear();
-    _impl.object_handles.clear();
+    _object_types.clear();
+    _object_handles.clear();
   }
 
   void push_back(Particle_handle h) {
-    _impl.object_types.push_back(Object_type::particle);
-    _impl.object_handles.push_back(h.value);
+    _object_types.push_back(Object_type::particle);
+    _object_handles.push_back(h.value);
   }
 
   void push_back(Rigid_body_handle h) {
-    _impl.object_types.push_back(Object_type::rigid_body);
-    _impl.object_handles.push_back(h.value);
+    _object_types.push_back(Object_type::rigid_body);
+    _object_handles.push_back(h.value);
   }
 
-  std::variant<Particle_handle, Rigid_body_handle> pop_back() noexcept {
-    auto const object_type = _impl.object_types.back();
-    auto const object_handle_value = _impl.object_handles.back();
-    _impl.object_types.pop_back();
-    _impl.object_handles.pop_back();
-    switch (object_type) {
-    case Object_type::particle:
-      return Particle_handle{object_handle_value};
-    case Object_type::rigid_body:
-      return Rigid_body_handle{object_handle_value};
-    case Object_type::static_body:
-    default:
-      math::unreachable();
-    }
+  void push_back(std::variant<Particle_handle, Rigid_body_handle> h) {
+    std::visit([this](auto &&arg) { push_back(arg); }, h);
   }
 
-  std::variant<Particle_handle, Rigid_body_handle> at(std::size_t i) {
-    auto const object_type = _impl.object_types[i];
-    auto const object_handle_value = _impl.object_handles[i];
-    switch (object_type) {
-    case Object_type::particle:
-      return Particle_handle{object_handle_value};
-    case Object_type::rigid_body:
-      return Rigid_body_handle{object_handle_value};
-    case Object_type::static_body:
-    default:
-      math::unreachable();
-    }
+  void pop_back() {
+    _object_types.pop_back();
+    _object_handles.pop_back();
   }
 
 private:
-  struct Impl {
-    Array<Object_type> object_types;
-    Array<Object_handle> object_handles;
+  List<Object_type> _object_types;
+  List<Object_handle> _object_handles;
+};
+
+template <typename Allocator>
+std::pair<Block, Dynamic_object_list>
+make_dynamic_object_list(Allocator &allocator, std::size_t max_size) {
+  auto const block =
+      allocator.alloc(Dynamic_object_list::memory_requirement(max_size));
+  return {block, Dynamic_object_list{block, max_size}};
+}
+
+class Neighbor_group_storage {
+  using Allocator = Stack_allocator<>;
+
+public:
+  static constexpr std::size_t memory_requirement(std::size_t max_object_count,
+                                                  std::size_t max_group_count) {
+    return Allocator::memory_requirement(
+        {decltype(_objects)::memory_requirement(max_object_count),
+         decltype(_groups)::memory_requirement(max_group_count)});
+  }
+
+  constexpr Neighbor_group_storage() noexcept = default;
+
+  Neighbor_group_storage(Block block,
+                         std::size_t max_object_count,
+                         std::size_t max_group_count)
+      : Neighbor_group_storage{block.begin, max_object_count, max_group_count} {
+  }
+
+  Neighbor_group_storage(void *block_begin,
+                         std::size_t max_object_count,
+                         std::size_t max_group_count) {
+    auto allocator = Allocator{make_block(
+        block_begin, memory_requirement(max_object_count, max_group_count))};
+    _objects = make_dynamic_object_list(allocator, max_object_count).second;
+    _groups = util::make_list<Group>(allocator, max_group_count).second;
+  }
+
+  std::size_t group_count() const noexcept { return _groups.size(); }
+
+  std::size_t group_begin(std::size_t group_index) const noexcept {
+    return _groups[group_index].end;
+  }
+
+  std::size_t group_end(std::size_t group_index) const noexcept {
+    return _groups[group_index].end;
+  }
+
+  std::variant<Particle_handle, Rigid_body_handle>
+  at(std::size_t object_index) const noexcept {
+    return _objects.at(object_index);
+  }
+
+  void clear() noexcept {
+    _objects.clear();
+    _groups.clear();
+    _index = 0;
+  }
+
+  void begin_group() { _groups.push_back({_index, _index}); }
+
+  void add_to_group(Particle_handle object) {
+    _objects.push_back(object);
+    ++_groups.back().end;
+    ++_index;
+  }
+
+  void add_to_group(Rigid_body_handle object) {
+    _objects.push_back(object);
+    ++_groups.back().end;
+    ++_index;
+  }
+
+  void add_to_group(std::variant<Particle_handle, Rigid_body_handle> object) {
+    std::visit([this](auto &&arg) { add_to_group(arg); }, object);
+  }
+
+private:
+  struct Group {
+    std::uint32_t begin;
+    std::uint32_t end;
   };
 
-  Impl _impl;
+  Dynamic_object_list _objects;
+  List<Group> _groups;
+  std::uint32_t _index{};
 };
 
 class Contact_stack {
@@ -473,21 +530,21 @@ public:
   static constexpr std::size_t
   memory_requirement(std::size_t capacity) noexcept {
     return Stack_allocator<>::memory_requirement(
-        {Array<Contact_type>::memory_requirement(capacity),
-         Array<Contact *>::memory_requirement(capacity)});
+        {List<Contact_type>::memory_requirement(capacity),
+         List<Contact *>::memory_requirement(capacity)});
   }
 
   explicit Contact_stack(Block block, std::size_t const capacity) noexcept
       : _impl{[&]() {
           auto allocator = Stack_allocator{block};
-          auto const contact_types_block = allocator.alloc(
-              Array<Contact_type>::memory_requirement(capacity));
+          auto const contact_types_block =
+              allocator.alloc(List<Contact_type>::memory_requirement(capacity));
           auto const contacts_block =
-              allocator.alloc(Array<Contact *>::memory_requirement(capacity));
+              allocator.alloc(List<Contact *>::memory_requirement(capacity));
           return Impl{
               .contact_types =
-                  Array<Contact_type>{contact_types_block.begin, capacity},
-              .contacts = Array<Contact *>{contacts_block.begin, capacity}};
+                  List<Contact_type>{contact_types_block.begin, capacity},
+              .contacts = List<Contact *>{contacts_block.begin, capacity}};
         }()} {}
 
   explicit Contact_stack(void *block_begin, std::size_t const capacity) noexcept
@@ -497,14 +554,6 @@ public:
   bool empty() const noexcept { return _impl.contact_types.empty(); }
 
   std::size_t size() const noexcept { return _impl.contact_types.size(); }
-
-  Contact_type const *contact_type_data() const noexcept {
-    return _impl.contact_types.data();
-  }
-
-  Contact *const *contact_data() const noexcept {
-    return _impl.contacts.data();
-  }
 
   std::variant<Particle_particle_contact *,
                Particle_rigid_body_contact *,
@@ -629,8 +678,8 @@ public:
 
 private:
   struct Impl {
-    Array<Contact_type> contact_types;
-    Array<Contact *> contacts;
+    List<Contact_type> contact_types;
+    List<Contact *> contacts;
   };
 
   Impl _impl;
@@ -1199,8 +1248,8 @@ public:
                    create_info.max_aabb_tree_leaf_nodes,
                    create_info.max_aabb_tree_internal_nodes},
         _particles{create_info.max_particles},
-        _static_bodies{create_info.max_static_rigid_bodies},
-        _rigid_bodies{create_info.max_dynamic_rigid_bodies},
+        _static_bodies{create_info.max_static_bodies},
+        _rigid_bodies{create_info.max_rigid_bodies},
         _particle_particle_neighbor_pairs{
             particle_particle_neighbor_pairs_begin,
             create_info.max_particle_particle_contacts},
@@ -1252,8 +1301,8 @@ public:
         _rigid_body_static_body_contact_pointers{
             rigid_body_static_body_contact_pointers_begin,
             create_info.max_rigid_body_static_body_contacts},
-        _contact_fringe{island_fringe_begin,
-                        create_info.max_island_object_count},
+        _contact_group_fringe{island_fringe_begin,
+                              create_info.max_island_object_count},
         _contact_group{island_contacts_begin,
                        create_info.max_island_contact_count},
         _contact_cache{contact_cache_block,
@@ -1922,7 +1971,7 @@ private:
         -2.0f * length(gravitational_velocity_delta);
     unmark_particles();
     unmark_dynamic_rigid_bodies();
-    auto const island_object_visitor = [this](auto &&handle) {
+    auto const visitor = [this](auto &&handle) {
       using T = std::decay_t<decltype(handle)>;
       if constexpr (std::is_same_v<T, Particle_handle>) {
         auto const data = _particles.data(handle);
@@ -1934,7 +1983,7 @@ private:
           auto const other_data = _particles.data(other_handle);
           if (!other_data->marked) {
             other_data->marked = true;
-            _contact_fringe.push_back(other_handle);
+            _contact_group_fringe.push_back(other_handle);
           }
           if (!other_data->visited) {
             _contact_group.push_back(contact);
@@ -1946,7 +1995,7 @@ private:
           auto const other_data = _rigid_bodies.data(other_handle);
           if (!other_data->marked) {
             other_data->marked = true;
-            _contact_fringe.push_back(other_handle);
+            _contact_group_fringe.push_back(other_handle);
           }
           if (!other_data->visited) {
             _contact_group.push_back(contact);
@@ -1965,7 +2014,7 @@ private:
           auto const other_data = _particles.data(other_handle);
           if (!other_data->marked) {
             other_data->marked = true;
-            _contact_fringe.push_back(other_handle);
+            _contact_group_fringe.push_back(other_handle);
           }
           if (!other_data->visited) {
             _contact_group.push_back(contact);
@@ -1978,7 +2027,7 @@ private:
           auto const other_data = _rigid_bodies.data(other_handle);
           if (!other_data->marked) {
             other_data->marked = true;
-            _contact_fringe.push_back(other_handle);
+            _contact_group_fringe.push_back(other_handle);
           }
           if (!other_data->visited) {
             _contact_group.push_back(contact);
@@ -1995,8 +2044,10 @@ private:
         data->marked = true;
         initialize_island(handle);
         do {
-          std::visit(island_object_visitor, _contact_fringe.pop_back());
-        } while (!_contact_fringe.empty());
+          auto const object = _contact_group_fringe.back();
+          _contact_group_fringe.pop_back();
+          std::visit(visitor, object);
+        } while (!_contact_group_fringe.empty());
         solve_current_island(min_position_iterations_per_contact,
                              max_position_iterations_per_contact,
                              min_velocity_iterations_per_contact,
@@ -2013,8 +2064,10 @@ private:
             data->marked = true;
             initialize_island(handle);
             do {
-              std::visit(island_object_visitor, _contact_fringe.pop_back());
-            } while (!_contact_fringe.empty());
+              auto const object = _contact_group_fringe.back();
+              _contact_group_fringe.pop_back();
+              std::visit(visitor, object);
+            } while (!_contact_group_fringe.empty());
             solve_current_island(min_position_iterations_per_contact,
                                  max_position_iterations_per_contact,
                                  min_position_iterations_per_contact,
@@ -2042,14 +2095,14 @@ private:
   }
 
   void initialize_island(Particle_handle handle) {
-    assert(_contact_fringe.empty());
-    _contact_fringe.push_back(handle);
+    assert(_contact_group_fringe.empty());
+    _contact_group_fringe.push_back(handle);
     _contact_group.clear();
   }
 
   void initialize_island(Rigid_body_handle handle) {
-    assert(_contact_fringe.empty());
-    _contact_fringe.push_back(handle);
+    assert(_contact_group_fringe.empty());
+    _contact_group_fringe.push_back(handle);
     _contact_group.clear();
   }
 
@@ -3028,32 +3081,32 @@ private:
   Particle_storage _particles;
   Static_body_storage _static_bodies;
   Rigid_body_storage _rigid_bodies;
-  Array<std::pair<Particle_handle, Particle_handle>>
+  List<std::pair<Particle_handle, Particle_handle>>
       _particle_particle_neighbor_pairs;
-  Array<std::pair<Particle_handle, Rigid_body_handle>>
+  List<std::pair<Particle_handle, Rigid_body_handle>>
       _particle_rigid_body_neighbor_pairs;
-  Array<std::pair<Particle_handle, Static_body_handle>>
+  List<std::pair<Particle_handle, Static_body_handle>>
       _particle_static_body_neighbor_pairs;
-  Array<std::pair<Rigid_body_handle, Rigid_body_handle>>
+  List<std::pair<Rigid_body_handle, Rigid_body_handle>>
       _rigid_body_rigid_body_neighbor_pairs;
-  Array<std::pair<Rigid_body_handle, Static_body_handle>>
+  List<std::pair<Rigid_body_handle, Static_body_handle>>
       _rigid_body_static_body_neighbor_pairs;
-  Array<Particle_handle> _particle_neighbors;
-  Array<Rigid_body_handle> _rigid_body_neighbors;
-  Array<Particle_particle_contact> _particle_particle_contacts;
-  Array<Particle_rigid_body_contact> _particle_rigid_body_contacts;
-  Array<Particle_static_body_contact> _particle_static_body_contacts;
-  Array<Rigid_body_rigid_body_contact> _rigid_body_rigid_body_contacts;
-  Array<Rigid_body_static_body_contact> _rigid_body_static_body_contacts;
-  Array<Particle_particle_contact *> _particle_particle_contact_pointers;
-  Array<Particle_rigid_body_contact *> _particle_rigid_body_contact_pointers;
-  Array<Particle_static_body_contact *> _particle_static_body_contact_pointers;
-  Array<Rigid_body_rigid_body_contact *>
-      _rigid_body_rigid_body_contact_pointers;
-  Array<Rigid_body_static_body_contact *>
+  List<Particle_handle> _particle_neighbors;
+  List<Rigid_body_handle> _rigid_body_neighbors;
+  // Dynamic_object_list _neighbor_group_fringe;
+  // Neighbor_group_storage _neighbor_groups;
+  List<Particle_particle_contact> _particle_particle_contacts;
+  List<Particle_rigid_body_contact> _particle_rigid_body_contacts;
+  List<Particle_static_body_contact> _particle_static_body_contacts;
+  List<Rigid_body_rigid_body_contact> _rigid_body_rigid_body_contacts;
+  List<Rigid_body_static_body_contact> _rigid_body_static_body_contacts;
+  List<Particle_particle_contact *> _particle_particle_contact_pointers;
+  List<Particle_rigid_body_contact *> _particle_rigid_body_contact_pointers;
+  List<Particle_static_body_contact *> _particle_static_body_contact_pointers;
+  List<Rigid_body_rigid_body_contact *> _rigid_body_rigid_body_contact_pointers;
+  List<Rigid_body_static_body_contact *>
       _rigid_body_static_body_contact_pointers;
-  // Object_stack _neighbor_group;
-  Object_stack _contact_fringe;
+  Dynamic_object_list _contact_group_fringe;
   Contact_stack _contact_group;
   Contact_cache _contact_cache;
   math::Vec3f _gravitational_acceleration;
@@ -3129,7 +3182,7 @@ Space::Space(Space_create_info const &create_info)
                 memory_requirement(
                     create_info.max_rigid_body_static_body_contacts);
         auto const contact_fringe_memory_requirement =
-            decltype(Impl::_contact_fringe)::memory_requirement(
+            decltype(Impl::_contact_group_fringe)::memory_requirement(
                 create_info.max_island_object_count);
         auto const contact_group_memory_requirement =
             decltype(Impl::_contact_group)::memory_requirement(

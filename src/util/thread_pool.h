@@ -40,7 +40,7 @@ private:
     std::thread _thread;
   };
 
-  Array<Node> _nodes;
+  List<Node> _nodes;
 };
 } // namespace util
 } // namespace marlon

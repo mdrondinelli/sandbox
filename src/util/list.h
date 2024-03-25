@@ -7,7 +7,7 @@
 
 namespace marlon {
 namespace util {
-template <typename T> class Array {
+template <typename T> class List {
 public:
   using Const_iterator = T const *;
   using Iterator = T *;
@@ -17,28 +17,28 @@ public:
     return sizeof(T) * max_size;
   }
 
-  constexpr Array() noexcept
+  constexpr List() noexcept
       : _begin{nullptr}, _stack_end{nullptr}, _buffer_end{nullptr} {}
 
-  explicit Array(Block block, std::size_t max_size) noexcept
-      : Array{block.begin, max_size} {}
+  explicit List(Block block, std::size_t max_size) noexcept
+      : List{block.begin, max_size} {}
 
-  explicit Array(void *block_begin, std::size_t max_size) noexcept
+  explicit List(void *block_begin, std::size_t max_size) noexcept
       : _begin{static_cast<T *>(block_begin)}, _stack_end{_begin},
         _buffer_end{_begin + max_size} {}
 
-  Array(Array<T> &&other)
+  List(List<T> &&other)
       : _begin{std::exchange(other._begin, nullptr)},
         _stack_end{std::exchange(other._stack_end, nullptr)},
         _buffer_end{std::exchange(other._buffer_end, nullptr)} {}
 
-  Array &operator=(Array<T> &&other) {
-    auto temp = Array<T>{std::move(other)};
+  List &operator=(List<T> &&other) {
+    auto temp = List<T>{std::move(other)};
     swap(temp);
     return *this;
   }
 
-  ~Array() { clear(); }
+  ~List() { clear(); }
 
   T const &operator[](std::size_t index) const noexcept {
     return _begin[index];
@@ -129,7 +129,7 @@ public:
   }
 
 private:
-  void swap(Array<T> &other) noexcept {
+  void swap(List<T> &other) noexcept {
     std::swap(_begin, other._begin);
     std::swap(_stack_end, other._stack_end);
     std::swap(_buffer_end, other._buffer_end);
@@ -141,25 +141,25 @@ private:
 };
 
 template <typename T, typename Allocator>
-std::pair<Block, Array<T>> make_array(Allocator &allocator,
-                                      std::size_t max_size) {
-  auto const block = allocator.alloc(Array<T>::memory_requirement(max_size));
-  return {block, Array<T>{block, max_size}};
+std::pair<Block, List<T>> make_list(Allocator &allocator,
+                                    std::size_t max_size) {
+  auto const block = allocator.alloc(List<T>::memory_requirement(max_size));
+  return {block, List<T>{block, max_size}};
 }
 
 template <typename T, typename Allocator = Polymorphic_allocator>
-class Dynamic_array {
+class Dynamic_list {
 public:
-  using Iterator = typename Array<T>::Iterator;
-  using Const_iterator = typename Array<T>::Const_iterator;
+  using Iterator = typename List<T>::Iterator;
+  using Const_iterator = typename List<T>::Const_iterator;
 
-  Dynamic_array() : _allocator{} { _impl.construct(); }
+  Dynamic_list() : _allocator{} { _impl.construct(); }
 
-  explicit Dynamic_array(const Allocator &allocator) : _allocator{allocator} {
+  explicit Dynamic_list(const Allocator &allocator) : _allocator{allocator} {
     _impl.construct();
   }
 
-  ~Dynamic_array() {
+  ~Dynamic_list() {
     if (_impl->max_size() != 0) {
       auto const block =
           make_block(_impl->data(), _impl->data() + _impl->max_size());
@@ -208,7 +208,7 @@ public:
 
   void reserve(std::size_t new_cap) {
     if (new_cap > _impl->capacity()) {
-      auto temp = make_array<T>(_allocator, new_cap).second;
+      auto temp = make_list<T>(_allocator, new_cap).second;
       for (auto &object : *_impl) {
         temp.emplace_back(std::move(object));
       }
@@ -252,7 +252,7 @@ public:
 
 private:
   Allocator _allocator;
-  Lifetime_box<Array<T>> _impl;
+  Lifetime_box<List<T>> _impl;
 };
 } // namespace util
 } // namespace marlon

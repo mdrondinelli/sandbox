@@ -7,7 +7,7 @@
 #include <variant>
 #include <vector>
 
-#include "../util/array.h"
+#include "../util/list.h"
 #include "../util/memory.h"
 #include "../util/pool.h"
 #include "../util/set.h"
@@ -53,9 +53,9 @@ public:
     _leaf_node_set =
         util::make_set<Node *>(allocator, leaf_node_capacity).second;
     _leaf_node_array =
-        util::make_array<Node *>(allocator, leaf_node_capacity).second;
+        util::make_list<Node *>(allocator, leaf_node_capacity).second;
     _internal_nodes =
-        util::make_array<Node>(allocator, internal_node_capacity).second;
+        util::make_list<Node>(allocator, internal_node_capacity).second;
   }
 
   Node *create_leaf(Aabb const &bounds, Payload const &payload) {
@@ -257,8 +257,8 @@ private:
 
   util::Pool<Node> _leaf_node_pool;
   util::Set<Node *> _leaf_node_set;
-  util::Array<Node *> _leaf_node_array;
-  util::Array<Node> _internal_nodes;
+  util::List<Node *> _leaf_node_array;
+  util::List<Node> _internal_nodes;
   Node *_root_node{};
 };
 } // namespace physics
