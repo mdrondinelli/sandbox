@@ -168,19 +168,18 @@ graphics::Unique_mesh_ptr create_cuboid_mesh(graphics::Graphics *graphics) {
 graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
                                                 int subdivisions) {
   auto const phi = std::numbers::phi_v<float>;
-  std::vector<Vertex> vertices{
-      {math::normalize(math::Vec3f{phi, 1.0f, 0.0f}), {}},
-      {math::normalize(math::Vec3f{phi, -1.0f, 0.0f}), {}},
-      {math::normalize(math::Vec3f{-phi, -1.0f, 0.0f}), {}},
-      {math::normalize(math::Vec3f{-phi, 1.0f, 0.0f}), {}},
-      {math::normalize(math::Vec3f{1.0f, 0.0f, phi}), {}},
-      {math::normalize(math::Vec3f{-1.0f, 0.0f, phi}), {}},
-      {math::normalize(math::Vec3f{-1.0f, 0.0f, -phi}), {}},
-      {math::normalize(math::Vec3f{1.0f, 0.0f, -phi}), {}},
-      {math::normalize(math::Vec3f{0.0f, phi, 1.0f}), {}},
-      {math::normalize(math::Vec3f{0.0f, phi, -1.0f}), {}},
-      {math::normalize(math::Vec3f{0.0f, -phi, -1.0f}), {}},
-      {math::normalize(math::Vec3f{0.0f, -phi, 1.0f}), {}}};
+  std::vector<Vertex> vertices{{normalize(math::Vec3f{phi, 1.0f, 0.0f}), {}},
+                               {normalize(math::Vec3f{phi, -1.0f, 0.0f}), {}},
+                               {normalize(math::Vec3f{-phi, -1.0f, 0.0f}), {}},
+                               {normalize(math::Vec3f{-phi, 1.0f, 0.0f}), {}},
+                               {normalize(math::Vec3f{1.0f, 0.0f, phi}), {}},
+                               {normalize(math::Vec3f{-1.0f, 0.0f, phi}), {}},
+                               {normalize(math::Vec3f{-1.0f, 0.0f, -phi}), {}},
+                               {normalize(math::Vec3f{1.0f, 0.0f, -phi}), {}},
+                               {normalize(math::Vec3f{0.0f, phi, 1.0f}), {}},
+                               {normalize(math::Vec3f{0.0f, phi, -1.0f}), {}},
+                               {normalize(math::Vec3f{0.0f, -phi, -1.0f}), {}},
+                               {normalize(math::Vec3f{0.0f, -phi, 1.0f}), {}}};
   std::vector<std::uint32_t> indices{
       0, 9, 8,  0, 8,  4,  0,  4, 1, 0, 1, 7,  0, 7,  9,  3, 8,  9,  3, 9,
       6, 3, 6,  2, 3,  2,  5,  3, 5, 8, 4, 8,  5, 11, 1,  4, 11, 4,  5, 11,
@@ -195,12 +194,12 @@ graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
       auto const &vertex_0 = vertices[index_0];
       auto const &vertex_1 = vertices[index_1];
       auto const &vertex_2 = vertices[index_2];
-      auto const new_vertex_0 = Vertex{
-          math::normalize(0.5f * (vertex_0.position + vertex_1.position)), {}};
-      auto const new_vertex_1 = Vertex{
-          math::normalize(0.5f * (vertex_1.position + vertex_2.position)), {}};
-      auto const new_vertex_2 = Vertex{
-          math::normalize(0.5f * (vertex_2.position + vertex_0.position)), {}};
+      auto const new_vertex_0 =
+          Vertex{normalize(0.5f * (vertex_0.position + vertex_1.position)), {}};
+      auto const new_vertex_1 =
+          Vertex{normalize(0.5f * (vertex_1.position + vertex_2.position)), {}};
+      auto const new_vertex_2 =
+          Vertex{normalize(0.5f * (vertex_2.position + vertex_0.position)), {}};
       auto const new_vertex_0_index =
           static_cast<std::uint32_t>(vertices.size());
       auto const new_vertex_1_index =
@@ -269,7 +268,7 @@ void run_game_loop(GLFWwindow *window,
   auto count = 0;
   auto offsetX = 0.0f;
   auto offsetZ = 0.0f;
-  auto spawn_debounce = 0.0f;
+  auto spawn_debounce = -6.5f;
   for (;;) {
     glfwPollEvents();
     if (glfwWindowShouldClose(window)) {
@@ -278,59 +277,61 @@ void run_game_loop(GLFWwindow *window,
     auto const current_time = glfwGetTime();
     auto const elapsed_time = current_time - previous_time;
     previous_time = current_time;
-    if (loop.run_once(elapsed_time)) {
-      test_entity_manager->tick(tick_duration);
-      for (auto i = 0; i < 0; ++i) {
-        test_entity_manager->create_entity({});
+    if (glfwGetKey(window, GLFW_KEY_SPACE)) {
+      if (loop.run_once(elapsed_time)) {
+        test_entity_manager->tick(tick_duration);
+        for (auto i = 0; i < 0; ++i) {
+          test_entity_manager->create_entity({});
+        }
+        if (/*glfwGetKey(window, GLFW_KEY_SPACE) && */ spawn_debounce >= 0.0f) {
+          spawn_debounce = -100.0f;
+          cotton_box_manager->create(
+              {.position = math::Vec3f{10.0f, height + 2.0f, 10.0f},
+               .velocity = math::Vec3f{-10.0f, 0.0f, -10.0f},
+               .orientation = math::Quatf::axis_angle(
+                   math::Vec3f{0.0f, 1.0f, 0.0f},
+                   math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
+               .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
+        }
       }
-      if (glfwGetKey(window, GLFW_KEY_SPACE) && spawn_debounce >= 0.0f) {
-        spawn_debounce = -0.1f;
+      spawn_debounce += elapsed_time;
+      box_spawn_timer += elapsed_time;
+      if (box_spawn_timer > 1.25f) {
+        box_spawn_timer = 0.0f;
+        if (height > 8.0f) {
+          height = 2.0f;
+          offsetX = 10 * (rand() / (float)RAND_MAX) - 5;
+          offsetZ = 10 * (rand() / (float)RAND_MAX) - 5;
+        } else {
+          height += 0.6f;
+        }
+        ++count;
+        if (count == 128) {
+          box_spawn_timer = -1000.0f;
+        }
+        std::cout << "box count: " << count << "\n";
+        // if (count >= 3) {
+        //   direction = 1 - direction;
+        //   count = 0;
+        //   height += 0.25f;
+        // }
+        // cotton_box_manager->create(
+        //     {.position = math::Vec3f{direction == 0 ? 0.0f : -0.65f * count +
+        //     0.65f, height, direction == 0 ? 0.65f * count : 0.65f},
+        //      .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+        //      .orientation = math::Quatf::axis_angle(
+        //          math::Vec3f{0.0f, 1.0f, 0.0f},
+        //          math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
+        //      .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
         cotton_box_manager->create(
-            {.position = math::Vec3f{10.0f, height + 2.0f, 10.0f},
-             .velocity = math::Vec3f{-10.0f, 0.0f, -10.0f},
+            {.position = math::Vec3f{offsetX, height, offsetZ},
+             .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
              .orientation = math::Quatf::axis_angle(
                  math::Vec3f{0.0f, 1.0f, 0.0f},
                  math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
              .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
+        // count += 1;
       }
-    }
-    spawn_debounce += elapsed_time;
-    box_spawn_timer += elapsed_time;
-    if (box_spawn_timer > 1.25f) {
-      box_spawn_timer = 0.0f;
-      if (height > 8.0f) {
-        height = 2.0f;
-        offsetX = 10 * (rand() / (float)RAND_MAX) - 5;
-        offsetZ = 10 * (rand() / (float)RAND_MAX) - 5;
-      } else {
-        height += 0.6f;
-      }
-      ++count;
-      if (count == 128) {
-        box_spawn_timer = -1000.0f;
-      }
-      std::cout << "box count: " << count << "\n";
-      // if (count >= 3) {
-      //   direction = 1 - direction;
-      //   count = 0;
-      //   height += 0.25f;
-      // }
-      // cotton_box_manager->create(
-      //     {.position = math::Vec3f{direction == 0 ? 0.0f : -0.65f * count +
-      //     0.65f, height, direction == 0 ? 0.65f * count : 0.65f},
-      //      .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-      //      .orientation = math::Quatf::axis_angle(
-      //          math::Vec3f{0.0f, 1.0f, 0.0f},
-      //          math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
-      //      .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
-      cotton_box_manager->create(
-          {.position = math::Vec3f{offsetX, height, offsetZ},
-           .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-           .orientation = math::Quatf::axis_angle(
-               math::Vec3f{0.0f, 1.0f, 0.0f},
-               math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
-           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
-      // count += 1;
     }
     graphics->render(scene, camera, render_target);
     glfwSwapBuffers(window);
