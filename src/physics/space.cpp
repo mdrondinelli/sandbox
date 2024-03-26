@@ -1407,9 +1407,21 @@ public:
     assign_neighbor_handles();
     find_neighbor_groups();
     auto const h = simulate_info.delta_time / simulate_info.substep_count;
+    auto const time_compensated_velocity_damping_factor =
+        std::pow(velocity_damping_factor, h);
+    auto const time_compensating_waking_motion_smoothing_factor =
+        1.0f - std::pow(1.0f - waking_motion_smoothing_factor, h);
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
-      update_awake_states();
-      integrate(h);
+      for (auto j = std::size_t{}; j != _neighbor_groups.group_count(); ++j) {
+        if (update_neighbor_group_awake_states(j)) {
+          simulate_neighbor_group(
+              j,
+              h,
+              time_compensated_velocity_damping_factor,
+              time_compensating_waking_motion_smoothing_factor);
+        }
+      }
+      // integrate(h);
       find_contacts();
       solve(h,
             simulate_info.min_position_iterations_per_contact,
@@ -1666,74 +1678,74 @@ private:
     // std::cout << _neighbor_groups.group_count() << " neighbor groups\n";
   }
 
-  void update_awake_states() {
-    for (auto i = std::size_t{}; i != _neighbor_groups.group_count(); ++i) {
-      auto const group_begin = _neighbor_groups.group_begin(i);
-      auto const group_end = _neighbor_groups.group_end(i);
-      auto contains_awake = false;
-      auto contains_sleeping = false;
-      auto sleepable = true;
-      for (auto j = group_begin; sleepable && j != group_end; ++j) {
-        auto const object = _neighbor_groups.object(j);
-        std::visit(
-            [&](auto &&handle) {
-              using T = std::decay_t<decltype(handle)>;
-              if constexpr (std::is_same_v<T, Particle_handle>) {
-                auto const data = _particles.data(handle);
-                if (data->awake) {
-                  contains_awake = true;
-                  if (data->waking_motion > waking_motion_epsilon) {
-                    sleepable = false;
-                  }
-                } else {
-                  contains_sleeping = true;
+  bool update_neighbor_group_awake_states(std::size_t group_index) {
+    auto const group_begin = _neighbor_groups.group_begin(group_index);
+    auto const group_end = _neighbor_groups.group_end(group_index);
+    auto contains_awake = false;
+    auto contains_sleeping = false;
+    auto sleepable = true;
+    for (auto i = group_begin; sleepable && i != group_end; ++i) {
+      auto const object = _neighbor_groups.object(i);
+      std::visit(
+          [&](auto &&handle) {
+            using T = std::decay_t<decltype(handle)>;
+            if constexpr (std::is_same_v<T, Particle_handle>) {
+              auto const data = _particles.data(handle);
+              if (data->awake) {
+                contains_awake = true;
+                if (data->waking_motion > waking_motion_epsilon) {
+                  sleepable = false;
                 }
               } else {
-                static_assert(std::is_same_v<T, Rigid_body_handle>);
-                auto const data = _rigid_bodies.data(handle);
-                if (data->awake) {
-                  contains_awake = true;
-                  if (data->waking_motion > waking_motion_epsilon) {
-                    sleepable = false;
+                contains_sleeping = true;
+              }
+            } else {
+              static_assert(std::is_same_v<T, Rigid_body_handle>);
+              auto const data = _rigid_bodies.data(handle);
+              if (data->awake) {
+                contains_awake = true;
+                if (data->waking_motion > waking_motion_epsilon) {
+                  sleepable = false;
+                }
+              } else {
+                contains_sleeping = true;
+              }
+            }
+          },
+          object);
+    }
+    if (contains_awake) {
+      if (sleepable) {
+        for (auto i = group_begin; i != group_end; ++i) {
+          auto const object = _neighbor_groups.object(i);
+          std::visit(
+              [&](auto &&handle) {
+                using T = std::decay_t<decltype(handle)>;
+                if constexpr (std::is_same_v<T, Particle_handle>) {
+                  auto const data = _particles.data(handle);
+                  if (data->awake) {
+                    data->velocity = Vec3f::zero();
+                    data->waking_motion = 0.0f;
+                    data->awake = false;
                   }
                 } else {
-                  contains_sleeping = true;
-                }
-              }
-            },
-            object);
-      }
-      if (contains_awake) {
-        if (sleepable) {
-          std::cout << "sleeping neighbor group\n";
-          for (auto j = group_begin; j != group_end; ++j) {
-            auto const object = _neighbor_groups.object(j);
-            std::visit(
-                [&](auto &&handle) {
-                  using T = std::decay_t<decltype(handle)>;
-                  if constexpr (std::is_same_v<T, Particle_handle>) {
-                    auto const data = _particles.data(handle);
-                    if (data->awake) {
-                      data->velocity = Vec3f::zero();
-                      data->waking_motion = 0.0f;
-                      data->awake = false;
-                    }
-                  } else {
-                    static_assert(std::is_same_v<T, Rigid_body_handle>);
-                    auto const data = _rigid_bodies.data(handle);
-                    if (data->awake) {
-                      data->velocity = Vec3f::zero();
-                      data->angular_velocity = Vec3f::zero();
-                      data->waking_motion = 0.0f;
-                      data->awake = false;
-                    }
+                  static_assert(std::is_same_v<T, Rigid_body_handle>);
+                  auto const data = _rigid_bodies.data(handle);
+                  if (data->awake) {
+                    data->velocity = Vec3f::zero();
+                    data->angular_velocity = Vec3f::zero();
+                    data->waking_motion = 0.0f;
+                    data->awake = false;
                   }
-                },
-                object);
-          }
-        } else if (contains_sleeping) {
-          for (auto j = group_begin; j != group_end; ++j) {
-            auto const object = _neighbor_groups.object(j);
+                }
+              },
+              object);
+        }
+        return false;
+      } else {
+        if (contains_sleeping) {
+          for (auto i = group_begin; i != group_end; ++i) {
+            auto const object = _neighbor_groups.object(i);
             std::visit(
                 [&](auto &&handle) {
                   using T = std::decay_t<decltype(handle)>;
@@ -1753,8 +1765,68 @@ private:
                 object);
           }
         }
+        return true;
       }
+    } else {
+      return false;
     }
+  }
+
+  void simulate_neighbor_group(std::size_t group_index,
+                               float delta_time,
+                               float velocity_damping_factor,
+                               float waking_motion_smoothing_factor) {
+    auto const group_begin = _neighbor_groups.group_begin(group_index);
+    auto const group_end = _neighbor_groups.group_end(group_index);
+    for (auto i = group_begin; i != group_end; ++i) {
+      auto const object = _neighbor_groups.object(i);
+      std::visit(
+          [&](auto &&handle) {
+            integrate(handle,
+                      delta_time,
+                      velocity_damping_factor,
+                      waking_motion_smoothing_factor);
+          },
+          object);
+    }
+  }
+
+  void integrate(Particle_handle particle,
+                 float delta_time,
+                 float velocity_damping_factor,
+                 float waking_motion_smoothing_factor) {
+    auto const data = _particles.data(particle);
+    data->previous_position = data->position;
+    data->velocity += delta_time * _gravitational_acceleration;
+    data->velocity *= velocity_damping_factor;
+    data->position += delta_time * data->velocity;
+    data->waking_motion = std::min(
+        (1.0f - waking_motion_smoothing_factor) * data->waking_motion +
+            waking_motion_smoothing_factor * length_squared(data->velocity),
+        waking_motion_limit);
+  }
+
+  void integrate(Rigid_body_handle rigid_body,
+                 float delta_time,
+                 float velocity_damping_factor,
+                 float waking_motion_smoothing_factor) {
+    auto const data = _rigid_bodies.data(rigid_body);
+    data->previous_position = data->position;
+    data->previous_orientation = data->orientation;
+    data->velocity += delta_time * _gravitational_acceleration;
+    data->velocity *= velocity_damping_factor;
+    data->position += delta_time * data->velocity;
+    data->angular_velocity *= velocity_damping_factor;
+    data->orientation +=
+        Quatf{0.0f, 0.5f * delta_time * data->angular_velocity} *
+        data->orientation;
+    data->orientation = normalize(data->orientation);
+    data->waking_motion =
+        std::min((1.0f - waking_motion_smoothing_factor) * data->waking_motion +
+                     waking_motion_smoothing_factor *
+                         (length_squared(data->velocity) +
+                          length_squared(data->angular_velocity)),
+                 waking_motion_limit);
   }
 
   void integrate(float h) {
