@@ -254,10 +254,10 @@ void run_game_loop(GLFWwindow *window,
   auto loop =
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
-                                .physics_substep_count = 16,
-                                .min_position_iterations_per_contact = 2,
+                                .physics_substep_count = 32,
+                                .min_position_iterations_per_contact = 1,
                                 .max_position_iterations_per_contact = 4,
-                                .min_velocity_iterations_per_contact = 2,
+                                .min_velocity_iterations_per_contact = 1,
                                 .max_velocity_iterations_per_contact = 4}};
   auto previous_time = glfwGetTime();
   auto fps_time_accumulator = 0.0;
@@ -284,7 +284,7 @@ void run_game_loop(GLFWwindow *window,
         test_entity_manager->create_entity({});
       }
       if (glfwGetKey(window, GLFW_KEY_SPACE) && spawn_debounce >= 0.0f) {
-        spawn_debounce = -0.5f;
+        spawn_debounce = -0.1f;
         cotton_box_manager->create(
             {.position = math::Vec3f{10.0f, height + 2.0f, 10.0f},
              .velocity = math::Vec3f{-10.0f, 0.0f, -10.0f},
@@ -306,7 +306,7 @@ void run_game_loop(GLFWwindow *window,
         height += 0.6f;
       }
       ++count;
-      if (count == 12) {
+      if (count == 128) {
         box_spawn_timer = -1000.0f;
       }
       std::cout << "box count: " << count << "\n";
