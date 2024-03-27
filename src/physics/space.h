@@ -15,11 +15,11 @@ struct Space_create_info {
   std::size_t max_particles{10000};
   std::size_t max_rigid_bodies{10000};
   std::size_t max_static_bodies{100000};
-  std::size_t max_particle_particle_contacts{10000};
-  std::size_t max_particle_rigid_body_contacts{10000};
-  std::size_t max_particle_static_body_contacts{10000};
-  std::size_t max_rigid_body_rigid_body_contacts{10000};
-  std::size_t max_rigid_body_static_body_contacts{10000};
+  std::size_t max_particle_particle_neighbor_pairs{10000};
+  std::size_t max_particle_rigid_body_neighbor_pairs{10000};
+  std::size_t max_particle_static_body_neighbor_pairs{10000};
+  std::size_t max_rigid_body_rigid_body_neighbor_pairs{10000};
+  std::size_t max_rigid_body_static_body_neighbor_pairs{10000};
   std::size_t max_neighbor_groups{10000};
   std::size_t max_contact_group_fringe_size{1000};
   std::size_t max_contact_group_size{1000};

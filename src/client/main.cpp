@@ -253,7 +253,7 @@ void run_game_loop(GLFWwindow *window,
   auto loop =
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
-                                .physics_substep_count = 32,
+                                .physics_substep_count = 16,
                                 .min_position_iterations_per_contact = 1,
                                 .max_position_iterations_per_contact = 4,
                                 .min_velocity_iterations_per_contact = 1,
@@ -277,27 +277,28 @@ void run_game_loop(GLFWwindow *window,
     auto const current_time = glfwGetTime();
     auto const elapsed_time = current_time - previous_time;
     previous_time = current_time;
-    if (glfwGetKey(window, GLFW_KEY_SPACE)) {
-      if (loop.run_once(elapsed_time)) {
-        test_entity_manager->tick(tick_duration);
-        for (auto i = 0; i < 0; ++i) {
-          test_entity_manager->create_entity({});
-        }
-        if (/*glfwGetKey(window, GLFW_KEY_SPACE) && */ spawn_debounce >= 0.0f) {
-          spawn_debounce = -100.0f;
-          cotton_box_manager->create(
-              {.position = math::Vec3f{10.0f, height + 2.0f, 10.0f},
-               .velocity = math::Vec3f{-10.0f, 0.0f, -10.0f},
-               .orientation = math::Quatf::axis_angle(
-                   math::Vec3f{0.0f, 1.0f, 0.0f},
-                   math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
-               .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
-        }
+    if (loop.run_once(elapsed_time)) {
+      test_entity_manager->tick(tick_duration);
+      for (auto i = 0; i < 0; ++i) {
+        test_entity_manager->create_entity({});
       }
-      spawn_debounce += elapsed_time;
-      box_spawn_timer += elapsed_time;
-      if (box_spawn_timer > 1.25f) {
-        box_spawn_timer = 0.0f;
+      if (glfwGetKey(window, GLFW_KEY_SPACE) && spawn_debounce >= 0.0f) {
+        spawn_debounce = -0.1f;
+        cotton_box_manager->create(
+            {.position =
+                 math::Vec3f{10.0f + 4.0f * (rand() / (float)RAND_MAX) - 2.0f,
+                             height + 2.0f,
+                             10.0f + 4.0f * (rand() / (float)RAND_MAX) - 2.0f},
+             .velocity = math::Vec3f{-10.0f, 0.0f, -10.0f},
+             .orientation = math::Quatf::axis_angle(
+                 math::Vec3f{0.0f, 1.0f, 0.0f},
+                 math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
+             .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
+      }
+      spawn_debounce += tick_duration;
+      box_spawn_timer += tick_duration;
+      if (box_spawn_timer > 0.0f) {
+        box_spawn_timer -= 1.0f;
         if (height > 8.0f) {
           height = 2.0f;
           offsetX = 10 * (rand() / (float)RAND_MAX) - 5;
