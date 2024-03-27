@@ -706,7 +706,7 @@ auto constexpr velocity_damping_factor = 0.99f;
 auto constexpr waking_motion_epsilon = 1.0f / 32.0f;
 auto constexpr waking_motion_initializer = 2.0f * waking_motion_epsilon;
 auto constexpr waking_motion_limit = 8.0f * waking_motion_epsilon;
-auto constexpr waking_motion_smoothing_factor = 3.0f / 4.0f;
+auto constexpr waking_motion_smoothing_factor = 1.0f / 2.0f;
 
 class Contact_cache {
 public:
