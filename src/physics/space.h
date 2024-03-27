@@ -3,9 +3,9 @@
 
 #include <memory>
 
-#include "dynamic_rigid_body.h"
 #include "particle.h"
-#include "static_rigid_body.h"
+#include "rigid_body.h"
+#include "static_body.h"
 
 namespace marlon {
 namespace physics {
@@ -22,19 +22,21 @@ struct Space_create_info {
   std::size_t max_rigid_body_static_body_neighbor_pairs{10000};
   std::size_t max_neighbor_groups{10000};
   std::size_t max_contact_group_fringe_size{1000};
-  std::size_t max_contact_group_size{1000};
+  std::size_t max_contact_group_size{10000};
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 
 struct Space_simulate_info {
   float delta_time;
   int substep_count{16};
-  int min_position_iterations_per_contact{1};
-  int max_position_iterations_per_contact{4};
-  int min_velocity_iterations_per_contact{1};
-  int max_velocity_iterations_per_contact{4};
+  int min_desired_position_iterations_per_contact{1};
+  int max_desired_position_iterations_per_contact{4};
+  int max_position_iterations_per_contact_group{256};
+  int min_desired_velocity_iterations_per_contact{1};
+  int max_desired_velocity_iterations_per_contact{4};
+  int max_velocity_iterations_per_contact_group{256};
   float early_out_contact_separation{-1.0f / 1024.0f};
-  float early_out_contact_separating_velocity{-1.0f / 1024.0f};
+  float early_out_contact_separating_velocity{-1.0f / 128.0f};
 };
 
 class Space {
@@ -47,15 +49,15 @@ public:
 
   void destroy_particle(Particle_handle handle);
 
-  Static_body_handle
-  create_static_rigid_body(Static_rigid_body_create_info const &create_info);
-
-  void destroy_static_rigid_body(Static_body_handle handle);
-
   Rigid_body_handle
-  create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info);
+  create_rigid_body(Rigid_body_create_info const &create_info);
 
-  void destroy_dynamic_rigid_body(Rigid_body_handle handle);
+  void destroy_rigid_body(Rigid_body_handle handle);
+
+  Static_body_handle
+  create_static_body(Static_body_create_info const &create_info);
+
+  void destroy_static_body(Static_body_handle handle);
 
   void simulate(Space_simulate_info const &simulate_info);
 

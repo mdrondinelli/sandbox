@@ -167,7 +167,7 @@ struct Rigid_body_data {
   Particle_rigid_body_contact **particle_contacts{};
   Rigid_body_static_body_contact **static_body_contacts{};
   Rigid_body_rigid_body_contact **rigid_body_contacts{};
-  Dynamic_rigid_body_motion_callback *motion_callback{};
+  Rigid_body_motion_callback *motion_callback{};
   Shape shape;
   float inverse_mass{};
   Mat3x3f inverse_inertia_tensor{};
@@ -836,80 +836,6 @@ public:
     _rigid_body_static_body_pairs.erase(key);
   }
 
-  // void update(std::pair<Rigid_body_handle, Rigid_body_handle> objects,
-  //             Rigid_body_storage const &storage) {
-  //   if (objects.first.value > objects.second.value) {
-  //     std::swap(objects.first, objects.second);
-  //   }
-  //   auto const key = (static_cast<std::uint64_t>(objects.first.value) << 32)
-  //   |
-  //                    static_cast<std::uint64_t>(objects.second.value);
-  //   auto const it = _rigid_body_rigid_body_pairs.find(key);
-  //   if (it != _rigid_body_rigid_body_pairs.end()) {
-  //     it->second.update(storage);
-  //   }
-  // }
-
-  // void update(std::pair<Rigid_body_handle, Static_body_handle> objects,
-  //             Rigid_body_storage const &storage) {
-  //   auto const key = (static_cast<std::uint64_t>(objects.first.value) << 32)
-  //   |
-  //                    static_cast<std::uint64_t>(objects.second.value);
-  //   auto const it = _rigid_body_static_body_pairs.find(key);
-  //   if (it != _rigid_body_static_body_pairs.end()) {
-  //     it->second.update(storage);
-  //   }
-  // }
-
-  std::size_t cache(Rigid_body_rigid_body_contact contact,
-                    Rigid_body_storage const &storage) {
-    if (contact.bodies[0].value > contact.bodies[1].value) {
-      contact.normal = -contact.normal;
-      std::swap(contact.bodies[0], contact.bodies[1]);
-      std::swap(contact.relative_positions[0], contact.relative_positions[1]);
-    }
-    // assert(contact.bodies[0].value < contact.bodies[1].value);
-    auto const data = std::array<Rigid_body_data const *, 2>{
-        storage.data(contact.bodies[0]), storage.data(contact.bodies[1])};
-    auto const positions =
-        std::array<Vec3f, 2>{data[0]->position, data[1]->position};
-    auto const orientations =
-        std::array<Quatf, 2>{data[0]->orientation, data[1]->orientation};
-    auto const key =
-        (static_cast<std::uint64_t>(contact.bodies[0].value) << 32) |
-        contact.bodies[1].value;
-    auto const it = _rigid_body_rigid_body_pairs.find(key);
-    if (it != _rigid_body_rigid_body_pairs.end()) {
-      it->second.update(storage);
-      it->second.cache(contact, positions, orientations);
-      return it->second.get_contacts().size();
-    } else {
-      _rigid_body_rigid_body_pairs.emplace(
-          key, Rigid_body_rigid_body_pair{contact, positions, orientations});
-      return 1;
-    }
-  }
-
-  std::size_t cache(Rigid_body_static_body_contact const &contact,
-                    Rigid_body_storage const &storage) {
-    auto const data = storage.data(contact.rigid_body);
-    auto const position = data->position;
-    auto const orientation = data->orientation;
-    auto const key =
-        (static_cast<std::uint64_t>(contact.rigid_body.value) << 32) |
-        contact.static_body.value;
-    auto const it = _rigid_body_static_body_pairs.find(key);
-    if (it != _rigid_body_static_body_pairs.end()) {
-      it->second.update(storage);
-      it->second.cache(contact, position, orientation);
-      return it->second.get_contacts().size();
-    } else {
-      _rigid_body_static_body_pairs.emplace(
-          key, Rigid_body_static_body_pair{contact, position, orientation});
-      return 1;
-    }
-  }
-
   void clear_unmarked() {
     for (auto it = _rigid_body_rigid_body_pairs.begin();
          it != _rigid_body_rigid_body_pairs.end();) {
@@ -931,160 +857,53 @@ public:
     }
   }
 
-  // void mark(Rigid_body_handle rigid_body_1, Rigid_body_handle rigid_body_2) {
-  //   assert(rigid_body_1.value < rigid_body_2.value);
-  //   auto const key = (static_cast<std::uint64_t>(rigid_body_1.value) << 32) |
-  //                    static_cast<std::uint64_t>(rigid_body_2.value);
-  //   auto const it = _rigid_body_rigid_body_pairs.find(key);
-  //   if (it != _rigid_body_rigid_body_pairs.end()) {
-  //     it->second.set_marked();
-  //   }
-  // }
+  std::size_t update(Rigid_body_rigid_body_contact contact,
+                     Rigid_body_storage const &storage) {
+    if (contact.bodies[0].value > contact.bodies[1].value) {
+      contact.normal = -contact.normal;
+      std::swap(contact.bodies[0], contact.bodies[1]);
+      std::swap(contact.relative_positions[0], contact.relative_positions[1]);
+    }
+    auto const data = std::array<Rigid_body_data const *, 2>{
+        storage.data(contact.bodies[0]), storage.data(contact.bodies[1])};
+    auto const positions =
+        std::array<Vec3f, 2>{data[0]->position, data[1]->position};
+    auto const orientations =
+        std::array<Quatf, 2>{data[0]->orientation, data[1]->orientation};
+    auto const key =
+        (static_cast<std::uint64_t>(contact.bodies[0].value) << 32) |
+        contact.bodies[1].value;
+    auto const it = _rigid_body_rigid_body_pairs.find(key);
+    if (it != _rigid_body_rigid_body_pairs.end()) {
+      it->second.update(storage);
+      it->second.cache(contact, positions, orientations);
+      return it->second.get_contacts().size();
+    } else {
+      _rigid_body_rigid_body_pairs.emplace(
+          key, Rigid_body_rigid_body_pair{contact, positions, orientations});
+      return 1;
+    }
+  }
 
-  // void mark(Rigid_body_handle rigid_body, Static_body_handle static_body) {
-  //   auto const key = (static_cast<std::uint64_t>(rigid_body.value) << 32) |
-  //                    static_cast<std::uint64_t>(static_body.value);
-  //   auto const it = _rigid_body_static_body_pairs.find(key);
-  //   if (it != _rigid_body_static_body_pairs.end()) {
-  //     it->second.set_marked();
-  //   }
-  // }
-
-  // void update(Rigid_body_storage const &rigid_bodies) {
-  //   _update_rigid_body_rigid_body_pairs(rigid_bodies);
-  //   _update_rigid_body_static_body_pairs(rigid_bodies);
-  // }
-
-  // void cache(Rigid_body_rigid_body_contact const &contact,
-  //            std::array<Vec3f, 2> const &body_positions,
-  //            std::array<Quatf, 2> const &body_orientations) {
-  //   assert(contact.bodies[0].value < contact.bodies[1].value);
-  //   auto const key =
-  //       (static_cast<std::uint64_t>(contact.bodies[0].value) << 32) |
-  //       (static_cast<std::uint64_t>(contact.bodies[1].value));
-  //   auto const it = _rigid_body_rigid_body_pairs.find(key);
-  //   if (it != _rigid_body_rigid_body_pairs.end()) {
-  //     it->second.cache(contact, body_positions, body_orientations);
-  //   } else {
-  //     _rigid_body_rigid_body_pairs.emplace(
-  //         key,
-  //         Rigid_body_rigid_body_pair{
-  //             contact, body_positions, body_orientations});
-  //   }
-  // }
-
-  // void cache(Rigid_body_static_body_contact const &contact,
-  //            Vec3f const &rigid_body_position,
-  //            Quatf const &rigid_body_orientation) {
-  //   auto const key =
-  //       (static_cast<std::uint64_t>(contact.rigid_body.value) << 32) |
-  //       (static_cast<std::uint64_t>(contact.static_body.value));
-  //   auto const it = _rigid_body_static_body_pairs.find(key);
-  //   if (it != _rigid_body_static_body_pairs.end()) {
-  //     it->second.cache(contact, rigid_body_position, rigid_body_orientation);
-  //   } else {
-  //     _rigid_body_static_body_pairs.emplace(
-  //         key,
-  //         Rigid_body_static_body_pair{
-  //             contact, rigid_body_position, rigid_body_orientation});
-  //   }
-  // }
-
-  // void count_contacts(Rigid_body_storage &rigid_bodies) {
-  //   for (auto const &[key, pair] : _rigid_body_rigid_body_pairs) {
-  //     auto const handle_1 =
-  //         Rigid_body_handle{static_cast<std::uint32_t>(key >> 32)};
-  //     auto const handle_2 =
-  //     Rigid_body_handle{static_cast<std::uint32_t>(key)}; auto const count =
-  //     pair.get_contacts().size();
-  //     rigid_bodies.data(handle_1)->rigid_body_contact_count += count;
-  //     rigid_bodies.data(handle_2)->rigid_body_contact_count += count;
-  //   }
-  //   for (auto const &[key, pair] : _rigid_body_static_body_pairs) {
-  //     auto const handle =
-  //         Rigid_body_handle{static_cast<std::uint32_t>(key >> 32)};
-  //     auto const count = pair.get_contacts().size();
-  //     rigid_bodies.data(handle)->static_body_contact_count += count;
-  //   }
-  // }
-
-  // void assign_contacts(Rigid_body_storage &rigid_bodies) {
-  //   for (auto &[key, pair] : _rigid_body_rigid_body_pairs) {
-  //     auto const handles = std::array<Rigid_body_handle, 2>{
-  //         Rigid_body_handle{static_cast<std::uint32_t>(key >> 32)},
-  //         Rigid_body_handle{static_cast<std::uint32_t>(key)}};
-  //     auto const datas = std::array<Rigid_body_data *, 2>{
-  //         rigid_bodies.data(handles[0]), rigid_bodies.data(handles[1])};
-  //     for (auto i = 0; i < 2; ++i) {
-  //       for (auto &contact : pair.get_contacts()) {
-  //         datas[i]->rigid_body_contacts[datas[i]->rigid_body_contact_count++]
-  //         =
-  //             &contact;
-  //       }
-  //     }
-  //   }
-  //   for (auto &[key, pair] : _rigid_body_static_body_pairs) {
-  //     auto const handle =
-  //         Rigid_body_handle{static_cast<std::uint32_t>(key >> 32)};
-  //     auto const data = rigid_bodies.data(handle);
-  //     for (auto &contact : pair.get_contacts()) {
-  //       data->static_body_contacts[data->static_body_contact_count++] =
-  //           &contact;
-  //     }
-  //   }
-  // }
-
-  // std::span<Rigid_body_rigid_body_contact const>
-  // contacts(Rigid_body_handle rigid_body_1,
-  //          Rigid_body_handle rigid_body_2) const {
-  //   assert(rigid_body_1.value < rigid_body_2.value);
-  //   auto const key = (static_cast<std::uint64_t>(rigid_body_1.value) << 32) |
-  //                    static_cast<std::uint64_t>(rigid_body_2.value);
-  //   auto const it = _rigid_body_rigid_body_pairs.find(key);
-  //   if (it != _rigid_body_rigid_body_pairs.end()) {
-  //     return it->second.get_contacts();
-  //   } else {
-  //     return {};
-  //   }
-  // }
-
-  // std::span<Rigid_body_rigid_body_contact>
-  // contacts(Rigid_body_handle rigid_body_1, Rigid_body_handle rigid_body_2) {
-  //   assert(rigid_body_1.value < rigid_body_2.value);
-  //   auto const key = (static_cast<std::uint64_t>(rigid_body_1.value) << 32) |
-  //                    static_cast<std::uint64_t>(rigid_body_2.value);
-  //   auto const it = _rigid_body_rigid_body_pairs.find(key);
-  //   if (it != _rigid_body_rigid_body_pairs.end()) {
-  //     return it->second.get_contacts();
-  //   } else {
-  //     return {};
-  //   }
-  // }
-
-  // std::span<Rigid_body_static_body_contact const>
-  // contacts(Rigid_body_handle dynamic_body,
-  //          Static_body_handle static_body) const {
-  //   auto const key = (static_cast<std::uint64_t>(dynamic_body.value) << 32) |
-  //                    static_cast<std::uint64_t>(static_body.value);
-  //   auto const it = _rigid_body_static_body_pairs.find(key);
-  //   if (it != _rigid_body_static_body_pairs.end()) {
-  //     return it->second.get_contacts();
-  //   } else {
-  //     return {};
-  //   }
-  // }
-
-  // std::span<Rigid_body_static_body_contact>
-  // contacts(Rigid_body_handle dynamic_body, Static_body_handle static_body) {
-  //   auto const key = (static_cast<std::uint64_t>(dynamic_body.value) << 32) |
-  //                    static_cast<std::uint64_t>(static_body.value);
-  //   auto const it = _rigid_body_static_body_pairs.find(key);
-  //   if (it != _rigid_body_static_body_pairs.end()) {
-  //     return it->second.get_contacts();
-  //   } else {
-  //     return {};
-  //   }
-  // }
+  std::size_t update(Rigid_body_static_body_contact const &contact,
+                     Rigid_body_storage const &storage) {
+    auto const data = storage.data(contact.rigid_body);
+    auto const position = data->position;
+    auto const orientation = data->orientation;
+    auto const key =
+        (static_cast<std::uint64_t>(contact.rigid_body.value) << 32) |
+        contact.static_body.value;
+    auto const it = _rigid_body_static_body_pairs.find(key);
+    if (it != _rigid_body_static_body_pairs.end()) {
+      it->second.update(storage);
+      it->second.cache(contact, position, orientation);
+      return it->second.get_contacts().size();
+    } else {
+      _rigid_body_static_body_pairs.emplace(
+          key, Rigid_body_static_body_pair{contact, position, orientation});
+      return 1;
+    }
+  }
 
 private:
   class Rigid_body_rigid_body_pair {
@@ -1550,7 +1369,7 @@ public:
   }
 
   Rigid_body_handle
-  create_dynamic_rigid_body(Dynamic_rigid_body_create_info const &create_info) {
+  create_dynamic_rigid_body(Rigid_body_create_info const &create_info) {
     auto const transform =
         Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const handle = _rigid_bodies.alloc();
@@ -1581,7 +1400,7 @@ public:
   }
 
   Static_body_handle
-  create_static_rigid_body(Static_rigid_body_create_info const &create_info) {
+  create_static_rigid_body(Static_body_create_info const &create_info) {
     auto const transform =
         Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const transform_inverse = rigid_inverse(transform);
@@ -1623,10 +1442,12 @@ public:
               h,
               time_compensated_velocity_damping_factor,
               time_compensating_waking_motion_smoothing_factor,
-              simulate_info.min_position_iterations_per_contact,
-              simulate_info.max_position_iterations_per_contact,
-              simulate_info.min_velocity_iterations_per_contact,
-              simulate_info.max_velocity_iterations_per_contact,
+              simulate_info.min_desired_position_iterations_per_contact,
+              simulate_info.max_desired_position_iterations_per_contact,
+              simulate_info.max_position_iterations_per_contact_group,
+              simulate_info.min_desired_velocity_iterations_per_contact,
+              simulate_info.max_desired_velocity_iterations_per_contact,
+              simulate_info.max_velocity_iterations_per_contact_group,
               simulate_info.early_out_contact_separation,
               simulate_info.early_out_contact_separating_velocity);
         }
@@ -2008,10 +1829,12 @@ private:
                                float delta_time,
                                float velocity_damping_factor,
                                float waking_motion_smoothing_factor,
-                               int min_position_iterations_per_contact,
-                               int max_position_iterations_per_contact,
-                               int min_velocity_iterations_per_contact,
-                               int max_velocity_iterations_per_contact,
+                               int min_desired_position_iterations_per_contact,
+                               int max_desired_position_iterations_per_contact,
+                               int max_position_iterations_per_contact_group,
+                               int min_desired_velocity_iterations_per_contact,
+                               int max_desired_velocity_iterations_per_contact,
+                               int max_velocity_iterations_per_contact_group,
                                float early_out_contact_separation,
                                float early_out_contact_separating_velocity) {
     auto const group_begin = _neighbor_groups.group_begin(group_index);
@@ -2024,7 +1847,6 @@ private:
       std::visit(
           [&](auto &&object) {
             set_unmarked(object);
-            // set_unvisited(object);
             reset_contact_counts(object);
             integrate(object,
                       delta_time,
@@ -2135,10 +1957,12 @@ private:
                     },
                     fringe_object);
               } while (!_contact_group_fringe.empty());
-              solve_contact_group(min_position_iterations_per_contact,
-                                  max_position_iterations_per_contact,
-                                  min_velocity_iterations_per_contact,
-                                  max_velocity_iterations_per_contact,
+              solve_contact_group(min_desired_position_iterations_per_contact,
+                                  max_desired_position_iterations_per_contact,
+                                  max_position_iterations_per_contact_group,
+                                  min_desired_velocity_iterations_per_contact,
+                                  max_desired_velocity_iterations_per_contact,
+                                  max_velocity_iterations_per_contact_group,
                                   early_out_contact_separation,
                                   early_out_contact_separating_velocity,
                                   gravitational_velocity_delta,
@@ -2459,7 +2283,7 @@ private:
            separating_velocity,
            {objects.first, objects.second},
            body_relative_contact_positions});
-      auto const contact_count = _contact_cache.cache(
+      auto const contact_count = _contact_cache.update(
           _rigid_body_rigid_body_contacts.back(), _rigid_bodies);
       for (auto i = 0; i != 2; ++i) {
         data[i]->rigid_body_contact_count += contact_count;
@@ -2500,7 +2324,7 @@ private:
            objects.first,
            objects.second,
            rigid_body_relative_contact_position});
-      auto const contact_count = _contact_cache.cache(
+      auto const contact_count = _contact_cache.update(
           _rigid_body_static_body_contacts.back(), _rigid_bodies);
       rigid_body_data->static_body_contact_count += contact_count;
       return true;
@@ -2586,39 +2410,55 @@ private:
     }
   }
 
-  void solve_contact_group(int min_position_iterations_per_contact,
-                           int max_position_iterations_per_contact,
-                           int min_velocity_iterations_per_contact,
-                           int max_velocity_iterations_per_contact,
+  void solve_contact_group(int min_desired_position_iterations_per_contact,
+                           int max_desired_position_iterations_per_contact,
+                           int max_position_iterations,
+                           int min_desired_velocity_iterations_per_contact,
+                           int max_desired_velocity_iterations_per_contact,
+                           int max_velocity_iterations,
                            float early_out_contact_separation,
                            float early_out_contact_separating_velocity,
                            Vec3f const &gravitational_velocity_delta,
                            float max_separating_velocity_for_bounce) {
+    auto position_iterations = 0;
+    auto const min_desired_position_iterations =
+        min_desired_position_iterations_per_contact * _contact_group.size();
     for (auto i = std::size_t{};
-         i != min_position_iterations_per_contact * _contact_group.size();
+         position_iterations < max_position_iterations &&
+         i != min_desired_position_iterations;
          ++i) {
       if (auto const contact =
               _contact_group.select_contact_position_solve(0.0f)) {
         std::visit([this](auto &&arg) { resolve_contact_position(arg); },
                    *contact);
+        ++position_iterations;
       } else {
         break;
       }
     }
-    for (auto i = std::size_t{}; i != (max_position_iterations_per_contact -
-                                       min_position_iterations_per_contact) *
-                                          _contact_group.size();
+    auto const optional_desired_position_iterations =
+        (max_desired_position_iterations_per_contact -
+         min_desired_position_iterations_per_contact) *
+        _contact_group.size();
+    for (auto i = std::size_t{};
+         position_iterations < max_position_iterations &&
+         i != optional_desired_position_iterations;
          ++i) {
       if (auto const contact = _contact_group.select_contact_position_solve(
               early_out_contact_separation)) {
         std::visit([this](auto &&arg) { resolve_contact_position(arg); },
                    *contact);
+        ++position_iterations;
       } else {
         break;
       }
     }
+    auto velocity_iterations = 0;
+    auto const min_desired_velocity_iterations =
+        min_desired_velocity_iterations_per_contact * _contact_group.size();
     for (auto i = std::size_t{};
-         i != min_velocity_iterations_per_contact * _contact_group.size();
+         velocity_iterations < max_velocity_iterations &&
+         i != min_desired_velocity_iterations;
          ++i) {
       if (auto const contact =
               _contact_group.select_contact_velocity_solve(0.0f)) {
@@ -2637,13 +2477,17 @@ private:
               }
             },
             *contact);
+        ++velocity_iterations;
       } else {
         break;
       }
     }
-    for (auto i = 0; i != (max_velocity_iterations_per_contact -
-                           min_velocity_iterations_per_contact) *
-                              (int)_contact_group.size();
+    auto const optional_desired_velocity_iterations =
+        (max_desired_velocity_iterations_per_contact -
+         min_desired_velocity_iterations_per_contact) *
+        (int)_contact_group.size();
+    for (auto i = 0; velocity_iterations < max_velocity_iterations &&
+                     i != optional_desired_velocity_iterations;
          ++i) {
       if (auto const contact = _contact_group.select_contact_velocity_solve(
               early_out_contact_separating_velocity)) {
@@ -2662,6 +2506,7 @@ private:
               }
             },
             *contact);
+        ++velocity_iterations;
       } else {
         break;
       }
@@ -3547,7 +3392,7 @@ private:
     _rigid_bodies.for_each(
         [&](Rigid_body_handle handle, Rigid_body_data *data) {
           if (data->motion_callback != nullptr) {
-            data->motion_callback->on_dynamic_rigid_body_motion(
+            data->motion_callback->on_rigid_body_motion(
                 {handle, data->position, data->orientation});
           }
         });
@@ -3769,21 +3614,21 @@ void Space::destroy_particle(Particle_handle particle) {
   _impl->destroy_particle(particle);
 }
 
-Static_body_handle Space::create_static_rigid_body(
-    Static_rigid_body_create_info const &create_info) {
+Static_body_handle Space::create_static_body(
+    Static_body_create_info const &create_info) {
   return _impl->create_static_rigid_body(create_info);
 }
 
-void Space::destroy_static_rigid_body(Static_body_handle static_rigid_body) {
+void Space::destroy_static_body(Static_body_handle static_rigid_body) {
   _impl->destroy_static_rigid_body(static_rigid_body);
 }
 
-Rigid_body_handle Space::create_dynamic_rigid_body(
-    Dynamic_rigid_body_create_info const &create_info) {
+Rigid_body_handle Space::create_rigid_body(
+    Rigid_body_create_info const &create_info) {
   return _impl->create_dynamic_rigid_body(create_info);
 }
 
-void Space::destroy_dynamic_rigid_body(Rigid_body_handle handle) {
+void Space::destroy_rigid_body(Rigid_body_handle handle) {
   _impl->destroy_dynamic_rigid_body(handle);
 }
 

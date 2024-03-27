@@ -1,5 +1,5 @@
-#ifndef MARLON_PHYSICS_DYNAMIC_RIGID_BODY_H
-#define MARLON_PHYSICS_DYNAMIC_RIGID_BODY_H
+#ifndef MARLON_PHYSICS_RIGID_BODY_H
+#define MARLON_PHYSICS_RIGID_BODY_H
 
 #include <cstdint>
 
@@ -11,14 +11,14 @@
 
 namespace marlon {
 namespace physics {
-class Dynamic_rigid_body_motion_callback;
+class Rigid_body_motion_callback;
 
 struct Rigid_body_handle {
   Object_handle value;
 };
 
-struct Dynamic_rigid_body_create_info {
-  Dynamic_rigid_body_motion_callback *motion_callback{};
+struct Rigid_body_create_info {
+  Rigid_body_motion_callback *motion_callback{};
   Shape shape;
   float mass{1.0f};
   math::Mat3x3f inertia_tensor{math::Mat3x3f::identity()};
@@ -29,18 +29,17 @@ struct Dynamic_rigid_body_create_info {
   math::Vec3f angular_velocity{math::Vec3f::zero()};
 };
 
-struct Dynamic_rigid_body_motion_event {
+struct Rigid_body_motion_event {
   Rigid_body_handle handle;
   math::Vec3f position;
   math::Quatf orientation;
 };
 
-class Dynamic_rigid_body_motion_callback {
+class Rigid_body_motion_callback {
 public:
-  virtual ~Dynamic_rigid_body_motion_callback() = default;
+  virtual ~Rigid_body_motion_callback() = default;
 
-  virtual void on_dynamic_rigid_body_motion(
-      Dynamic_rigid_body_motion_event const &event) = 0;
+  virtual void on_rigid_body_motion(Rigid_body_motion_event const &event) = 0;
 };
 
 constexpr bool operator==(Rigid_body_handle lhs,
@@ -52,8 +51,8 @@ constexpr bool operator==(Rigid_body_handle lhs,
 
 namespace std {
 template <> struct hash<marlon::physics::Rigid_body_handle> {
-  std::size_t operator()(
-      marlon::physics::Rigid_body_handle reference) const noexcept {
+  std::size_t
+  operator()(marlon::physics::Rigid_body_handle reference) const noexcept {
     return hash<std::size_t>{}(reference.value);
   }
 };

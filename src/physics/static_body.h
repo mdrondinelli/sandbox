@@ -1,5 +1,5 @@
-#ifndef MARLON_PHYSICS_STATIC_RIGID_BODY_H
-#define MARLON_PHYSICS_STATIC_RIGID_BODY_H
+#ifndef MARLON_PHYSICS_STATIC_BODY_H
+#define MARLON_PHYSICS_STATIC_BODY_H
 
 #include <cstdint>
 
@@ -15,7 +15,7 @@ struct Static_body_handle {
   Object_handle value;
 };
 
-struct Static_rigid_body_create_info {
+struct Static_body_create_info {
   Shape shape;
   Material material;
   math::Vec3f position{math::Vec3f::zero()};
@@ -31,8 +31,8 @@ constexpr bool operator==(Static_body_handle lhs,
 
 namespace std {
 template <> struct hash<marlon::physics::Static_body_handle> {
-  std::size_t operator()(
-      marlon::physics::Static_body_handle reference) const noexcept {
+  std::size_t
+  operator()(marlon::physics::Static_body_handle reference) const noexcept {
     return hash<std::size_t>{}(reference.value);
   }
 };

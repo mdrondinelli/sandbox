@@ -253,7 +253,7 @@ void run_game_loop(GLFWwindow *window,
   auto loop =
       client::Application_loop{{.space = space,
                                 .physics_step_duration = tick_duration,
-                                .physics_substep_count = 16,
+                                .physics_substep_count = 24,
                                 .min_position_iterations_per_contact = 1,
                                 .max_position_iterations_per_contact = 4,
                                 .min_velocity_iterations_per_contact = 1,
@@ -269,6 +269,7 @@ void run_game_loop(GLFWwindow *window,
   auto offsetX = 0.0f;
   auto offsetZ = 0.0f;
   auto spawn_debounce = -6.5f;
+  srand(25);
   for (;;) {
     glfwPollEvents();
     if (glfwWindowShouldClose(window)) {
@@ -301,14 +302,14 @@ void run_game_loop(GLFWwindow *window,
         box_spawn_timer -= 0.1f;
         if (height > 8.0f) {
           height = 2.0f;
-          offsetX = 10 * (rand() / (float)RAND_MAX) - 5;
-          offsetZ = 10 * (rand() / (float)RAND_MAX) - 5;
+          offsetX = 40 * (rand() / (float)RAND_MAX) - 20;
+          offsetZ = 40 * (rand() / (float)RAND_MAX) - 20;
         } else {
           height += 0.6f;
         }
         ++count;
-        if (count == 256) {
-          box_spawn_timer = -1000.0f;
+        if (count == 768) {
+          box_spawn_timer = -1000000.0f;
         }
         // std::cout << "box count: " << count << "\n";
         // if (count >= 3) {
@@ -383,7 +384,7 @@ int main() {
   physics::Ball ball_shape{0.5f};
   physics::Box brick_box_shape{{1.0f, 1.0f, 1.0f}};
   physics::Box cotton_box_shape{{0.3f, 0.3f, 0.3f}};
-  space.create_static_rigid_body({.shape = ground_shape,
+  space.create_static_body({.shape = ground_shape,
                                   .material = physics_material,
                                   .position = math::Vec3f{0.0f, -0.5f, 0.0f}});
   client::Static_prop_manager red_ball_manager{

@@ -3,11 +3,11 @@
 
 // #include "aabb_tree.h"
 #include "aabb.h"
-#include "dynamic_rigid_body.h"
 #include "material.h"
 #include "particle.h"
+#include "rigid_body.h"
 #include "shape.h"
 #include "space.h"
-#include "static_rigid_body.h"
+#include "static_body.h"
 
 #endif

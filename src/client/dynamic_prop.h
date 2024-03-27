@@ -47,13 +47,13 @@ public:
   void destroy(Dynamic_prop_handle handle);
 
 private:
-  struct Entity : public physics::Dynamic_rigid_body_motion_callback {
+  struct Entity : public physics::Rigid_body_motion_callback {
     Dynamic_prop_manager *manager;
     graphics::Surface *surface;
     physics::Rigid_body_handle body;
 
-    void on_dynamic_rigid_body_motion(
-        physics::Dynamic_rigid_body_motion_event const &event) final;
+    void on_rigid_body_motion(
+        physics::Rigid_body_motion_event const &event) final;
   };
 
   graphics::Graphics *_graphics;

@@ -32,7 +32,7 @@ Dynamic_prop_manager::create(Dynamic_prop_create_info const &create_info) {
                                  .material = _surface_material,
                                  .transform = surface_transform_3x4});
   try {
-    value.body = _space->create_dynamic_rigid_body(
+    value.body = _space->create_rigid_body(
         {.motion_callback = &value,
          .shape = _body_shape,
          .mass = _body_mass,
@@ -49,7 +49,7 @@ Dynamic_prop_manager::create(Dynamic_prop_create_info const &create_info) {
   try {
     _scene->add_surface(value.surface);
   } catch (...) {
-    _space->destroy_dynamic_rigid_body(value.body);
+    _space->destroy_rigid_body(value.body);
     _graphics->destroy_surface(value.surface);
     throw;
   }
@@ -59,14 +59,14 @@ Dynamic_prop_manager::create(Dynamic_prop_create_info const &create_info) {
 void Dynamic_prop_manager::destroy(Dynamic_prop_handle handle) {
   auto const it = _entities.find(handle.value);
   auto &value = it->second;
-  _space->destroy_dynamic_rigid_body(value.body);
+  _space->destroy_rigid_body(value.body);
   _scene->remove_surface(value.surface);
   _graphics->destroy_surface(value.surface);
   _entities.erase(it);
 }
 
-void Dynamic_prop_manager::Entity::on_dynamic_rigid_body_motion(
-    physics::Dynamic_rigid_body_motion_event const &event) {
+void Dynamic_prop_manager::Entity::on_rigid_body_motion(
+    physics::Rigid_body_motion_event const &event) {
   auto const prop_transform =
       math::Mat4x4f::rigid(event.position, event.orientation);
   auto const &surface_pretransform_3x4 = manager->_surface_pretransform_3x4;

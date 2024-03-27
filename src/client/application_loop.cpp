@@ -30,13 +30,13 @@ bool Application_loop::run_once(double delta_time) {
     _accumulated_time -= _physics_step_duration;
     _space->simulate({.delta_time = _physics_step_duration,
                       .substep_count = _physics_substep_count,
-                      .min_position_iterations_per_contact =
+                      .min_desired_position_iterations_per_contact =
                           _min_position_iterations_per_contact,
-                      .max_position_iterations_per_contact =
+                      .max_desired_position_iterations_per_contact =
                           _max_position_iterations_per_contact,
-                      .min_velocity_iterations_per_contact =
+                      .min_desired_velocity_iterations_per_contact =
                           _min_velocity_iterations_per_contact,
-                      .max_velocity_iterations_per_contact =
+                      .max_desired_velocity_iterations_per_contact =
                           _max_velocity_iterations_per_contact});
     retval = true;
   }
