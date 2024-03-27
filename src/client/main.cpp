@@ -298,7 +298,7 @@ void run_game_loop(GLFWwindow *window,
       spawn_debounce += tick_duration;
       box_spawn_timer += tick_duration;
       if (box_spawn_timer > 0.0f) {
-        box_spawn_timer -= 1.0f;
+        box_spawn_timer -= 0.1f;
         if (height > 8.0f) {
           height = 2.0f;
           offsetX = 10 * (rand() / (float)RAND_MAX) - 5;
@@ -307,10 +307,10 @@ void run_game_loop(GLFWwindow *window,
           height += 0.6f;
         }
         ++count;
-        if (count == 128) {
+        if (count == 256) {
           box_spawn_timer = -1000.0f;
         }
-        std::cout << "box count: " << count << "\n";
+        // std::cout << "box count: " << count << "\n";
         // if (count >= 3) {
         //   direction = 1 - direction;
         //   count = 0;
