@@ -703,10 +703,10 @@ auto constexpr max_cached_contact_separation = 1.0f / 128.0f;
 
 // integration constants
 auto constexpr velocity_damping_factor = 0.99f;
-auto constexpr waking_motion_epsilon = 1.0f / 16.0f;
+auto constexpr waking_motion_epsilon = 1.0f / 32.0f;
 auto constexpr waking_motion_initializer = 2.0f * waking_motion_epsilon;
 auto constexpr waking_motion_limit = 8.0f * waking_motion_epsilon;
-auto constexpr waking_motion_smoothing_factor = 1.0f / 2.0f;
+auto constexpr waking_motion_smoothing_factor = 3.0f / 4.0f;
 
 class Contact_cache {
 public:
@@ -1993,6 +1993,7 @@ private:
                   if constexpr (std::is_same_v<T, Particle_handle>) {
                     auto const data = _particles.data(handle);
                     if (!data->awake) {
+                      data->waking_motion = waking_motion_initializer;
                       data->awake = true;
                     }
                   } else {
