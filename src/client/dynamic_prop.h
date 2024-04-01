@@ -19,7 +19,7 @@ struct Dynamic_prop_manager_create_info {
   graphics::Mesh *surface_mesh{};
   graphics::Material *surface_material{};
   math::Mat3x4f surface_pretransform{math::Mat3x4f::identity()};
-  physics::Space *space;
+  physics::World *space;
   float body_mass{1.0f};
   math::Mat3x3f body_inertia_tensor{math::Mat3x3f::identity()};
   physics::Shape body_shape;
@@ -61,7 +61,7 @@ private:
   graphics::Mesh *_surface_mesh;
   graphics::Material *_surface_material;
   math::Mat3x4f _surface_pretransform_3x4;
-  physics::Space *_space;
+  physics::World *_space;
   float _body_mass;
   math::Mat3x3f _body_inertia_tensor;
   physics::Shape _body_shape;

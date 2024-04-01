@@ -5,7 +5,6 @@
 
 #include "../math/quat.h"
 #include "../math/vec.h"
-#include "camera.h"
 #include "material.h"
 #include "mesh.h"
 #include "render_target.h"
@@ -17,6 +16,16 @@
 namespace marlon {
 namespace graphics {
 class Graphics;
+
+struct Render_info {
+  Render_target *target;
+  Scene *source;
+  math::Vec3f position{math::Vec3f::zero()};
+  math::Quatf orientation{math::Quatf::identity()};
+  math::Vec2f zoom{1.0f, 1.0f};
+  float near_plane_distance{0.01f};
+  float far_plane_distance{1000.0f};
+};
 
 class Mesh_deleter {
 public:
@@ -68,22 +77,11 @@ private:
   Graphics *_owner;
 };
 
-class Camera_deleter {
-public:
-  Camera_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
-
-  void operator()(Camera *camera) const noexcept;
-
-private:
-  Graphics *_owner;
-};
-
 using Unique_mesh_ptr = std::unique_ptr<Mesh, Mesh_deleter>;
 using Unique_texture_ptr = std::unique_ptr<Texture, Texture_deleter>;
 using Unique_material_ptr = std::unique_ptr<Material, Material_deleter>;
 using Unique_scene_ptr = std::unique_ptr<Scene, Scene_deleter>;
 using Unique_surface_ptr = std::unique_ptr<Surface, Surface_deleter>;
-using Unique_camera_ptr = std::unique_ptr<Camera, Camera_deleter>;
 
 class Graphics {
 public:
@@ -133,21 +131,11 @@ public:
     return Unique_surface_ptr{create_surface(create_info), this};
   }
 
-  virtual Camera *create_camera(Camera_create_info const &create_info) = 0;
-
-  virtual void destroy_camera(Camera *camera) noexcept = 0;
-
-  Unique_camera_ptr
-  create_camera_unique(Camera_create_info const &create_info) {
-    return Unique_camera_ptr{create_camera(create_info), this};
-  }
-
   // Render_target creation is implementation-specific
 
   virtual void destroy_render_target(Render_target *target) noexcept = 0;
 
-  virtual void render(Scene *source_scene, Camera *source_camera,
-                      Render_target *target) = 0;
+  virtual void render(Render_info const &info) = 0;
 
   // TODO: interface for compositing or figure out how multi view rendering will
   // work compositing could be used for first person view models
@@ -180,12 +168,6 @@ inline void Surface_deleter::operator()(Surface *surface) const noexcept {
 inline void Scene_deleter::operator()(Scene *scene) const noexcept {
   if (_owner) {
     _owner->destroy_scene(scene);
-  }
-}
-
-inline void Camera_deleter::operator()(Camera *camera) const noexcept {
-  if (_owner) {
-    _owner->destroy_camera(camera);
   }
 }
 } // namespace graphics

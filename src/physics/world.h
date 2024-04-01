@@ -9,7 +9,7 @@
 
 namespace marlon {
 namespace physics {
-struct Space_create_info {
+struct World_create_info {
   std::size_t max_aabb_tree_leaf_nodes{100000};
   std::size_t max_aabb_tree_internal_nodes{100000};
   std::size_t max_particles{10000};
@@ -26,8 +26,8 @@ struct Space_create_info {
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 
-struct Space_simulate_info {
-  float delta_time;
+struct World_simulate_info {
+  float delta_time{1.0f / 64.0f};
   int substep_count{16};
   int min_desired_position_iterations_per_contact{1};
   int max_desired_position_iterations_per_contact{4};
@@ -39,11 +39,11 @@ struct Space_simulate_info {
   float early_out_contact_separating_velocity{-1.0f / 128.0f};
 };
 
-class Space {
+class World {
 public:
-  explicit Space(Space_create_info const &create_info);
+  explicit World(World_create_info const &create_info);
 
-  ~Space();
+  ~World();
 
   Particle_handle create_particle(Particle_create_info const &create_info);
 
@@ -59,7 +59,7 @@ public:
 
   void destroy_static_body(Static_body_handle handle);
 
-  void simulate(Space_simulate_info const &simulate_info);
+  void simulate(World_simulate_info const &simulate_info);
 
 private:
   class Impl;

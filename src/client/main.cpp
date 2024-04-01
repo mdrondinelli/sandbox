@@ -1,32 +1,14 @@
-#include <array>
 #include <fstream>
 #include <iostream>
-#include <vector>
+#include <stdexcept>
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wlanguage-extension-token"
-#include <glad/glad.h>
-#pragma clang diagnostic pop
-#else
-#include <glad/glad.h>
-#endif
-
-#include <GLFW/glfw3.h>
-
-#include "../graphics/gl/graphics.h"
-#include "../physics/physics.h"
-#include "application_loop.h"
 #include "dynamic_prop.h"
-#include "glfw_instance.h"
-#include "glfw_window.h"
 #include "static_prop.h"
-#include "test_entity.h"
 
-namespace client = marlon::client;
-namespace graphics = marlon::graphics;
-namespace math = marlon::math;
-namespace physics = marlon::physics;
+#include "../engine/app.h"
+#include "../graphics/graphics.h"
+
+using namespace marlon;
 
 struct Vertex {
   math::Vec3f position;
@@ -45,24 +27,6 @@ struct Resources {
   graphics::Unique_mesh_ptr low_quality_sphere_mesh;
   graphics::Unique_mesh_ptr high_quality_sphere_mesh;
 };
-
-client::Unique_glfw_window_ptr create_window() {
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  return client::make_unique_glfw_window(1600, 900, "title");
-}
-
-std::unique_ptr<graphics::Gl_graphics> create_graphics(GLFWwindow *window) {
-  glfwMakeContextCurrent(window);
-  if (!gladLoadGLLoader([](char const *procname) {
-        return reinterpret_cast<void *>(glfwGetProcAddress(procname));
-      })) {
-    throw std::runtime_error{"Failed to initialize OpenGL"};
-  }
-  return std::make_unique<graphics::Gl_graphics>();
-}
 
 graphics::Unique_texture_ptr create_texture(graphics::Graphics *graphics,
                                             const char *path);
@@ -240,233 +204,140 @@ graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
        .vertex_data = vertices.data()});
 }
 
-void run_game_loop(GLFWwindow *window,
-                   graphics::Graphics *graphics,
-                   graphics::Render_target *render_target,
-                   graphics::Scene *scene,
-                   graphics::Camera *camera,
-                   physics::Space *space,
-                   client::Dynamic_prop_manager *cotton_box_manager,
-                   client::Test_entity_manager *test_entity_manager) {
-  auto const tick_rate = 64.0f;
-  auto const tick_duration = 1.0f / tick_rate;
-  auto loop =
-      client::Application_loop{{.space = space,
-                                .physics_step_duration = tick_duration,
-                                .physics_substep_count = 24,
-                                .min_position_iterations_per_contact = 1,
-                                .max_position_iterations_per_contact = 4,
-                                .min_velocity_iterations_per_contact = 1,
-                                .max_velocity_iterations_per_contact = 4}};
-  auto previous_time = glfwGetTime();
-  auto fps_time_accumulator = 0.0;
-  auto fps_frame_accumulator = 0;
-  auto worst_frame_time = 0.0;
-  auto box_spawn_timer = 0.0;
-  auto height = 0.5f;
-  auto direction = 0;
-  auto count = 0;
-  auto offsetX = 0.0f;
-  auto offsetZ = 0.0f;
-  auto spawn_debounce = -6.5f;
-  srand(25);
-  for (;;) {
-    glfwPollEvents();
-    if (glfwWindowShouldClose(window)) {
-      break;
-    }
-    auto const current_time = glfwGetTime();
-    auto const elapsed_time = current_time - previous_time;
-    previous_time = current_time;
-    if (loop.run_once(elapsed_time)) {
-      test_entity_manager->tick(tick_duration);
-      for (auto i = 0; i < 0; ++i) {
-        test_entity_manager->create_entity({});
+class Client : public engine::App {
+public:
+  Client()
+      : App{{
+            .physics_world_create_info =
+                {
+                    .gravitational_acceleration = {0.0f, -9.8f, 0.0f},
+                },
+            .physics_world_simulate_info =
+                {
+                    .substep_count = 24,
+                },
+            .default_window_extents = {1600, 900},
+        }} {}
+
+  void pre_loop() final {
+    auto const world = get_world();
+    auto const graphics = get_graphics();
+    auto const scene = get_scene();
+    auto const camera = get_camera();
+    _resources = create_resources(graphics);
+    _red_ball_manager = std::make_unique<client::Static_prop_manager>(
+        client::Static_prop_manager_create_info{
+            .graphics = graphics,
+            .scene = scene,
+            .surface_mesh = _resources.high_quality_sphere_mesh.get(),
+            .surface_material = _resources.red_material.get(),
+            .surface_pretransform = math::Mat3x4f{{0.5f, 0.0f, 0.0f, 0.0f},
+                                                  {0.0f, 0.5f, 0.0f, 0.0f},
+                                                  {0.0f, 0.0f, 0.5f, 0.0f}},
+            .space = world,
+            .body_shape = physics::Ball{0.5f},
+            .body_material =
+                {
+                    .static_friction_coefficient = 0.2f,
+                    .dynamic_friction_coefficient = 0.1f,
+                    .restitution_coefficient = 0.3f,
+                },
+        });
+    physics::Box cotton_box_shape{{0.3f, 0.3f, 0.3f}};
+    _cotton_box_manager = std::make_unique<client::Dynamic_prop_manager>(
+        client::Dynamic_prop_manager_create_info{
+            .graphics = graphics,
+            .scene = scene,
+            .surface_mesh = _resources.cube_mesh.get(),
+            .surface_material = _resources.striped_cotton_material.get(),
+            .surface_pretransform =
+                math::Mat3x4f{
+                    {cotton_box_shape.half_extents[0], 0.0f, 0.0f, 0.0f},
+                    {0.0f, cotton_box_shape.half_extents[1], 0.0f, 0.0f},
+                    {0.0f, 0.0f, cotton_box_shape.half_extents[2], 0.0f}},
+            .space = world,
+            .body_mass = 80.0f,
+            .body_inertia_tensor =
+                80.0f * physics::solid_inertia_tensor(cotton_box_shape),
+            .body_shape = cotton_box_shape,
+            .body_material =
+                {
+                    .static_friction_coefficient = 0.3f,
+                    .dynamic_friction_coefficient = 0.2f,
+                    .restitution_coefficient = 0.2f,
+                },
+        });
+    _red_ball_manager->create({.position = {-1.5f, 0.5f, -1.5f}});
+    _red_ball_manager->create({.position = {1.5f, 0.5f, 1.5f}});
+    world->create_static_body({
+        .shape = physics::Box{{100.0f, 0.5f, 100.0f}},
+        .material =
+            {
+                .static_friction_coefficient = 0.4f,
+                .dynamic_friction_coefficient = 0.3f,
+                .restitution_coefficient = 0.1f,
+            },
+        .position = {0.0f, -0.5f, 0.0f},
+    });
+    _ground_surface = graphics->create_surface_unique(
+        {.mesh = _resources.cube_mesh.get(),
+         .material = _resources.blue_material.get(),
+         .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
+                                    {0.0f, 0.5f, 0.0f, -0.5f},
+                                    {0.0f, 0.0f, 100.0f, 0.0f}}});
+    scene->add_surface(_ground_surface.get());
+    camera->set_position({-10.0f, 3.5f, 10.0f});
+    camera->set_orientation(
+        math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                math::deg_to_rad(-45.0f)) *
+        math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
+                                math::deg_to_rad(-12.0f)));
+    camera->set_zoom(math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f);
+    _box_count = 0;
+    _box_spawn_timer = 0.0;
+    _box_spawn_height = 0.5f;
+    _box_spawn_offset_x = 0.0f;
+    _box_spawn_offset_z = 0.0f;
+    srand(25);
+  }
+
+  void post_physics() final {
+    _box_spawn_timer += 1.0f / 64.0f;
+    if (_box_spawn_timer > 0.0f) {
+      _box_spawn_timer -= 0.1f;
+      if (_box_spawn_height > 8.0f) {
+        _box_spawn_height = 2.0f;
+        _box_spawn_offset_x = 40 * (rand() / (float)RAND_MAX) - 20;
+        _box_spawn_offset_z = 40 * (rand() / (float)RAND_MAX) - 20;
+      } else {
+        _box_spawn_height += 0.6f;
       }
-      if (glfwGetKey(window, GLFW_KEY_SPACE) && spawn_debounce >= 0.0f) {
-        spawn_debounce = -0.1f;
-        cotton_box_manager->create(
-            {.position =
-                 math::Vec3f{10.0f + 4.0f * (rand() / (float)RAND_MAX) - 2.0f,
-                             height + 2.0f,
-                             10.0f + 4.0f * (rand() / (float)RAND_MAX) - 2.0f},
-             .velocity = math::Vec3f{-10.0f, 0.0f, -10.0f},
-             .orientation = math::Quatf::axis_angle(
-                 math::Vec3f{0.0f, 1.0f, 0.0f},
-                 math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
-             .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
+      ++_box_count;
+      if (_box_count == 768) {
+        _box_spawn_timer = -1000000.0f;
       }
-      spawn_debounce += tick_duration;
-      box_spawn_timer += tick_duration;
-      if (box_spawn_timer > 0.0f) {
-        box_spawn_timer -= 0.1f;
-        if (height > 8.0f) {
-          height = 2.0f;
-          offsetX = 40 * (rand() / (float)RAND_MAX) - 20;
-          offsetZ = 40 * (rand() / (float)RAND_MAX) - 20;
-        } else {
-          height += 0.6f;
-        }
-        ++count;
-        if (count == 768) {
-          box_spawn_timer = -1000000.0f;
-        }
-        // std::cout << "box count: " << count << "\n";
-        // if (count >= 3) {
-        //   direction = 1 - direction;
-        //   count = 0;
-        //   height += 0.25f;
-        // }
-        // cotton_box_manager->create(
-        //     {.position = math::Vec3f{direction == 0 ? 0.0f : -0.65f * count +
-        //     0.65f, height, direction == 0 ? 0.65f * count : 0.65f},
-        //      .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-        //      .orientation = math::Quatf::axis_angle(
-        //          math::Vec3f{0.0f, 1.0f, 0.0f},
-        //          math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
-        //      .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
-        cotton_box_manager->create(
-            {.position = math::Vec3f{offsetX, height, offsetZ},
-             .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-             .orientation = math::Quatf::axis_angle(
-                 math::Vec3f{0.0f, 1.0f, 0.0f},
-                 math::deg_to_rad(direction == 0 ? 90.0f : 0.0f)),
-             .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
-        // count += 1;
-      }
-    }
-    graphics->render(scene, camera, render_target);
-    glfwSwapBuffers(window);
-    fps_time_accumulator += elapsed_time;
-    ++fps_frame_accumulator;
-    if (elapsed_time > worst_frame_time) {
-      worst_frame_time = elapsed_time;
-    }
-    while (fps_time_accumulator >= 1.0) {
-      std::cout << "frames per second: " << fps_frame_accumulator << std::endl;
-      std::cout << "worst frame time: " << worst_frame_time << std::endl;
-      std::cout << "running for " << glfwGetTime() << " seconds" << std::endl;
-      fps_time_accumulator -= 1.0;
-      fps_frame_accumulator = 0;
-      worst_frame_time = 0.0;
+      _cotton_box_manager->create(
+          {.position = math::Vec3f{_box_spawn_offset_x,
+                                   _box_spawn_height,
+                                   _box_spawn_offset_z},
+           .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+           .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                                  math::deg_to_rad(90.0f)),
+           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
+      // std::cout << "box count: " << _box_count << "\n";
     }
   }
-}
 
-int main() {
-  client::Shared_glfw_instance const glfw;
-  auto const window = create_window();
-  auto const graphics = create_graphics(window.get());
-  glfwSwapInterval(0);
-  auto const resources = create_resources(graphics.get());
-  auto const scene = graphics->create_scene_unique({});
-  auto const camera = graphics->create_camera_unique(
-      {.zoom = math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f,
-       .near_plane_distance = 0.01f,
-       .far_plane_distance = 1000.0f,
-       .position = {-10.0f, 3.5f, 10.0f},
-       .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                              math::deg_to_rad(-45.0f)) *
-                      math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
-                                              math::deg_to_rad(-12.0f))});
-  auto const ground_surface = graphics->create_surface_unique(
-      {.mesh = resources.cube_mesh.get(),
-       .material = resources.blue_material.get(),
-       .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
-                                  {0.0f, 100.0f, 0.0f, -100.0f},
-                                  {0.0f, 0.0f, 100.0f, 0.0f}}});
-  scene->add_surface(ground_surface.get());
-  physics::Space space{{.gravitational_acceleration = {0.0f, -9.8f, 0.0f}}};
-  physics::Material const physics_material{.static_friction_coefficient = 0.4f,
-                                           .dynamic_friction_coefficient = 0.3f,
-                                           .restitution_coefficient = 0.1f};
-  physics::Box ground_shape{{100.0f, 0.5f, 100.0f}};
-  physics::Ball ball_shape{0.5f};
-  physics::Box brick_box_shape{{1.0f, 1.0f, 1.0f}};
-  physics::Box cotton_box_shape{{0.3f, 0.3f, 0.3f}};
-  space.create_static_body({.shape = ground_shape,
-                                  .material = physics_material,
-                                  .position = math::Vec3f{0.0f, -0.5f, 0.0f}});
-  client::Static_prop_manager red_ball_manager{
-      {.graphics = graphics.get(),
-       .scene = scene.get(),
-       .surface_mesh = resources.high_quality_sphere_mesh.get(),
-       .surface_material = resources.red_material.get(),
-       .surface_pretransform = math::Mat3x4f{{0.5f, 0.0f, 0.0f, 0.0f},
-                                             {0.0f, 0.5f, 0.0f, 0.0f},
-                                             {0.0f, 0.0f, 0.5f, 0.0f}},
-       .space = &space,
-       .body_shape = ball_shape,
-       .body_material = {.static_friction_coefficient = 0.2f,
-                         .dynamic_friction_coefficient = 0.1f,
-                         .restitution_coefficient = 0.3f}}};
-  client::Static_prop_manager brick_box_manager{
-      {.graphics = graphics.get(),
-       .scene = scene.get(),
-       .surface_mesh = resources.cube_mesh.get(),
-       .surface_material = resources.brick_material.get(),
-       .space = &space,
-       .body_shape = brick_box_shape,
-       .body_material = physics_material}};
-  client::Dynamic_prop_manager cotton_box_manager{
-      {.graphics = graphics.get(),
-       .scene = scene.get(),
-       .surface_mesh = resources.cube_mesh.get(),
-       .surface_material = resources.striped_cotton_material.get(),
-       .surface_pretransform =
-           math::Mat3x4f{{cotton_box_shape.half_extents[0], 0.0f, 0.0f, 0.0f},
-                         {0.0f, cotton_box_shape.half_extents[1], 0.0f, 0.0f},
-                         {0.0f, 0.0f, cotton_box_shape.half_extents[2], 0.0f}},
-       .space = &space,
-       .body_mass = 80.0f,
-       .body_inertia_tensor =
-           80.0f * physics::solid_inertia_tensor(cotton_box_shape),
-       .body_shape = cotton_box_shape,
-       .body_material = {.static_friction_coefficient = 0.3f,
-                         .dynamic_friction_coefficient = 0.2f,
-                         .restitution_coefficient = 0.2f}}};
-  client::Test_entity_manager test_entity_manager{
-      {.graphics = graphics.get(),
-       .scene = scene.get(),
-       .surface_mesh = resources.low_quality_sphere_mesh.get(),
-       .surface_material = resources.particle_material.get(),
-       .space = &space}};
-  red_ball_manager.create({.position = {-1.5f, 0.5f, -1.5f}});
-  red_ball_manager.create({.position = {1.5f, 0.5f, 1.5f}});
-  // brick_box_manager.create(
-  //     {.position = {0.0f, 10.0f, 0.0f},
-  //      .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-  //                                             math::deg_to_rad(-45.0f)) *
-  //                     math::Quatf::axis_angle(math::Vec3f{0.0f, 0.0f, 1.0f},
-  //                                             math::deg_to_rad(45.0f))});
-  // cotton_box_manager.create(
-  //     {.position = math::Vec3f{0.0f, 1.5f, 0.0f},
-  //      .angular_velocity = math::Vec3f{0.0f, 10.0f, 0.0f}});
-  // cotton_box_manager.create(
-  //     {.position = math::Vec3f{0.0f, 3.5f, 0.0f},
-  //      .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},
-  //      .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
-  // cotton_box_manager.create(
-  //     {.position = math::Vec3f{3.0f, 1.5f, 3.0f},
-  //      .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},
-  //      .orientation = math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
-  //                                             math::deg_to_rad(90.0f)),
-  //      .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
-  // cotton_box_manager.create(
-  //     {.position = math::Vec3f{-3.0f, 1.5f, -3.0f},
-  //      .velocity = math::Vec3f{0.0f, 7.0f, 0.0f},
-  //      .orientation = math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
-  //                                             math::deg_to_rad(90.0f)),
-  //      .angular_velocity = math::Vec3f{0.0f, 20.0f, 0.0f}});
-  // graphics->apply_scene_diff(scene_diff.get());
-  auto const render_target = graphics->get_default_render_target();
-  run_game_loop(window.get(),
-                graphics.get(),
-                render_target,
-                scene.get(),
-                camera.get(),
-                &space,
-                &cotton_box_manager,
-                &test_entity_manager);
-  return 0;
-}
+private:
+  Resources _resources;
+  std::unique_ptr<client::Static_prop_manager> _red_ball_manager;
+  std::unique_ptr<client::Dynamic_prop_manager> _cotton_box_manager;
+  graphics::Unique_surface_ptr _ground_surface;
+  int _box_count;
+  double _box_spawn_timer;
+  float _box_spawn_height;
+  float _box_spawn_offset_x;
+  float _box_spawn_offset_z;
+};
+
+int main() { return Client{}.run(); }

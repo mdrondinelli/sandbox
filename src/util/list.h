@@ -148,18 +148,18 @@ std::pair<Block, List<T>> make_list(Allocator &allocator,
 }
 
 template <typename T, typename Allocator = Polymorphic_allocator>
-class Dynamic_list {
+class Allocating_list {
 public:
   using Iterator = typename List<T>::Iterator;
   using Const_iterator = typename List<T>::Const_iterator;
 
-  Dynamic_list() : _allocator{} { _impl.construct(); }
+  Allocating_list() : _allocator{} { _impl.construct(); }
 
-  explicit Dynamic_list(const Allocator &allocator) : _allocator{allocator} {
+  explicit Allocating_list(const Allocator &allocator) : _allocator{allocator} {
     _impl.construct();
   }
 
-  ~Dynamic_list() {
+  ~Allocating_list() {
     if (_impl->max_size() != 0) {
       auto const block =
           make_block(_impl->data(), _impl->data() + _impl->max_size());

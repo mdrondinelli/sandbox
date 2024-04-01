@@ -3,10 +3,10 @@
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wlanguage-extension-token"
-#include <glad/glad.h>
+#include <glad/gl.h>
 #pragma clang diagnostic pop
 #else
-#include <glad/glad.h>
+#include <glad/gl.h>
 #endif
 
 #include "../../util/set.h"
@@ -61,7 +61,7 @@ struct Gl_scene::Impl {
     }
   }
 
-  util::Dynamic_set<Gl_surface *> surfaces{util::System_allocator::instance()};
+  util::Allocating_set<Gl_surface *> surfaces{util::System_allocator::instance()};
 };
 
 Gl_scene::Gl_scene(Scene_create_info const &) noexcept

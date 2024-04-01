@@ -158,14 +158,16 @@ public:
   explicit Set(Block block, std::size_t max_node_count) noexcept
       : Set{block, max_node_count, max_node_count} {}
 
-  explicit Set(Block block, std::size_t max_node_count,
+  explicit Set(Block block,
+               std::size_t max_node_count,
                std::size_t max_bucket_count) noexcept
       : Set{block.begin, max_node_count, max_bucket_count} {}
 
   explicit Set(void *block_begin, std::size_t max_node_count) noexcept
       : Set{block_begin, max_node_count, max_node_count} {}
 
-  explicit Set(void *block_begin, std::size_t max_node_count,
+  explicit Set(void *block_begin,
+               std::size_t max_node_count,
                std::size_t max_bucket_count) noexcept {
     max_bucket_count =
         std::bit_ceil(std::max(max_bucket_count, std::size_t{2}));
@@ -555,7 +557,8 @@ public:
   void rehash(std::size_t count) noexcept {
     auto const n =
         std::min(std::bit_ceil(std::max(
-                     {count, std::size_t{2},
+                     {count,
+                      std::size_t{2},
                       static_cast<std::size_t>(std::ceil(
                           _size / static_cast<double>(_max_load_factor)))})),
                  _buckets.capacity());
@@ -621,7 +624,9 @@ private:
   float _max_load_factor{1.0f};
 };
 
-template <typename T, typename Hash = Hash<T>, typename Equal = Equal<T>,
+template <typename T,
+          typename Hash = Hash<T>,
+          typename Equal = Equal<T>,
           typename Allocator>
 std::pair<Block, Set<T, Hash, Equal>> make_set(Allocator &allocator,
                                                std::size_t max_node_count,
@@ -631,32 +636,37 @@ std::pair<Block, Set<T, Hash, Equal>> make_set(Allocator &allocator,
   return {block, Set<T, Hash, Equal>{block, max_node_count, max_bucket_count}};
 }
 
-template <typename T, typename Hash = Hash<T>, typename Equal = Equal<T>,
+template <typename T,
+          typename Hash = Hash<T>,
+          typename Equal = Equal<T>,
           typename Allocator>
 std::pair<Block, Set<T, Hash, Equal>> make_set(Allocator &allocator,
                                                std::size_t max_node_count) {
-  return make_set<T, Hash, Equal, Allocator>(allocator, max_node_count,
-                                             max_node_count);
+  return make_set<T, Hash, Equal, Allocator>(
+      allocator, max_node_count, max_node_count);
 }
 
-template <typename T, typename Hash = Hash<T>, typename Equal = Equal<T>,
+template <typename T,
+          typename Hash = Hash<T>,
+          typename Equal = Equal<T>,
           typename Allocator = Polymorphic_allocator>
-class Dynamic_set {
+class Allocating_set {
 public:
   using Iterator = typename Set<T, Hash, Equal>::Iterator;
   using Const_iterator = typename Set<T, Hash, Equal>::Const_iterator;
 
-  Dynamic_set() { _impl.construct(); }
+  Allocating_set() { _impl.construct(); }
 
-  explicit Dynamic_set(Allocator const &allocator) : _allocator{allocator} {
+  explicit Allocating_set(Allocator const &allocator) : _allocator{allocator} {
     _impl.construct();
   }
 
-  ~Dynamic_set() {
+  ~Allocating_set() {
     if (_impl->max_size() != 0 || _impl->max_bucket_count() != 0) {
-      auto const block = make_block(
-          _impl->data(), Set<T, Hash, Equal>::memory_requirement(
-                             _impl->max_size(), _impl->max_bucket_count()));
+      auto const block =
+          make_block(_impl->data(),
+                     Set<T, Hash, Equal>::memory_requirement(
+                         _impl->max_size(), _impl->max_bucket_count()));
       _impl.destruct();
       _allocator.free(block);
     }
@@ -732,8 +742,9 @@ public:
 
   void rehash(std::size_t count) noexcept {
     auto const max_bucket_count = std::bit_ceil(
-        std::max(count, static_cast<std::size_t>(std::ceil(
-                            size() / static_cast<double>(max_load_factor())))));
+        std::max(count,
+                 static_cast<std::size_t>(std::ceil(
+                     size() / static_cast<double>(max_load_factor())))));
     auto const max_node_count = static_cast<std::size_t>(
         max_bucket_count * static_cast<double>(max_load_factor()));
     if (max_bucket_count > _impl->max_bucket_count() ||
@@ -746,9 +757,10 @@ public:
         temp.emplace(std::move(object));
       }
       if (_impl->max_bucket_count() > 0) {
-        auto const block = make_block(
-            _impl->data(), Set<T, Hash, Equal>::memory_requirement(
-                               _impl->max_size(), _impl->max_bucket_count()));
+        auto const block =
+            make_block(_impl->data(),
+                       Set<T, Hash, Equal>::memory_requirement(
+                           _impl->max_size(), _impl->max_bucket_count()));
         *_impl = std::move(temp);
         _allocator.free(block);
       } else {

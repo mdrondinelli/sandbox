@@ -3,10 +3,10 @@
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wlanguage-extension-token"
-#include <glad/glad.h>
+#include <glad/gl.h>
 #pragma clang diagnostic pop
 #else
-#include <glad/glad.h>
+#include <glad/gl.h>
 #endif
 
 namespace marlon {

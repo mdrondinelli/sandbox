@@ -1,4 +1,4 @@
-#include "space.h"
+#include "world.h"
 
 #include <cstdint>
 
@@ -1236,11 +1236,11 @@ private:
 auto constexpr max_rotational_displacement_factor = 0.2f;
 } // namespace
 
-class Space::Impl {
+class World::Impl {
 public:
-  friend class Space;
+  friend class World;
 
-  explicit Impl(Space_create_info const &create_info,
+  explicit Impl(World_create_info const &create_info,
                 std::unique_ptr<std::byte[]> system_allocation,
                 void *aabb_tree_block,
                 void *particle_particle_neighbor_pairs_block,
@@ -1255,8 +1255,8 @@ public:
                 void *particle_particle_contacts_block,
                 void *particle_rigid_body_contacts_block,
                 void *particle_static_body_contacts_block,
-                void *rigid_body_rigid_body_contacts_block,
-                void *rigid_body_static_body_contacts_block,
+                void *rigid_body_rigid_body_contact_pairs_block,
+                void *rigid_body_static_body_contact_pairs_block,
                 void *particle_particle_contact_ptrs_block,
                 void *particle_rigid_body_contact_ptrs_block,
                 void *particle_static_body_contact_ptrs_block,
@@ -1312,11 +1312,11 @@ public:
         _particle_static_body_contacts{
             particle_static_body_contacts_block,
             create_info.max_particle_static_body_neighbor_pairs},
-        _rigid_body_rigid_body_contacts{
-            rigid_body_rigid_body_contacts_block,
+        _rigid_body_rigid_body_contact_pairs{
+            rigid_body_rigid_body_contact_pairs_block,
             create_info.max_rigid_body_rigid_body_neighbor_pairs},
-        _rigid_body_static_body_contacts{
-            rigid_body_static_body_contacts_block,
+        _rigid_body_static_body_contact_pairs{
+            rigid_body_static_body_contact_pairs_block,
             create_info.max_rigid_body_static_body_neighbor_pairs},
         _particle_particle_contact_ptrs{
             particle_particle_contact_ptrs_block,
@@ -1421,7 +1421,7 @@ public:
     _static_bodies.free(handle);
   }
 
-  void simulate(Space_simulate_info const &simulate_info) {
+  void simulate(World_simulate_info const &simulate_info) {
     build_aabb_tree(simulate_info.delta_time);
     clear_neighbor_state();
     find_neighbor_pairs();
@@ -1878,7 +1878,7 @@ private:
           },
           _neighbor_groups.object(i));
     }
-    assign_contact_ptrs();
+    assign_neighbor_group_contact_ptrs();
     for (auto i = group_begin; i != group_end; ++i) {
       std::visit(
           [&](auto &&object) {
@@ -2144,8 +2144,10 @@ private:
     _particle_particle_contacts.clear();
     _particle_rigid_body_contacts.clear();
     _particle_static_body_contacts.clear();
-    _rigid_body_rigid_body_contacts.clear();
-    _rigid_body_static_body_contacts.clear();
+    _rigid_body_rigid_body_contact_pairs.clear();
+    _rigid_body_static_body_contact_pairs.clear();
+    // _rigid_body_rigid_body_contacts.clear();
+    // _rigid_body_static_body_contacts.clear();
     _particle_particle_contact_ptrs.clear();
     _particle_rigid_body_contact_ptrs.clear();
     _particle_static_body_contact_ptrs.clear();
@@ -2277,17 +2279,17 @@ private:
                                      body_relative_contact_positions[1]));
       auto const separating_velocity =
           dot(relative_velocity, contact_geometry->normal);
-      _rigid_body_rigid_body_contacts.push_back(
-          {contact_geometry->normal,
-           contact_geometry->separation,
-           separating_velocity,
-           {objects.first, objects.second},
-           body_relative_contact_positions});
       auto const contact_count = _contact_cache.update(
-          _rigid_body_rigid_body_contacts.back(), _rigid_bodies);
+          Rigid_body_rigid_body_contact{contact_geometry->normal,
+                                        contact_geometry->separation,
+                                        separating_velocity,
+                                        {objects.first, objects.second},
+                                        body_relative_contact_positions},
+          _rigid_bodies);
       for (auto i = 0; i != 2; ++i) {
         data[i]->rigid_body_contact_count += contact_count;
       }
+      _rigid_body_rigid_body_contact_pairs.emplace_back(objects);
       return true;
     } else {
       _contact_cache.clear(objects);
@@ -2317,16 +2319,16 @@ private:
                 rigid_body_relative_contact_position);
       auto const separating_velocity =
           dot(relative_velocity, contact_geometry->normal);
-      _rigid_body_static_body_contacts.push_back(
-          {contact_geometry->normal,
-           contact_geometry->separation,
-           separating_velocity,
-           objects.first,
-           objects.second,
-           rigid_body_relative_contact_position});
       auto const contact_count = _contact_cache.update(
-          _rigid_body_static_body_contacts.back(), _rigid_bodies);
+          Rigid_body_static_body_contact{contact_geometry->normal,
+                                         contact_geometry->separation,
+                                         separating_velocity,
+                                         objects.first,
+                                         objects.second,
+                                         rigid_body_relative_contact_position},
+          _rigid_bodies);
       rigid_body_data->static_body_contact_count += contact_count;
+      _rigid_body_static_body_contact_pairs.emplace_back(objects);
       return true;
     } else {
       _contact_cache.clear(objects);
@@ -2365,7 +2367,7 @@ private:
         data->static_body_contact_count);
   }
 
-  void assign_contact_ptrs() {
+  void assign_neighbor_group_contact_ptrs() {
     for (auto &contact : _particle_particle_contacts) {
       for (auto i = 0; i != 2; ++i) {
         auto const data = _particles.data(contact.particles[i]);
@@ -2388,24 +2390,22 @@ private:
           ->static_body_contacts[particle_data->static_body_contact_count++] =
           &contact;
     }
-    for (auto const &new_contact : _rigid_body_rigid_body_contacts) {
-      auto const data = std::array<Rigid_body_data *, 2>{
-          _rigid_bodies.data(new_contact.bodies[0]),
-          _rigid_bodies.data(new_contact.bodies[1])};
-      for (auto &cached_contact : _contact_cache.get_contacts(
-               {new_contact.bodies[0], new_contact.bodies[1]})) {
+    for (auto const &pair : _rigid_body_rigid_body_contact_pairs) {
+      for (auto &contact : _contact_cache.get_contacts(pair)) {
+        auto const data = std::array<Rigid_body_data *, 2>{
+            _rigid_bodies.data(contact.bodies[0]),
+            _rigid_bodies.data(contact.bodies[1])};
         for (auto i = 0; i != 2; ++i) {
           data[i]->rigid_body_contacts[data[i]->rigid_body_contact_count++] =
-              &cached_contact;
+              &contact;
         }
       }
     }
-    for (auto const &new_contact : _rigid_body_static_body_contacts) {
-      auto const data = _rigid_bodies.data(new_contact.rigid_body);
-      for (auto &cached_contact : _contact_cache.get_contacts(
-               {new_contact.rigid_body, new_contact.static_body})) {
+    for (auto const &pair : _rigid_body_static_body_contact_pairs) {
+      for (auto &contact : _contact_cache.get_contacts(pair)) {
+        auto const data = _rigid_bodies.data(contact.rigid_body);
         data->static_body_contacts[data->static_body_contact_count++] =
-            &cached_contact;
+            &contact;
       }
     }
   }
@@ -3420,8 +3420,10 @@ private:
   List<Particle_particle_contact> _particle_particle_contacts;
   List<Particle_rigid_body_contact> _particle_rigid_body_contacts;
   List<Particle_static_body_contact> _particle_static_body_contacts;
-  List<Rigid_body_rigid_body_contact> _rigid_body_rigid_body_contacts;
-  List<Rigid_body_static_body_contact> _rigid_body_static_body_contacts;
+  List<std::pair<Rigid_body_handle, Rigid_body_handle>>
+      _rigid_body_rigid_body_contact_pairs;
+  List<std::pair<Rigid_body_handle, Static_body_handle>>
+      _rigid_body_static_body_contact_pairs;
   List<Particle_particle_contact *> _particle_particle_contact_ptrs;
   List<Particle_rigid_body_contact *> _particle_rigid_body_contact_ptrs;
   List<Particle_static_body_contact *> _particle_static_body_contact_ptrs;
@@ -3433,7 +3435,7 @@ private:
   Vec3f _gravitational_acceleration;
 };
 
-Space::Space(Space_create_info const &create_info)
+World::World(World_create_info const &create_info)
     : _impl{[&]() {
         auto const aabb_tree_memory_requirement =
             decltype(Impl::_aabb_tree)::memory_requirement(
@@ -3484,11 +3486,12 @@ Space::Space(Space_create_info const &create_info)
         auto const particle_static_body_contacts_memory_requirement =
             decltype(Impl::_particle_static_body_contacts)::memory_requirement(
                 create_info.max_particle_static_body_neighbor_pairs);
-        auto const rigid_body_rigid_body_contacts_memory_requirement =
-            decltype(Impl::_rigid_body_rigid_body_contacts)::memory_requirement(
-                create_info.max_rigid_body_rigid_body_neighbor_pairs);
-        auto const rigid_body_static_body_contacts_memory_requirement =
-            decltype(Impl::_rigid_body_static_body_contacts)::
+        auto const rigid_body_rigid_body_contact_pairs_memory_requirement =
+            decltype(Impl::_rigid_body_rigid_body_contact_pairs)::
+                memory_requirement(
+                    create_info.max_rigid_body_rigid_body_neighbor_pairs);
+        auto const rigid_body_static_body_contact_pairs_memory_requirement =
+            decltype(Impl::_rigid_body_static_body_contact_pairs)::
                 memory_requirement(
                     create_info.max_rigid_body_static_body_neighbor_pairs);
         auto const particle_particle_contact_pointers_memory_requirement =
@@ -3535,8 +3538,8 @@ Space::Space(Space_create_info const &create_info)
                  particle_particle_contacts_memory_requirement,
                  particle_rigid_body_contacts_memory_requirement,
                  particle_static_body_contacts_memory_requirement,
-                 rigid_body_rigid_body_contacts_memory_requirement,
-                 rigid_body_static_body_contacts_memory_requirement,
+                 rigid_body_rigid_body_contact_pairs_memory_requirement,
+                 rigid_body_static_body_contact_pairs_memory_requirement,
                  particle_particle_contact_pointers_memory_requirement,
                  particle_rigid_body_contact_pointers_memory_requirement,
                  particle_static_body_contact_pointers_memory_requirement,
@@ -3577,9 +3580,11 @@ Space::Space(Space_create_info const &create_info)
                 .begin,
             allocator.alloc(particle_static_body_contacts_memory_requirement)
                 .begin,
-            allocator.alloc(rigid_body_rigid_body_contacts_memory_requirement)
+            allocator
+                .alloc(rigid_body_rigid_body_contact_pairs_memory_requirement)
                 .begin,
-            allocator.alloc(rigid_body_static_body_contacts_memory_requirement)
+            allocator
+                .alloc(rigid_body_static_body_contact_pairs_memory_requirement)
                 .begin,
             allocator
                 .alloc(particle_particle_contact_pointers_memory_requirement)
@@ -3603,36 +3608,36 @@ Space::Space(Space_create_info const &create_info)
             allocator.alloc(contact_cache_memory_requirement).begin);
       }()} {}
 
-Space::~Space() {}
+World::~World() {}
 
 Particle_handle
-Space::create_particle(Particle_create_info const &create_info) {
+World::create_particle(Particle_create_info const &create_info) {
   return _impl->create_particle(create_info);
 }
 
-void Space::destroy_particle(Particle_handle particle) {
+void World::destroy_particle(Particle_handle particle) {
   _impl->destroy_particle(particle);
 }
 
-Static_body_handle Space::create_static_body(
-    Static_body_create_info const &create_info) {
+Static_body_handle
+World::create_static_body(Static_body_create_info const &create_info) {
   return _impl->create_static_rigid_body(create_info);
 }
 
-void Space::destroy_static_body(Static_body_handle static_rigid_body) {
+void World::destroy_static_body(Static_body_handle static_rigid_body) {
   _impl->destroy_static_rigid_body(static_rigid_body);
 }
 
-Rigid_body_handle Space::create_rigid_body(
-    Rigid_body_create_info const &create_info) {
+Rigid_body_handle
+World::create_rigid_body(Rigid_body_create_info const &create_info) {
   return _impl->create_dynamic_rigid_body(create_info);
 }
 
-void Space::destroy_rigid_body(Rigid_body_handle handle) {
+void World::destroy_rigid_body(Rigid_body_handle handle) {
   _impl->destroy_dynamic_rigid_body(handle);
 }
 
-void Space::simulate(Space_simulate_info const &simulate_info) {
+void World::simulate(World_simulate_info const &simulate_info) {
   return _impl->simulate(simulate_info);
 }
 } // namespace physics

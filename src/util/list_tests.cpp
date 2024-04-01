@@ -10,8 +10,8 @@ namespace util {
 //   alignas(16) std::array<std::byte, 1024> memory;
 //   make_block(memory.data(), memory.size());
 // }
-TEST_CASE("Dynamic_list") {
-  auto a = Dynamic_list<int>{System_allocator::instance()};
+TEST_CASE("Allocating_list") {
+  auto a = Allocating_list<int>{System_allocator::instance()};
   for (int i = 0; i < 100000; ++i) {
     a.emplace_back(i);
   }

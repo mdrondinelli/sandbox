@@ -16,7 +16,7 @@ struct Static_prop_manager_create_info {
   graphics::Mesh *surface_mesh{};
   graphics::Material *surface_material{};
   math::Mat3x4f surface_pretransform{math::Mat3x4f::identity()};
-  physics::Space *space;
+  physics::World *space;
   physics::Shape body_shape;
   physics::Material body_material;
 };
@@ -46,7 +46,7 @@ private:
   graphics::Mesh *_surface_mesh;
   graphics::Material *_surface_material;
   math::Mat3x4f _surface_pretransform_3x4;
-  physics::Space *_space;
+  physics::World *_space;
   physics::Shape _body_shape;
   physics::Material _body_material;
   std::unordered_map<std::uint64_t, Entity> _entities;

@@ -9,13 +9,12 @@
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wlanguage-extension-token"
-#include <glad/glad.h>
+#include <glad/gl.h>
 #pragma clang diagnostic pop
 #else
-#include <glad/glad.h>
+#include <glad/gl.h>
 #endif
 
-#include "camera.h"
 #include "material.h"
 #include "mesh.h"
 #include "scene.h"
@@ -75,10 +74,15 @@ void main() {
 )";
 } // namespace
 
-Gl_graphics::Gl_graphics()
-    : _default_render_target{std::make_unique<Gl_default_render_target>()},
-      _shader_program{gl_make_unique_shader_program()},
-      _default_base_color_texture{gl_make_unique_texture(GL_TEXTURE_2D)} {
+Gl_graphics::Gl_graphics(Gl_graphics_create_info const &create_info) {
+  if (gladLoadGL(create_info.function_loader) == 0) {
+    throw std::runtime_error{"Failed to load OpenGL functions."};
+  } 
+  _default_render_target = std::make_unique<Gl_default_render_target>(
+      Gl_default_render_target_create_info{
+          .window = create_info.window,
+      });
+  _shader_program = gl_make_unique_shader_program();
   GLint status;
   auto const vertex_shader{gl_make_unique_shader(GL_VERTEX_SHADER)};
   glShaderSource(vertex_shader.get(), 1, &vert_src, nullptr);
@@ -118,10 +122,17 @@ Gl_graphics::Gl_graphics()
     glGetProgramInfoLog(_shader_program.get(), log_size, nullptr, log.data());
     throw std::runtime_error{log.data()};
   }
+  _default_base_color_texture = gl_make_unique_texture(GL_TEXTURE_2D);
   auto const default_base_color_texture_pixels =
       std::array<std::uint8_t, 4>{0xFF, 0xFF, 0xFF, 0xFF};
   glTextureStorage2D(_default_base_color_texture.get(), 1, GL_RGBA8, 1, 1);
-  glTextureSubImage2D(_default_base_color_texture.get(), 0, 0, 0, 1, 1, GL_RGBA,
+  glTextureSubImage2D(_default_base_color_texture.get(),
+                      0,
+                      0,
+                      0,
+                      1,
+                      1,
+                      GL_RGBA,
                       GL_UNSIGNED_BYTE,
                       default_base_color_texture_pixels.data());
 }
@@ -167,14 +178,6 @@ void Gl_graphics::destroy_surface(Surface *surface) noexcept {
   delete static_cast<Gl_surface *>(surface);
 }
 
-Camera *Gl_graphics::create_camera(Camera_create_info const &create_info) {
-  return new Gl_camera{create_info};
-}
-
-void Gl_graphics::destroy_camera(Camera *camera) noexcept {
-  delete static_cast<Gl_camera *>(camera);
-}
-
 Render_target *Gl_graphics::get_default_render_target() noexcept {
   return _default_render_target.get();
 }
@@ -183,25 +186,81 @@ void Gl_graphics::destroy_render_target(Render_target *) noexcept {
   // delete static_cast<Gl_render_target *>(target);
 }
 
-void Gl_graphics::render(Scene *source_scene, Camera *source_camera_instance,
-                         Render_target *target) {
-  auto const gl_source_scene = static_cast<Gl_scene *>(source_scene);
-  auto const gl_source_camera_instance =
-      static_cast<Gl_camera *>(source_camera_instance);
-  auto const gl_target = static_cast<Gl_render_target *>(target);
-  auto const view_matrix_3x4 = gl_source_camera_instance->get_view_matrix();
+namespace {
+math::Mat3x4f calculate_view_matrix(math::Vec3f const &position,
+                                    math::Quatf const &orientation) {
+  auto const upper_left_inv =
+      math::Mat3x3f{{(1.0f - 2.0f * orientation.v.y * orientation.v.y -
+                      2.0f * orientation.v.z * orientation.v.z),
+                     (2.0f * orientation.v.x * orientation.v.y +
+                      2.0f * orientation.w * orientation.v.z),
+                     (2.0f * orientation.v.x * orientation.v.z -
+                      2.0f * orientation.w * orientation.v.y)},
+                    {(2.0f * orientation.v.x * orientation.v.y -
+                      2.0f * orientation.w * orientation.v.z),
+                     (1.0f - 2.0f * orientation.v.x * orientation.v.x -
+                      2.0f * orientation.v.z * orientation.v.z),
+                     (2.0f * orientation.v.y * orientation.v.z +
+                      2.0f * orientation.w * orientation.v.x)},
+                    {(2.0f * orientation.v.x * orientation.v.z +
+                      2.0f * orientation.w * orientation.v.y),
+                     (2.0f * orientation.v.y * orientation.v.z -
+                      2.0f * orientation.w * orientation.v.x),
+                     (1.0f - 2.0f * orientation.v.x * orientation.v.x -
+                      2.0f * orientation.v.y * orientation.v.y)}};
+  return math::Mat3x4f{{upper_left_inv[0][0],
+                        upper_left_inv[0][1],
+                        upper_left_inv[0][2],
+                        -(upper_left_inv[0] * position)},
+                       {upper_left_inv[1][0],
+                        upper_left_inv[1][1],
+                        upper_left_inv[1][2],
+                        -(upper_left_inv[1] * position)},
+                       {upper_left_inv[2][0],
+                        upper_left_inv[2][1],
+                        upper_left_inv[2][2],
+                        -(upper_left_inv[2] * position)}};
+}
+
+math::Mat4x4f calculate_clip_matrix(math::Vec2f const &zoom,
+                                    float near_plane_distance,
+                                    float far_plane_distance) {
+  return math::Mat4x4f{{zoom.x, 0.0f, 0.0f, 0.0f},
+                       {0.0f, zoom.y, 0.0f, 0.0f},
+                       {0.0f,
+                        0.0f,
+                        -(far_plane_distance + near_plane_distance) /
+                            (far_plane_distance - near_plane_distance),
+                        -2.0f * near_plane_distance * far_plane_distance /
+                            (far_plane_distance - near_plane_distance)},
+                       {0.0f, 0.0f, -1.0f, 0.0f}};
+}
+} // namespace
+
+void Gl_graphics::render(Render_info const &info) {
+  auto const gl_source_scene = static_cast<Gl_scene *>(info.source);
+  auto const gl_target = static_cast<Gl_render_target *>(info.target);
+  auto const view_matrix_3x4 =
+      calculate_view_matrix(info.position, info.orientation);
   auto const view_matrix_4x4 =
       math::Mat4x4f{view_matrix_3x4, {0.0f, 0.0f, 0.0f, 1.0f}};
-  auto const clip_matrix = gl_source_camera_instance->get_clip_matrix();
+  auto const clip_matrix = calculate_clip_matrix(
+      info.zoom, info.near_plane_distance, info.far_plane_distance);
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_FRAMEBUFFER_SRGB);
   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
+  auto const viewport_extents = gl_target->get_extents();
+  glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glUseProgram(_shader_program.get());
-  gl_source_scene->draw_surfaces(
-      _shader_program.get(), _default_base_color_texture.get(), 0, 1, 2,
-      view_matrix_4x4, clip_matrix * view_matrix_4x4);
+  gl_source_scene->draw_surfaces(_shader_program.get(),
+                                 _default_base_color_texture.get(),
+                                 0,
+                                 1,
+                                 2,
+                                 view_matrix_4x4,
+                                 clip_matrix * view_matrix_4x4);
 }
 } // namespace graphics
 } // namespace marlon

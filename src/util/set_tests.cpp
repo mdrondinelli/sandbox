@@ -61,8 +61,8 @@ TEST_CASE("marlon::util::Set") {
     REQUIRE(b);
   }
 }
-TEST_CASE("marlon::util::Dynamic_set") {
-  auto set = Dynamic_set<int>{System_allocator::instance()};
+TEST_CASE("marlon::util::Allocating_set") {
+  auto set = Allocating_set<int>{System_allocator::instance()};
   REQUIRE(set.begin() == set.cbegin());
   REQUIRE(set.end() == set.cend());
   REQUIRE(set.begin() == set.end());

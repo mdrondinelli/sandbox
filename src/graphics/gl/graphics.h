@@ -7,12 +7,26 @@
 #include "default_render_target.h"
 #include "unique_shader_program_handle.h"
 #include "unique_texture_handle.h"
+#include "window.h"
 
 namespace marlon {
 namespace graphics {
+using Gl_function = void (*)();
+
+using Gl_function_loader = Gl_function (*)(char const *);
+
+struct Gl_graphics_create_info {
+  Gl_function_loader function_loader;
+  Gl_window const *window;
+};
+
 class Gl_graphics : public Graphics {
 public:
-  Gl_graphics();
+  explicit Gl_graphics(Gl_graphics_create_info const &create_info);
+
+  Gl_graphics(Gl_graphics const &other) = delete;
+
+  Gl_graphics &operator=(Gl_graphics const &other) = delete;
 
   Mesh *create_mesh(Mesh_create_info const &create_info) final;
 
@@ -34,16 +48,11 @@ public:
 
   void destroy_surface(Surface *surface) noexcept final;
 
-  Camera *create_camera(Camera_create_info const &create_info) final;
-
-  void destroy_camera(Camera *camera) noexcept final;
-
   Render_target *get_default_render_target() noexcept;
 
   void destroy_render_target(Render_target *target) noexcept final;
 
-  void render(Scene *source_scene, Camera *source_camera_instance,
-              Render_target *target) final;
+  void render(Render_info const &info) final;
 
 private:
   std::unique_ptr<Gl_default_render_target> _default_render_target;

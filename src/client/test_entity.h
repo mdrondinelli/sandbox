@@ -18,7 +18,7 @@ struct Test_entity_manager_create_info {
   graphics::Scene *scene;
   graphics::Mesh *surface_mesh;
   graphics::Material *surface_material;
-  physics::Space *space;
+  physics::World *space;
 };
 
 struct Test_entity_create_info {};
@@ -50,7 +50,7 @@ private:
   graphics::Scene *_scene;
   graphics::Mesh *_surface_mesh;
   graphics::Material *_surface_material;
-  physics::Space *_space;
+  physics::World *_space;
   std::mt19937 _random_number_engine;
   std::unordered_map<std::uint64_t, Entity> _entities;
   std::uint64_t _next_entity_reference_value;
