@@ -7,14 +7,15 @@
 #include "../graphics/graphics.h"
 #include "../physics/physics.h"
 #include "camera.h"
+#include "window.h"
 
 namespace marlon {
 namespace engine {
 struct App_create_info {
-  physics::World_create_info physics_world_create_info;
-  physics::World_simulate_info physics_world_simulate_info;
-  math::Vec2i default_window_extents{1280, 720};
-  std::string_view default_window_title{"app"};
+  physics::World_create_info world_create_info;
+  physics::World_simulate_info world_simulate_info;
+  math::Vec2i window_extents{1280, 720};
+  std::string_view window_title{"app"};
   Camera_create_info camera_create_info;
 };
 
@@ -29,31 +30,44 @@ public:
 protected:
   physics::World *get_world() noexcept;
 
+  Window *get_window() noexcept;
+
+  Camera *get_camera() noexcept;
+
   graphics::Graphics *get_graphics() noexcept;
 
   graphics::Scene *get_scene() noexcept;
 
-  Camera *get_camera() noexcept;
+  double get_delta_time() const noexcept;
 
   virtual void pre_loop() {}
 
   virtual void post_loop() {}
 
+  virtual void pre_input() {}
+
+  virtual void post_input() {}
+
   virtual void pre_physics() {}
 
   virtual void post_physics() {}
+
+  virtual void pre_render() {}
+
+  virtual void post_render() {}
 
 private:
   class Runtime;
 
   void loop();
 
-  physics::World_create_info _physics_world_create_info;
-  physics::World_simulate_info _physics_world_simulate_info;
-  math::Vec2i _default_window_extents;
-  std::string _default_window_title;
+  physics::World_create_info _world_create_info;
+  physics::World_simulate_info _world_simulate_info;
+  math::Vec2i _window_extents;
+  std::string _window_title;
   Camera_create_info _camera_create_info;
   std::unique_ptr<Runtime> _runtime;
+  double _delta_time;
 };
 } // namespace engine
 } // namespace marlon

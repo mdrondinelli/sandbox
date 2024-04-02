@@ -1,5 +1,6 @@
 #include "app.h"
 
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
 
@@ -78,10 +79,10 @@ private:
 };
 
 App::App(App_create_info const &create_info)
-    : _physics_world_create_info{create_info.physics_world_create_info},
-      _physics_world_simulate_info{create_info.physics_world_simulate_info},
-      _default_window_extents{create_info.default_window_extents},
-      _default_window_title{create_info.default_window_title},
+    : _world_create_info{create_info.world_create_info},
+      _world_simulate_info{create_info.world_simulate_info},
+      _window_extents{create_info.window_extents},
+      _window_title{create_info.window_title},
       _camera_create_info{create_info.camera_create_info} {}
 
 App::~App() {}
@@ -90,13 +91,12 @@ int App::run() {
   assert(_runtime == nullptr);
   auto result = 0;
   try {
-    _runtime =
-        std::make_unique<Runtime>(_physics_world_create_info,
-                                  Window_create_info{
-                                      .extents = _default_window_extents,
-                                      .title = _default_window_title.c_str(),
-                                  },
-                                  _camera_create_info);
+    _runtime = std::make_unique<Runtime>(_world_create_info,
+                                         Window_create_info{
+                                             .extents = _window_extents,
+                                             .title = _window_title.c_str(),
+                                         },
+                                         _camera_create_info);
     pre_loop();
     loop();
     post_loop();
@@ -113,37 +113,47 @@ int App::run() {
 
 physics::World *App::get_world() noexcept { return _runtime->get_world(); }
 
+Window *App::get_window() noexcept { return _runtime->get_window(); }
+
+Camera *App::get_camera() noexcept { return _runtime->get_camera(); }
+
 graphics::Graphics *App::get_graphics() noexcept {
   return _runtime->get_graphics();
 }
 
 graphics::Scene *App::get_scene() noexcept { return _runtime->get_scene(); }
 
-Camera *App::get_camera() noexcept { return _runtime->get_camera(); }
+double App::get_delta_time() const noexcept { return _delta_time; }
 
 void App::loop() {
-  auto previous_time = glfwGetTime();
-  auto accumulated_time = 0.0;
+  using clock = std::chrono::high_resolution_clock;
+  using duration = std::chrono::duration<double>;
+  _delta_time = 0.0;
+  auto previous_time = clock::now();
+  auto elapsed_time = 0.0;
   for (;;) {
+    auto const current_time = clock::now();
+    _delta_time =
+        std::chrono::duration_cast<duration>(current_time - previous_time)
+            .count();
+    previous_time = current_time;
+    elapsed_time += _delta_time;
+    _runtime->get_window()->pre_input();
+    pre_input();
     glfwPollEvents();
-    if (glfwWindowShouldClose(_runtime->get_window()->get_glfw_window())) {
+    if (_runtime->get_window()->should_close()) {
       break;
     }
-    auto const current_time = glfwGetTime();
-    auto const elapsed_time = current_time - previous_time;
-    previous_time = current_time;
-    accumulated_time += elapsed_time;
-    auto render_required = false;
-    while (accumulated_time > _physics_world_simulate_info.delta_time) {
-      accumulated_time -= _physics_world_simulate_info.delta_time;
-      render_required = true;
+    post_input();
+    if (elapsed_time >= _world_simulate_info.delta_time) {
+      elapsed_time -= _world_simulate_info.delta_time;
       pre_physics();
-      _runtime->get_world()->simulate(_physics_world_simulate_info);
+      _runtime->get_world()->simulate(_world_simulate_info);
       post_physics();
     }
-    if (render_required) {
-      _runtime->render();
-    }
+    pre_render();
+    _runtime->render();
+    post_render();
   }
 }
 } // namespace engine

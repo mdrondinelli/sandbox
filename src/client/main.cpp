@@ -9,6 +9,8 @@
 #include "../graphics/graphics.h"
 
 using namespace marlon;
+using enum engine::Key;
+using enum engine::Mouse_button;
 
 struct Vertex {
   math::Vec3f position;
@@ -208,15 +210,15 @@ class Client : public engine::App {
 public:
   Client()
       : App{{
-            .physics_world_create_info =
+            .world_create_info =
                 {
                     .gravitational_acceleration = {0.0f, -9.8f, 0.0f},
                 },
-            .physics_world_simulate_info =
+            .world_simulate_info =
                 {
                     .substep_count = 24,
                 },
-            .default_window_extents = {1600, 900},
+            .window_extents = {1600, 900},
         }} {}
 
   void pre_loop() final {
@@ -287,18 +289,54 @@ public:
                                     {0.0f, 0.0f, 100.0f, 0.0f}}});
     scene->add_surface(_ground_surface.get());
     camera->set_position({-10.0f, 3.5f, 10.0f});
-    camera->set_orientation(
-        math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                math::deg_to_rad(-45.0f)) *
-        math::Quatf::axis_angle(math::Vec3f{1.0f, 0.0f, 0.0f},
-                                math::deg_to_rad(-12.0f)));
     camera->set_zoom(math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f);
-    _box_count = 0;
-    _box_spawn_timer = 0.0;
-    _box_spawn_height = 0.5f;
-    _box_spawn_offset_x = 0.0f;
-    _box_spawn_offset_z = 0.0f;
     srand(25);
+  }
+
+  void post_input() final {
+    auto const window = get_window();
+    auto const camera = get_camera();
+    auto const dt = static_cast<float>(get_delta_time());
+    auto const rotation_matrix =
+        math::Mat3x3f::rotation(camera->get_orientation());
+    auto const right_vector = column(rotation_matrix, 0);
+    auto const forward_vector = -column(rotation_matrix, 2);
+    auto movement = math::Vec3f::zero();
+    if (window->is_key_pressed(k_w)) {
+      movement += forward_vector;
+    }
+    if (window->is_key_pressed(k_a)) {
+      movement -= right_vector;
+    }
+    if (window->is_key_pressed(k_s)) {
+      movement -= forward_vector;
+    }
+    if (window->is_key_pressed(k_d)) {
+      movement += right_vector;
+    }
+    if (window->is_key_pressed(k_e)) {
+      movement += math::Vec3f::y_axis();
+    }
+    if (window->is_key_pressed(k_q)) {
+      movement -= math::Vec3f::y_axis();
+    }
+    if (movement != math::Vec3f::zero()) {
+      movement = 8.0f * normalize(movement);
+    }
+    camera->set_position(camera->get_position() + movement * dt);
+    if (window->is_mouse_button_pressed(mb_right)) {
+      window->set_cursor_mode(engine::Cursor_mode::disabled);
+      _camera_yaw -= window->get_delta_cursor_position().x * 0.002f;
+      _camera_pitch -= window->get_delta_cursor_position().y * 0.002f;
+      _camera_pitch = std::clamp(_camera_pitch,
+                                 -0.5f * std::numbers::pi_v<float>,
+                                 0.5f * std::numbers::pi_v<float>);
+    } else {
+      window->set_cursor_mode(engine::Cursor_mode::normal);
+    }
+    camera->set_orientation(
+        math::Quatf::axis_angle(math::Vec3f::y_axis(), _camera_yaw) *
+        math::Quatf::axis_angle(math::Vec3f::x_axis(), _camera_pitch));
   }
 
   void post_physics() final {
@@ -316,15 +354,15 @@ public:
       if (_box_count == 768) {
         _box_spawn_timer = -1000000.0f;
       }
-      _cotton_box_manager->create(
-          {.position = math::Vec3f{_box_spawn_offset_x,
-                                   _box_spawn_height,
-                                   _box_spawn_offset_z},
-           .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-           .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                                  math::deg_to_rad(90.0f)),
-           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f}});
-      // std::cout << "box count: " << _box_count << "\n";
+      _cotton_box_manager->create({
+          .position = math::Vec3f{_box_spawn_offset_x,
+                                  _box_spawn_height,
+                                  _box_spawn_offset_z},
+          .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                                 math::deg_to_rad(90.0f)),
+          .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+      });
     }
   }
 
@@ -333,11 +371,13 @@ private:
   std::unique_ptr<client::Static_prop_manager> _red_ball_manager;
   std::unique_ptr<client::Dynamic_prop_manager> _cotton_box_manager;
   graphics::Unique_surface_ptr _ground_surface;
-  int _box_count;
-  double _box_spawn_timer;
-  float _box_spawn_height;
-  float _box_spawn_offset_x;
-  float _box_spawn_offset_z;
+  float _camera_yaw{math::deg_to_rad(-45.0f)};
+  float _camera_pitch{0.0f};
+  int _box_count{0};
+  double _box_spawn_timer{0.0};
+  float _box_spawn_height{0.5f};
+  float _box_spawn_offset_x{0.0f};
+  float _box_spawn_offset_z{0.0f};
 };
 
 int main() { return Client{}.run(); }
