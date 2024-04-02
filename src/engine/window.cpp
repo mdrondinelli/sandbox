@@ -15,6 +15,9 @@ Window::Window(Window_create_info const &create_info)
         return make_unique_glfw_window(
             create_info.extents.x, create_info.extents.y, create_info.title);
       }()} {
+  if (glfwRawMouseMotionSupported()) {
+    glfwSetInputMode(_glfw_window.get(), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+  }
   glfwSetWindowUserPointer(_glfw_window.get(), this);
   glfwSetCursorPosCallback(
       _glfw_window.get(), [](GLFWwindow *window, double x, double y) {
