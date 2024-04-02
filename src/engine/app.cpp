@@ -151,9 +151,7 @@ void App::loop() {
       _runtime->get_world()->simulate(_world_simulate_info);
       post_physics();
     }
-    pre_render();
     _runtime->render();
-    post_render();
   }
 }
 } // namespace engine

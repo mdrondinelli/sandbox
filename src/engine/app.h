@@ -52,10 +52,6 @@ protected:
 
   virtual void post_physics() {}
 
-  virtual void pre_render() {}
-
-  virtual void post_render() {}
-
 private:
   class Runtime;
 
