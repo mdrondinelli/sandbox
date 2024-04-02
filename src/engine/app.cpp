@@ -123,6 +123,10 @@ graphics::Graphics *App::get_graphics() noexcept {
 
 graphics::Scene *App::get_scene() noexcept { return _runtime->get_scene(); }
 
+bool App::is_looping() const noexcept { return _looping; }
+
+void App::stop_looping() noexcept { _looping = false; }
+
 double App::get_delta_time() const noexcept { return _delta_time; }
 
 void App::loop() {
@@ -131,7 +135,8 @@ void App::loop() {
   _delta_time = 0.0;
   auto previous_time = clock::now();
   auto elapsed_time = 0.0;
-  for (;;) {
+  _looping = true;
+  while (_looping) {
     auto const current_time = clock::now();
     _delta_time =
         std::chrono::duration_cast<duration>(current_time - previous_time)
@@ -141,9 +146,6 @@ void App::loop() {
     _runtime->get_window()->pre_input();
     pre_input();
     glfwPollEvents();
-    if (_runtime->get_window()->should_close()) {
-      break;
-    }
     post_input();
     if (elapsed_time >= _world_simulate_info.delta_time) {
       elapsed_time -= _world_simulate_info.delta_time;

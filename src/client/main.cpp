@@ -295,37 +295,41 @@ public:
 
   void post_input() final {
     auto const window = get_window();
+    if (window->should_close()) {
+      stop_looping();
+      return;
+    }
     auto const camera = get_camera();
-    auto const dt = static_cast<float>(get_delta_time());
-    auto const rotation_matrix =
-        math::Mat3x3f::rotation(camera->get_orientation());
-    auto const right_vector = column(rotation_matrix, 0);
-    auto const forward_vector = -column(rotation_matrix, 2);
-    auto movement = math::Vec3f::zero();
-    if (window->is_key_pressed(k_w)) {
-      movement += forward_vector;
-    }
-    if (window->is_key_pressed(k_a)) {
-      movement -= right_vector;
-    }
-    if (window->is_key_pressed(k_s)) {
-      movement -= forward_vector;
-    }
-    if (window->is_key_pressed(k_d)) {
-      movement += right_vector;
-    }
-    if (window->is_key_pressed(k_e)) {
-      movement += math::Vec3f::y_axis();
-    }
-    if (window->is_key_pressed(k_q)) {
-      movement -= math::Vec3f::y_axis();
-    }
-    if (movement != math::Vec3f::zero()) {
-      movement = 8.0f * normalize(movement);
-    }
-    camera->set_position(camera->get_position() + movement * dt);
     if (window->is_mouse_button_pressed(mb_right)) {
       window->set_cursor_mode(engine::Cursor_mode::disabled);
+      auto const rotation_matrix =
+          math::Mat3x3f::rotation(camera->get_orientation());
+      auto const right_vector = column(rotation_matrix, 0);
+      auto const forward_vector = -column(rotation_matrix, 2);
+      auto movement = math::Vec3f::zero();
+      if (window->is_key_pressed(k_w)) {
+        movement += forward_vector;
+      }
+      if (window->is_key_pressed(k_a)) {
+        movement -= right_vector;
+      }
+      if (window->is_key_pressed(k_s)) {
+        movement -= forward_vector;
+      }
+      if (window->is_key_pressed(k_d)) {
+        movement += right_vector;
+      }
+      if (window->is_key_pressed(k_e)) {
+        movement += math::Vec3f::y_axis();
+      }
+      if (window->is_key_pressed(k_q)) {
+        movement -= math::Vec3f::y_axis();
+      }
+      if (movement != math::Vec3f::zero()) {
+        movement = 8.0f * normalize(movement);
+      }
+      auto const dt = static_cast<float>(get_delta_time());
+      camera->set_position(camera->get_position() + movement * dt);
       _camera_yaw -= window->get_delta_cursor_position().x * 0.002f;
       _camera_pitch -= window->get_delta_cursor_position().y * 0.002f;
       _camera_pitch = std::clamp(_camera_pitch,

@@ -38,6 +38,10 @@ protected:
 
   graphics::Scene *get_scene() noexcept;
 
+  bool is_looping() const noexcept;
+
+  void stop_looping() noexcept;
+
   double get_delta_time() const noexcept;
 
   virtual void pre_loop() {}
@@ -63,7 +67,8 @@ private:
   std::string _window_title;
   Camera_create_info _camera_create_info;
   std::unique_ptr<Runtime> _runtime;
-  double _delta_time;
+  bool _looping{false};
+  double _delta_time{0.0};
 };
 } // namespace engine
 } // namespace marlon
