@@ -7,7 +7,10 @@
 
 namespace marlon {
 namespace graphics {
-struct Scene_create_info {};
+struct Scene_create_info {
+  std::size_t max_surfaces{10000};
+  std::size_t max_wireframes{10000};
+};
 
 class Scene;
 

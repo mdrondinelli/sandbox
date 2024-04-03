@@ -4,7 +4,10 @@
 #include <memory>
 
 #include "../../math/mat.h"
+#include "../../util/pool.h"
+#include "../../util/set.h"
 #include "../scene.h"
+#include "surface.h"
 
 namespace marlon {
 namespace graphics {
@@ -31,8 +34,11 @@ private:
                      std::int32_t base_color_tint_location,
                      math::Mat4x4f const &view_matrix,
                      math::Mat4x4f const &view_clip_matrix);
-
-  std::unique_ptr<Impl> _impl;
+  
+  util::Block _memory;
+  util::Pool<Gl_surface> _surface_pool;
+  util::Set<Gl_surface *> _surfaces;
+  // std::unique_ptr<Impl> _impl;
 };
 } // namespace graphics
 } // namespace marlon

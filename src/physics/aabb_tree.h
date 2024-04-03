@@ -59,11 +59,11 @@ public:
   }
 
   Node *create_leaf(Aabb const &bounds, Payload const &payload) {
-    auto const node = _leaf_node_pool.alloc();
+    auto const node = _leaf_node_pool.emplace();
     try {
       _leaf_node_set.emplace(node);
     } catch (...) {
-      _leaf_node_pool.free(node);
+      _leaf_node_pool.erase(node);
       throw;
     }
     node->parent = nullptr;
@@ -78,7 +78,7 @@ public:
       parents_children[parents_children[0] == node ? 0 : 1] = nullptr;
     }
     _leaf_node_set.erase(node);
-    _leaf_node_pool.free(node);
+    _leaf_node_pool.erase(node);
   }
 
   void build() {

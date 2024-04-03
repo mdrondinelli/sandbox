@@ -33,6 +33,8 @@ inline std::ptrdiff_t ptrdiff(void const *p1, void const *p2) noexcept {
          reinterpret_cast<std::uintptr_t>(p2);
 }
 
+class Unique_block;
+
 class Allocator {
 public:
   virtual ~Allocator() = default;
@@ -40,6 +42,8 @@ public:
   virtual Block alloc(std::size_t size) = 0;
 
   virtual void free(Block block) noexcept = 0;
+
+  Unique_block alloc_unique(std::size_t size);
 };
 
 template <std::size_t Alignment = alignof(std::max_align_t)>
@@ -166,7 +170,8 @@ private:
   Free_list_allocator<Stack_allocator<1>, MinSize, MaxSize> _impl;
 };
 
-template <std::size_t MinSize, std::size_t MaxSize = MinSize,
+template <std::size_t MinSize,
+          std::size_t MaxSize = MinSize,
           typename Allocator>
 std::pair<Block, Pool_allocator<MinSize, MaxSize>>
 make_pool_allocator(Allocator &allocator, std::size_t max_blocks) {
@@ -254,10 +259,15 @@ private:
   Allocator *_allocator;
 };
 
+// DEPRECATED
 inline Unique_block
 make_unique_block(std::size_t size,
                   Allocator *allocator = System_allocator::instance()) {
   return {allocator->alloc(size), allocator};
+}
+
+inline Unique_block Allocator::alloc_unique(std::size_t size) {
+  return {alloc(size), this};
 }
 } // namespace util
 } // namespace marlon

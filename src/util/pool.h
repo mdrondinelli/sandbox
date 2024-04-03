@@ -31,18 +31,19 @@ public:
       : _allocator{Stack_allocator<alignof(T)>{
             make_block(block_begin, memory_requirement(max_objects))}} {}
 
-  template <typename... Args> T *alloc(Args &&...args) {
+  template <typename... Args> T *emplace(Args &&...args) {
     return new (_allocator.alloc(sizeof(T)).begin)
         T(std::forward<Args>(args)...);
   }
 
-  void free(T *object) {
+  void erase(T *object) {
     object->~T();
     _allocator.free(make_block(object, sizeof(T)));
   }
 
 private:
-  Free_list_allocator<Stack_allocator<alignof(T)>, sizeof(T),
+  Free_list_allocator<Stack_allocator<alignof(T)>,
+                      sizeof(T),
                       std::max(sizeof(T), sizeof(void *))>
       _allocator;
 };
