@@ -12,31 +12,27 @@ using namespace marlon;
 using enum engine::Key;
 using enum engine::Mouse_button;
 
-struct Vertex {
-  math::Vec3f position;
-  math::Vec2f texcoord;
-};
-
 struct Resources {
   graphics::Unique_texture_ptr brick_base_color_texture;
   graphics::Unique_texture_ptr striped_cotton_base_color_texture;
-  graphics::Unique_material_ptr brick_material;
-  graphics::Unique_material_ptr striped_cotton_material;
-  graphics::Unique_material_ptr red_material;
-  graphics::Unique_material_ptr blue_material;
-  graphics::Unique_material_ptr particle_material;
-  graphics::Unique_mesh_ptr cube_mesh;
-  graphics::Unique_mesh_ptr low_quality_sphere_mesh;
-  graphics::Unique_mesh_ptr high_quality_sphere_mesh;
+  graphics::Unique_surface_material_ptr brick_material;
+  graphics::Unique_surface_material_ptr striped_cotton_material;
+  graphics::Unique_surface_material_ptr red_material;
+  graphics::Unique_surface_material_ptr blue_material;
+  graphics::Unique_surface_material_ptr particle_material;
+  graphics::Unique_surface_mesh_ptr cube_mesh;
+  graphics::Unique_surface_mesh_ptr low_quality_sphere_mesh;
+  graphics::Unique_surface_mesh_ptr high_quality_sphere_mesh;
 };
 
 graphics::Unique_texture_ptr create_texture(graphics::Graphics *graphics,
                                             const char *path);
 
-graphics::Unique_mesh_ptr create_cuboid_mesh(graphics::Graphics *graphics);
+graphics::Unique_surface_mesh_ptr
+create_cuboid_mesh(graphics::Graphics *graphics);
 
-graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
-                                                int subdivisions = 0);
+graphics::Unique_surface_mesh_ptr
+create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions = 0);
 
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
@@ -44,15 +40,15 @@ Resources create_resources(graphics::Graphics *graphics) {
       graphics, "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
   retval.striped_cotton_base_color_texture = create_texture(
       graphics, "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
-  retval.brick_material = graphics->create_material_unique(
+  retval.brick_material = graphics->create_surface_material_unique(
       {.base_color_texture = retval.brick_base_color_texture.get()});
-  retval.striped_cotton_material = graphics->create_material_unique(
+  retval.striped_cotton_material = graphics->create_surface_material_unique(
       {.base_color_texture = retval.striped_cotton_base_color_texture.get()});
-  retval.red_material =
-      graphics->create_material_unique({.base_color_tint = {0.1f, 0.0f, 0.0f}});
-  retval.blue_material = graphics->create_material_unique(
+  retval.red_material = graphics->create_surface_material_unique(
+      {.base_color_tint = {0.1f, 0.0f, 0.0f}});
+  retval.blue_material = graphics->create_surface_material_unique(
       {.base_color_tint = {0.00f, 0.005f, 0.02f}});
-  retval.particle_material = graphics->create_material_unique(
+  retval.particle_material = graphics->create_surface_material_unique(
       {.base_color_tint = {0.25f, 0.5f, 1.0f}});
   retval.cube_mesh = create_cuboid_mesh(graphics);
   retval.low_quality_sphere_mesh = create_icosphere_mesh(graphics, 1);
@@ -80,73 +76,63 @@ graphics::Unique_texture_ptr create_texture(graphics::Graphics *graphics,
   }
 }
 
-graphics::Unique_mesh_ptr create_cuboid_mesh(graphics::Graphics *graphics) {
-  std::vector<Vertex> const vertices{// -x face
-                                     {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
-                                     {{-1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}},
-                                     {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
-                                     {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
-                                     // +x face
-                                     {{1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}},
-                                     {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
-                                     {{1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-                                     {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
-                                     // -y face
-                                     {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
-                                     {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
-                                     {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}},
-                                     {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}},
-                                     // +y face
-                                     {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
-                                     {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},
-                                     {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
-                                     {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
-                                     // -z face
-                                     {{1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
-                                     {{-1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
-                                     {{1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
-                                     {{-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
-                                     // +z face
-                                     {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}},
-                                     {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}},
-                                     {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-                                     {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}};
-  std::vector<std::uint32_t> const indices{
+graphics::Unique_surface_mesh_ptr
+create_cuboid_mesh(graphics::Graphics *graphics) {
+  std::vector<graphics::Surface_vertex> const vertices{
+      // -x face
+      {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
+      {{-1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}},
+      {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
+      {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+      // +x face
+      {{1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}},
+      {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
+      {{1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+      {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
+      // -y face
+      {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
+      {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
+      {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}},
+      {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}},
+      // +y face
+      {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+      {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},
+      {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
+      {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
+      // -z face
+      {{1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
+      {{-1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
+      {{1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
+      {{-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
+      // +z face
+      {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}},
+      {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}},
+      {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+      {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}};
+  std::vector<std::uint16_t> const indices{
       0,  1,  2,  3,  2,  1,  4,  5,  6,  7,  6,  5,  8,  9,  10, 11, 10, 9,
       12, 13, 14, 15, 14, 13, 16, 17, 18, 19, 18, 17, 20, 21, 22, 23, 22, 21};
-  return graphics->create_mesh_unique(
-      {.index_format = graphics::Mesh_index_format::uint32,
-       .index_count = static_cast<std::uint32_t>(indices.size()),
-       .index_data = indices.data(),
-       .vertex_format = {.position_fetch_info =
-                             {.format =
-                                  graphics::Mesh_vertex_position_format::float3,
-                              .offset = 0u},
-                         .texcoord_fetch_info =
-                             {.format =
-                                  graphics::Mesh_vertex_texcoord_format::float2,
-                              .offset = 12u},
-                         .stride = 20u},
-       .vertex_count = static_cast<std::uint32_t>(vertices.size()),
-       .vertex_data = vertices.data()});
+  return graphics->create_surface_mesh_unique(
+      {.indices = indices, .vertices = vertices});
 }
 
-graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
-                                                int subdivisions) {
+graphics::Unique_surface_mesh_ptr
+create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
   auto const phi = std::numbers::phi_v<float>;
-  std::vector<Vertex> vertices{{normalize(math::Vec3f{phi, 1.0f, 0.0f}), {}},
-                               {normalize(math::Vec3f{phi, -1.0f, 0.0f}), {}},
-                               {normalize(math::Vec3f{-phi, -1.0f, 0.0f}), {}},
-                               {normalize(math::Vec3f{-phi, 1.0f, 0.0f}), {}},
-                               {normalize(math::Vec3f{1.0f, 0.0f, phi}), {}},
-                               {normalize(math::Vec3f{-1.0f, 0.0f, phi}), {}},
-                               {normalize(math::Vec3f{-1.0f, 0.0f, -phi}), {}},
-                               {normalize(math::Vec3f{1.0f, 0.0f, -phi}), {}},
-                               {normalize(math::Vec3f{0.0f, phi, 1.0f}), {}},
-                               {normalize(math::Vec3f{0.0f, phi, -1.0f}), {}},
-                               {normalize(math::Vec3f{0.0f, -phi, -1.0f}), {}},
-                               {normalize(math::Vec3f{0.0f, -phi, 1.0f}), {}}};
-  std::vector<std::uint32_t> indices{
+  std::vector<graphics::Surface_vertex> vertices{
+      {normalize(math::Vec3f{phi, 1.0f, 0.0f}), {}},
+      {normalize(math::Vec3f{phi, -1.0f, 0.0f}), {}},
+      {normalize(math::Vec3f{-phi, -1.0f, 0.0f}), {}},
+      {normalize(math::Vec3f{-phi, 1.0f, 0.0f}), {}},
+      {normalize(math::Vec3f{1.0f, 0.0f, phi}), {}},
+      {normalize(math::Vec3f{-1.0f, 0.0f, phi}), {}},
+      {normalize(math::Vec3f{-1.0f, 0.0f, -phi}), {}},
+      {normalize(math::Vec3f{1.0f, 0.0f, -phi}), {}},
+      {normalize(math::Vec3f{0.0f, phi, 1.0f}), {}},
+      {normalize(math::Vec3f{0.0f, phi, -1.0f}), {}},
+      {normalize(math::Vec3f{0.0f, -phi, -1.0f}), {}},
+      {normalize(math::Vec3f{0.0f, -phi, 1.0f}), {}}};
+  std::vector<std::uint16_t> indices{
       0, 9, 8,  0, 8,  4,  0,  4, 1, 0, 1, 7,  0, 7,  9,  3, 8,  9,  3, 9,
       6, 3, 6,  2, 3,  2,  5,  3, 5, 8, 4, 8,  5, 11, 1,  4, 11, 4,  5, 11,
       5, 2, 11, 2, 10, 11, 10, 1, 6, 9, 7, 10, 7, 1,  10, 6, 7,  10, 2, 6};
@@ -160,12 +146,12 @@ graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
       auto const &vertex_0 = vertices[index_0];
       auto const &vertex_1 = vertices[index_1];
       auto const &vertex_2 = vertices[index_2];
-      auto const new_vertex_0 =
-          Vertex{normalize(0.5f * (vertex_0.position + vertex_1.position)), {}};
-      auto const new_vertex_1 =
-          Vertex{normalize(0.5f * (vertex_1.position + vertex_2.position)), {}};
-      auto const new_vertex_2 =
-          Vertex{normalize(0.5f * (vertex_2.position + vertex_0.position)), {}};
+      auto const new_vertex_0 = graphics::Surface_vertex{
+          normalize(0.5f * (vertex_0.position + vertex_1.position)), {}};
+      auto const new_vertex_1 = graphics::Surface_vertex{
+          normalize(0.5f * (vertex_1.position + vertex_2.position)), {}};
+      auto const new_vertex_2 = graphics::Surface_vertex{
+          normalize(0.5f * (vertex_2.position + vertex_0.position)), {}};
       auto const new_vertex_0_index =
           static_cast<std::uint32_t>(vertices.size());
       auto const new_vertex_1_index =
@@ -189,21 +175,10 @@ graphics::Unique_mesh_ptr create_icosphere_mesh(graphics::Graphics *graphics,
       indices.emplace_back(new_vertex_2_index);
     }
   }
-  return graphics->create_mesh_unique(
-      {.index_format = graphics::Mesh_index_format::uint32,
-       .index_count = static_cast<std::uint32_t>(indices.size()),
-       .index_data = indices.data(),
-       .vertex_format = {.position_fetch_info =
-                             {.format =
-                                  graphics::Mesh_vertex_position_format::float3,
-                              .offset = 0u},
-                         .texcoord_fetch_info =
-                             {.format =
-                                  graphics::Mesh_vertex_texcoord_format::float2,
-                              .offset = 12u},
-                         .stride = 20u},
-       .vertex_count = static_cast<std::uint32_t>(vertices.size()),
-       .vertex_data = vertices.data()});
+  return graphics->create_surface_mesh_unique({
+      .indices = indices,
+      .vertices = vertices,
+  });
 }
 
 class Client : public engine::App {
@@ -229,7 +204,6 @@ public:
     _resources = create_resources(graphics);
     _red_ball_manager = std::make_unique<client::Static_prop_manager>(
         client::Static_prop_manager_create_info{
-            .graphics = graphics,
             .scene = scene,
             .surface_mesh = _resources.high_quality_sphere_mesh.get(),
             .surface_material = _resources.red_material.get(),
@@ -248,7 +222,6 @@ public:
     physics::Box cotton_box_shape{{0.3f, 0.3f, 0.3f}};
     _cotton_box_manager = std::make_unique<client::Dynamic_prop_manager>(
         client::Dynamic_prop_manager_create_info{
-            .graphics = graphics,
             .scene = scene,
             .surface_mesh = _resources.cube_mesh.get(),
             .surface_material = _resources.striped_cotton_material.get(),
@@ -281,13 +254,12 @@ public:
             },
         .position = {0.0f, -0.5f, 0.0f},
     });
-    _ground_surface = graphics->create_surface_unique(
+    _ground_surface = scene->create_surface_unique(
         {.mesh = _resources.cube_mesh.get(),
          .material = _resources.blue_material.get(),
          .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
                                     {0.0f, 0.5f, 0.0f, -0.5f},
                                     {0.0f, 0.0f, 100.0f, 0.0f}}});
-    scene->add_surface(_ground_surface.get());
     camera->set_position({-10.0f, 3.5f, 10.0f});
     camera->set_zoom(math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f);
     srand(25);

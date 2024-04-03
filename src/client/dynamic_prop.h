@@ -14,10 +14,9 @@ struct Dynamic_prop_handle {
 };
 
 struct Dynamic_prop_manager_create_info {
-  graphics::Graphics *graphics{};
   graphics::Scene *scene{};
-  graphics::Mesh *surface_mesh{};
-  graphics::Material *surface_material{};
+  graphics::Surface_mesh *surface_mesh{};
+  graphics::Surface_material *surface_material{};
   math::Mat3x4f surface_pretransform{math::Mat3x4f::identity()};
   physics::World *space;
   float body_mass{1.0f};
@@ -56,10 +55,9 @@ private:
         physics::Rigid_body_motion_event const &event) final;
   };
 
-  graphics::Graphics *_graphics;
   graphics::Scene *_scene;
-  graphics::Mesh *_surface_mesh;
-  graphics::Material *_surface_material;
+  graphics::Surface_mesh *_surface_mesh;
+  graphics::Surface_material *_surface_material;
   math::Mat3x4f _surface_pretransform_3x4;
   physics::World *_space;
   float _body_mass;

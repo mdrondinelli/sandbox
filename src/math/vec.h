@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 
 #include <type_traits>
@@ -224,6 +225,7 @@ template <typename T> struct Vec<T, 4> {
 template <typename T> using Vec2 = Vec<T, 2>;
 template <typename T> using Vec3 = Vec<T, 3>;
 template <typename T> using Vec4 = Vec<T, 4>;
+
 using Vec2i = Vec2<std::int32_t>;
 using Vec3i = Vec3<std::int32_t>;
 using Vec4i = Vec4<std::int32_t>;
@@ -233,6 +235,60 @@ using Vec4f = Vec4<float>;
 using Vec2d = Vec2<double>;
 using Vec3d = Vec3<double>;
 using Vec4d = Vec4<double>;
+
+static_assert(std::is_standard_layout_v<Vec2i>);
+static_assert(offsetof(Vec2i, x) == 0);
+static_assert(offsetof(Vec2i, y) == 4);
+static_assert(sizeof(Vec2i) == 8);
+
+static_assert(std::is_standard_layout_v<Vec3i>);
+static_assert(offsetof(Vec3i, x) == 0);
+static_assert(offsetof(Vec3i, y) == 4);
+static_assert(offsetof(Vec3i, z) == 8);
+static_assert(sizeof(Vec3i) == 12);
+
+static_assert(std::is_standard_layout_v<Vec4i>);
+static_assert(offsetof(Vec4i, x) == 0);
+static_assert(offsetof(Vec4i, y) == 4);
+static_assert(offsetof(Vec4i, z) == 8);
+static_assert(offsetof(Vec4i, w) == 12);
+static_assert(sizeof(Vec4i) == 16);
+
+static_assert(std::is_standard_layout_v<Vec2f>);
+static_assert(offsetof(Vec2f, x) == 0);
+static_assert(offsetof(Vec2f, y) == 4);
+static_assert(sizeof(Vec2f) == 8);
+
+static_assert(std::is_standard_layout_v<Vec3f>);
+static_assert(offsetof(Vec3f, x) == 0);
+static_assert(offsetof(Vec3f, y) == 4);
+static_assert(offsetof(Vec3f, z) == 8);
+static_assert(sizeof(Vec3f) == 12);
+
+static_assert(std::is_standard_layout_v<Vec4f>);
+static_assert(offsetof(Vec4f, x) == 0);
+static_assert(offsetof(Vec4f, y) == 4);
+static_assert(offsetof(Vec4f, z) == 8);
+static_assert(offsetof(Vec4f, w) == 12);
+static_assert(sizeof(Vec4f) == 16);
+
+static_assert(std::is_standard_layout_v<Vec2d>);
+static_assert(offsetof(Vec2d, x) == 0);
+static_assert(offsetof(Vec2d, y) == 8);
+static_assert(sizeof(Vec2d) == 16);
+
+static_assert(std::is_standard_layout_v<Vec3d>);
+static_assert(offsetof(Vec3d, x) == 0);
+static_assert(offsetof(Vec3d, y) == 8);
+static_assert(offsetof(Vec3d, z) == 16);
+static_assert(sizeof(Vec3d) == 24);
+
+static_assert(std::is_standard_layout_v<Vec4d>);
+static_assert(offsetof(Vec4d, x) == 0);
+static_assert(offsetof(Vec4d, y) == 8);
+static_assert(offsetof(Vec4d, z) == 16);
+static_assert(offsetof(Vec4d, w) == 24);
+static_assert(sizeof(Vec4d) == 32);
 
 template <typename T, int N>
 constexpr bool operator==(Vec<T, N> const &u, Vec<T, N> const &v) noexcept {

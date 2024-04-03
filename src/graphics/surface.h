@@ -1,17 +1,16 @@
-#ifndef MARLONR_GRAPHICS_SURFACE_H
-#define MARLONR_GRAPHICS_SURFACE_H
+#ifndef MARLON_GRAPHICS_SURFACE_H
+#define MARLON_GRAPHICS_SURFACE_H
 
 #include "../math/mat.h"
-#include "../math/quat.h"
-#include "../math/vec.h"
-#include "material.h"
-#include "mesh.h"
+
+#include "surface_material.h"
+#include "surface_mesh.h"
 
 namespace marlon {
 namespace graphics {
 struct Surface_create_info {
-  Mesh *mesh{};
-  Material *material{};
+  Surface_mesh *mesh;
+  Surface_material *material;
   math::Mat3x4f transform{math::Mat3x4f::identity()};
 };
 

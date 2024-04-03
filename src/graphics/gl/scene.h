@@ -17,9 +17,9 @@ public:
 
   ~Gl_scene();
 
-  void add_surface(Surface *surface) final;
+  Surface *create_surface(Surface_create_info const &create_info) final;
 
-  void remove_surface(Surface *surface) final;
+  void destroy_surface(Surface *surface) noexcept final;
 
 private:
   struct Impl;

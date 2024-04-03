@@ -1,5 +1,5 @@
-#ifndef MARLON_GRAPHICS_GL_RENDER_ENGINE_H
-#define MARLON_GRAPHICS_GL_RENDER_ENGINE_H
+#ifndef MARLON_GRAPHICS_GL_GRAPHICS_H
+#define MARLON_GRAPHICS_GL_GRAPHICS_H
 
 #include <memory>
 
@@ -28,29 +28,28 @@ public:
 
   Gl_graphics &operator=(Gl_graphics const &other) = delete;
 
-  Mesh *create_mesh(Mesh_create_info const &create_info) final;
+  Render_target *get_default_render_target() noexcept;
 
-  void destroy_mesh(Mesh *mesh) noexcept final;
-
-  Texture *create_texture(Texture_create_info const &create_info) final;
-
-  void destroy_texture(Texture *texture) noexcept final;
-
-  Material *create_material(Material_create_info const &create_info) final;
-
-  void destroy_material(Material *material) noexcept final;
+  void destroy_render_target(Render_target *target) noexcept final;
 
   Scene *create_scene(Scene_create_info const &create_info) final;
 
   void destroy_scene(Scene *scene) noexcept final;
 
-  Surface *create_surface(Surface_create_info const &create_info) final;
+  Surface_material *create_surface_material(
+      Surface_material_create_info const &create_info) final;
 
-  void destroy_surface(Surface *surface) noexcept final;
+  void
+  destroy_surface_material(Surface_material *surface_material) noexcept final;
 
-  Render_target *get_default_render_target() noexcept;
+  Surface_mesh *
+  create_surface_mesh(Surface_mesh_create_info const &create_info) final;
 
-  void destroy_render_target(Render_target *target) noexcept final;
+  void destroy_surface_mesh(Surface_mesh *surface_mesh) noexcept final;
+
+  Texture *create_texture(Texture_create_info const &create_info) final;
+
+  void destroy_texture(Texture *texture) noexcept final;
 
   void render(Render_info const &info) final;
 

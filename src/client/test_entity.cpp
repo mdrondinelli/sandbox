@@ -6,10 +6,11 @@ namespace marlon {
 namespace client {
 Test_entity_manager::Test_entity_manager(
     Test_entity_manager_create_info const &create_info)
-    : _graphics{create_info.graphics}, _scene{create_info.scene},
+    : _scene{create_info.scene},
       _surface_mesh{create_info.surface_mesh},
       _surface_material{create_info.surface_material},
-      _space{create_info.space}, _random_number_engine{std::random_device{}()},
+      _space{create_info.space},
+      _random_number_engine{std::random_device{}()},
       _next_entity_reference_value{} {}
 
 Test_entity_manager::~Test_entity_manager() {}
@@ -65,13 +66,12 @@ Test_entity_manager::create_entity(Test_entity_create_info const &) {
   auto const scale = scale_distribution(_random_number_engine);
   auto &value = _entities[_next_entity_reference_value];
   value.manager = this;
-  value.surface = _graphics->create_surface(
+  value.surface = _scene->create_surface(
       {.mesh = _surface_mesh,
        .material = _surface_material,
        .transform = math::Mat3x4f{{scale, 0.0f, 0.0f, position.x},
                                   {0.0f, scale, 0.0f, position.y},
                                   {0.0f, 0.0f, scale, position.z}}});
-  _scene->add_surface(value.surface);
   value.particle = _space->create_particle(
       {.motion_callback = &value,
        .radius = scale,
@@ -88,8 +88,7 @@ void Test_entity_manager::destroy_entity(Test_entity_handle handle) {
   auto const it = _entities.find(handle.value);
   auto &value = it->second;
   _space->destroy_particle(value.particle);
-  _scene->remove_surface(value.surface);
-  _graphics->destroy_surface(value.surface);
+  _scene->destroy_surface(value.surface);
   _entities.erase(it);
 }
 

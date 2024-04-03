@@ -15,10 +15,9 @@
 #include <glad/gl.h>
 #endif
 
-#include "material.h"
-#include "mesh.h"
 #include "scene.h"
-#include "surface.h"
+#include "surface_material.h"
+#include "surface_mesh.h"
 #include "texture.h"
 #include "unique_shader_handle.h"
 
@@ -77,7 +76,7 @@ void main() {
 Gl_graphics::Gl_graphics(Gl_graphics_create_info const &create_info) {
   if (gladLoadGL(create_info.function_loader) == 0) {
     throw std::runtime_error{"Failed to load OpenGL functions."};
-  } 
+  }
   _default_render_target = std::make_unique<Gl_default_render_target>(
       Gl_default_render_target_create_info{
           .window = create_info.window,
@@ -137,29 +136,12 @@ Gl_graphics::Gl_graphics(Gl_graphics_create_info const &create_info) {
                       default_base_color_texture_pixels.data());
 }
 
-Mesh *Gl_graphics::create_mesh(Mesh_create_info const &create_info) {
-  return new Gl_mesh{create_info};
+Render_target *Gl_graphics::get_default_render_target() noexcept {
+  return _default_render_target.get();
 }
 
-void Gl_graphics::destroy_mesh(Mesh *mesh) noexcept {
-  delete static_cast<Gl_mesh *>(mesh);
-}
-
-Texture *Gl_graphics::create_texture(Texture_create_info const &create_info) {
-  return new Gl_texture{create_info};
-}
-
-void Gl_graphics::destroy_texture(Texture *texture) noexcept {
-  delete static_cast<Gl_texture *>(texture);
-}
-
-Material *
-Gl_graphics::create_material(Material_create_info const &create_info) {
-  return new Gl_material{create_info};
-}
-
-void Gl_graphics::destroy_material(Material *material) noexcept {
-  delete static_cast<Gl_material *>(material);
+void Gl_graphics::destroy_render_target(Render_target *) noexcept {
+  // delete static_cast<Gl_render_target *>(target);
 }
 
 Scene *Gl_graphics::create_scene(Scene_create_info const &create_info) {
@@ -170,20 +152,31 @@ void Gl_graphics::destroy_scene(Scene *scene) noexcept {
   delete static_cast<Gl_scene *>(scene);
 }
 
-Surface *Gl_graphics::create_surface(Surface_create_info const &create_info) {
-  return new Gl_surface{create_info};
+Surface_material *Gl_graphics::create_surface_material(
+    Surface_material_create_info const &create_info) {
+  return new Gl_surface_material{create_info};
 }
 
-void Gl_graphics::destroy_surface(Surface *surface) noexcept {
-  delete static_cast<Gl_surface *>(surface);
+void Gl_graphics::destroy_surface_material(
+    Surface_material *surface_material) noexcept {
+  delete static_cast<Gl_surface_material *>(surface_material);
 }
 
-Render_target *Gl_graphics::get_default_render_target() noexcept {
-  return _default_render_target.get();
+Surface_mesh *
+Gl_graphics::create_surface_mesh(Surface_mesh_create_info const &create_info) {
+  return new Gl_surface_mesh{create_info};
 }
 
-void Gl_graphics::destroy_render_target(Render_target *) noexcept {
-  // delete static_cast<Gl_render_target *>(target);
+void Gl_graphics::destroy_surface_mesh(Surface_mesh *surface_mesh) noexcept {
+  delete static_cast<Gl_surface_mesh *>(surface_mesh);
+}
+
+Texture *Gl_graphics::create_texture(Texture_create_info const &create_info) {
+  return new Gl_texture{create_info};
+}
+
+void Gl_graphics::destroy_texture(Texture *texture) noexcept {
+  delete static_cast<Gl_texture *>(texture);
 }
 
 namespace {

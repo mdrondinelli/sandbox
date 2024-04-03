@@ -1,21 +1,21 @@
-#ifndef MARLONR_GRAPHICS_GL_MESH_H
-#define MARLONR_GRAPHICS_GL_MESH_H
+#ifndef MARLONR_GRAPHICS_GL_SURFACE_MESH_H
+#define MARLONR_GRAPHICS_GL_SURFACE_MESH_H
 
 #include <cstdint>
 
-#include "../mesh.h"
+#include "../surface_mesh.h"
 #include "unique_buffer_handle.h"
 #include "unique_vertex_array_handle.h"
 
 namespace marlon {
 namespace graphics {
-class Gl_mesh : public Mesh {
+class Gl_surface_mesh : public Surface_mesh {
   friend class Gl_scene;
 
 public:
   class Impl {
   public:
-    explicit Impl(Mesh_create_info const &create_info);
+    explicit Impl(Surface_mesh_create_info const &create_info);
 
     void bind_vertex_array() const noexcept;
 
@@ -23,13 +23,12 @@ public:
 
   private:
     std::uint32_t _index_count;
-    Mesh_index_format _index_format;
     Gl_unique_buffer_handle _index_buffer;
     Gl_unique_buffer_handle _vertex_buffer;
     Gl_unique_vertex_array_handle _vertex_array;
   };
 
-  explicit Gl_mesh(Mesh_create_info const &create_info);
+  explicit Gl_surface_mesh(Surface_mesh_create_info const &create_info);
 
 private:
   Impl _impl;

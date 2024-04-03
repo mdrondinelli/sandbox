@@ -11,10 +11,10 @@ struct Static_prop_handle {
 };
 
 struct Static_prop_manager_create_info {
-  graphics::Graphics *graphics{};
+  // graphics::Graphics *graphics{};
   graphics::Scene *scene{};
-  graphics::Mesh *surface_mesh{};
-  graphics::Material *surface_material{};
+  graphics::Surface_mesh *surface_mesh{};
+  graphics::Surface_material *surface_material{};
   math::Mat3x4f surface_pretransform{math::Mat3x4f::identity()};
   physics::World *space;
   physics::Shape body_shape;
@@ -41,10 +41,10 @@ private:
     physics::Static_body_handle body{};
   };
 
-  graphics::Graphics *_graphics;
+  // graphics::Graphics *_graphics;
   graphics::Scene *_scene;
-  graphics::Mesh *_surface_mesh;
-  graphics::Material *_surface_material;
+  graphics::Surface_mesh *_surface_mesh;
+  graphics::Surface_material *_surface_material;
   math::Mat3x4f _surface_pretransform_3x4;
   physics::World *_space;
   physics::Shape _body_shape;

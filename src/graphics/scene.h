@@ -1,18 +1,45 @@
 #ifndef MARLON_GRAPHICS_SCENE_H
 #define MARLON_GRAPHICS_SCENE_H
 
+#include <memory>
+
 #include "surface.h"
 
 namespace marlon {
 namespace graphics {
 struct Scene_create_info {};
 
+class Scene;
+
+class Surface_deleter {
+public:
+  Surface_deleter(Scene *owner = nullptr) noexcept : _owner{owner} {}
+
+  void operator()(Surface *surface) const noexcept;
+
+private:
+  Scene *_owner;
+};
+
+using Unique_surface_ptr = std::unique_ptr<Surface, Surface_deleter>;
+
 class Scene {
 public:
-  virtual void add_surface(Surface *surface) = 0;
-  
-  virtual void remove_surface(Surface *surface) = 0;
+  virtual Surface *create_surface(Surface_create_info const &create_info) = 0;
+
+  virtual void destroy_surface(Surface *surface) noexcept = 0;
+
+  Unique_surface_ptr
+  create_surface_unique(Surface_create_info const &create_info) {
+    return Unique_surface_ptr{create_surface(create_info), this};
+  }
 };
+
+inline void Surface_deleter::operator()(Surface *surface) const noexcept {
+  if (_owner) {
+    _owner->destroy_surface(surface);
+  }
+}
 } // namespace graphics
 } // namespace marlon
 

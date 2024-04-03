@@ -10,14 +10,11 @@
 #endif
 
 #include "../../util/set.h"
-#include "material.h"
-#include "mesh.h"
 #include "surface.h"
 #include "texture.h"
 
 namespace marlon {
 namespace graphics {
-
 struct Gl_scene::Impl {
   void add_surface(Surface *surface) {
     surfaces.emplace(static_cast<Gl_surface *>(surface));
@@ -40,10 +37,16 @@ struct Gl_scene::Impl {
           math::Mat4x4f{model_matrix_3x4, {0.0f, 0.0f, 0.0f, 1.0f}};
       auto const model_view_matrix = view_matrix * model_matrix_4x4;
       auto const model_view_clip_matrix = view_clip_matrix * model_matrix_4x4;
-      glProgramUniformMatrix4fv(shader_program, model_view_matrix_location, 1,
-                                GL_TRUE, &model_view_matrix[0][0]);
-      glProgramUniformMatrix4fv(shader_program, model_view_clip_matrix_location,
-                                1, GL_TRUE, &model_view_clip_matrix[0][0]);
+      glProgramUniformMatrix4fv(shader_program,
+                                model_view_matrix_location,
+                                1,
+                                GL_TRUE,
+                                &model_view_matrix[0][0]);
+      glProgramUniformMatrix4fv(shader_program,
+                                model_view_clip_matrix_location,
+                                1,
+                                GL_TRUE,
+                                &model_view_clip_matrix[0][0]);
       auto const material = surface_instance->get_material();
       if (auto const base_color_texture =
               material->_impl.get_base_color_texture()) {
@@ -51,7 +54,8 @@ struct Gl_scene::Impl {
       } else {
         glBindTextureUnit(0, default_base_color_texture);
       }
-      glProgramUniform3f(shader_program, base_color_tint_location,
+      glProgramUniform3f(shader_program,
+                         base_color_tint_location,
                          material->_impl.get_base_color_tint().r,
                          material->_impl.get_base_color_tint().g,
                          material->_impl.get_base_color_tint().b);
@@ -61,18 +65,33 @@ struct Gl_scene::Impl {
     }
   }
 
-  util::Allocating_set<Gl_surface *> surfaces{util::System_allocator::instance()};
+  util::Allocating_set<Gl_surface *> surfaces{
+      util::System_allocator::instance()};
 };
 
 Gl_scene::Gl_scene(Scene_create_info const &) noexcept
     : _impl{std::make_unique<Impl>()} {}
 
-Gl_scene::~Gl_scene() {}
+Gl_scene::~Gl_scene() {
+  for (auto const surface : _impl->surfaces) {
+    delete surface;
+  }
+}
 
-void Gl_scene::add_surface(Surface *surface) { _impl->add_surface(surface); }
+Surface *Gl_scene::create_surface(Surface_create_info const &create_info) {
+  auto const surface = new Gl_surface{create_info};
+  try {
+    _impl->add_surface(surface);
+  } catch (...) {
+    delete surface;
+    throw;
+  }
+  return surface;
+}
 
-void Gl_scene::remove_surface(Surface *surface) {
+void Gl_scene::destroy_surface(Surface *surface) noexcept {
   _impl->remove_surface(surface);
+  delete static_cast<Gl_surface *>(surface);
 }
 
 void Gl_scene::draw_surfaces(std::uint32_t shader_program,
@@ -82,10 +101,13 @@ void Gl_scene::draw_surfaces(std::uint32_t shader_program,
                              std::int32_t base_color_tint_location,
                              math::Mat4x4f const &view_matrix,
                              math::Mat4x4f const &view_clip_matrix) {
-  _impl->draw_surfaces(shader_program, default_base_color_texture,
+  _impl->draw_surfaces(shader_program,
+                       default_base_color_texture,
                        model_view_matrix_location,
                        model_view_clip_matrix_location,
-                       base_color_tint_location, view_matrix, view_clip_matrix);
+                       base_color_tint_location,
+                       view_matrix,
+                       view_clip_matrix);
 }
 } // namespace graphics
 } // namespace marlon

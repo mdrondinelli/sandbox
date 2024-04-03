@@ -14,10 +14,9 @@ struct Test_entity_handle {
 };
 
 struct Test_entity_manager_create_info {
-  graphics::Graphics *graphics;
   graphics::Scene *scene;
-  graphics::Mesh *surface_mesh;
-  graphics::Material *surface_material;
+  graphics::Surface_mesh *surface_mesh;
+  graphics::Surface_material *surface_material;
   physics::World *space;
 };
 
@@ -46,10 +45,9 @@ private:
     void on_particle_motion(physics::Particle_motion_event const &event) final;
   };
 
-  graphics::Graphics *_graphics;
   graphics::Scene *_scene;
-  graphics::Mesh *_surface_mesh;
-  graphics::Material *_surface_material;
+  graphics::Surface_mesh *_surface_mesh;
+  graphics::Surface_material *_surface_material;
   physics::World *_space;
   std::mt19937 _random_number_engine;
   std::unordered_map<std::uint64_t, Entity> _entities;
