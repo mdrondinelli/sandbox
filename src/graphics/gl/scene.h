@@ -25,8 +25,6 @@ public:
   void destroy_surface(Surface *surface) noexcept final;
 
 private:
-  struct Impl;
-
   void draw_surfaces(std::uint32_t shader_program,
                      std::uint32_t default_base_color_texture,
                      std::int32_t model_view_matrix_location,
