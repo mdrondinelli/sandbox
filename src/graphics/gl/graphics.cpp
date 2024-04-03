@@ -24,7 +24,7 @@
 namespace marlon {
 namespace graphics {
 namespace {
-constexpr auto vert_src = R"(#version 460 core
+constexpr auto surface_vertex_shader_source = R"(#version 460 core
 layout(location = 0) in vec3 model_space_position;
 layout(location = 1) in vec2 texcoord;
 
@@ -43,7 +43,7 @@ void main() {
 }
 )";
 
-constexpr auto frag_src = R"(#version 460 core
+constexpr auto surface_fragment_shader_source = R"(#version 460 core
 in Vertex_data {
   vec3 view_space_position;
   vec2 texcoord;
@@ -71,6 +71,43 @@ void main() {
   fragColor = vec4(base_color * (max(dot(n, l), 0.0) * 0.9 + 0.1), 1.0);
 }
 )";
+
+void compile_shader(GLuint shader) {
+  GLint status;
+  glCompileShader(shader);
+  glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+  if (status == GL_FALSE) {
+    GLint log_size = 0;
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_size);
+    std::vector<char> log;
+    log.resize(log_size);
+    glGetShaderInfoLog(shader, log_size, nullptr, log.data());
+    throw std::runtime_error{log.data()};
+  }
+}
+
+void link_shader_program(GLuint shader_program) {
+  GLint status;
+  glLinkProgram(shader_program);
+  glGetProgramiv(shader_program, GL_LINK_STATUS, &status);
+  if (status == GL_FALSE) {
+    GLint log_size;
+    glGetProgramiv(shader_program, GL_INFO_LOG_LENGTH, &log_size);
+    std::vector<char> log;
+    log.resize(log_size);
+    glGetProgramInfoLog(shader_program, log_size, nullptr, log.data());
+    throw std::runtime_error{log.data()};
+  }
+}
+
+Gl_unique_texture_handle make_default_base_color_texture() {
+  auto result = gl_make_unique_texture(GL_TEXTURE_2D);
+  auto const pixels = std::array<std::uint8_t, 4>{0xFF, 0xFF, 0xFF, 0xFF};
+  glTextureStorage2D(result.get(), 1, GL_RGBA8, 1, 1);
+  glTextureSubImage2D(
+      result.get(), 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+  return result;
+}
 } // namespace
 
 Gl_graphics::Gl_graphics(Gl_graphics_create_info const &create_info) {
@@ -81,59 +118,21 @@ Gl_graphics::Gl_graphics(Gl_graphics_create_info const &create_info) {
       Gl_default_render_target_create_info{
           .window = create_info.window,
       });
-  _shader_program = gl_make_unique_shader_program();
-  GLint status;
   auto const vertex_shader{gl_make_unique_shader(GL_VERTEX_SHADER)};
-  glShaderSource(vertex_shader.get(), 1, &vert_src, nullptr);
-  glCompileShader(vertex_shader.get());
-  glGetShaderiv(vertex_shader.get(), GL_COMPILE_STATUS, &status);
-  if (status == GL_FALSE) {
-    GLint log_size = 0;
-    glGetShaderiv(vertex_shader.get(), GL_INFO_LOG_LENGTH, &log_size);
-    std::vector<char> log;
-    log.resize(log_size);
-    glGetShaderInfoLog(vertex_shader.get(), log_size, nullptr, log.data());
-    throw std::runtime_error{log.data()};
-  }
+  glShaderSource(
+      vertex_shader.get(), 1, &surface_vertex_shader_source, nullptr);
+  compile_shader(vertex_shader.get());
   auto const fragment_shader{gl_make_unique_shader(GL_FRAGMENT_SHADER)};
-  glShaderSource(fragment_shader.get(), 1, &frag_src, nullptr);
-  glCompileShader(fragment_shader.get());
-  glGetShaderiv(fragment_shader.get(), GL_COMPILE_STATUS, &status);
-  if (status == GL_FALSE) {
-    GLint log_size;
-    glGetShaderiv(fragment_shader.get(), GL_INFO_LOG_LENGTH, &log_size);
-    std::vector<char> log;
-    log.resize(log_size);
-    glGetShaderInfoLog(fragment_shader.get(), log_size, nullptr, log.data());
-    throw std::runtime_error{log.data()};
-  }
+  glShaderSource(
+      fragment_shader.get(), 1, &surface_fragment_shader_source, nullptr);
+  compile_shader(fragment_shader.get());
+  _shader_program = gl_make_unique_shader_program();
   glAttachShader(_shader_program.get(), vertex_shader.get());
   glAttachShader(_shader_program.get(), fragment_shader.get());
-  glLinkProgram(_shader_program.get());
+  link_shader_program(_shader_program.get());
   glDetachShader(_shader_program.get(), vertex_shader.get());
   glDetachShader(_shader_program.get(), fragment_shader.get());
-  glGetProgramiv(_shader_program.get(), GL_LINK_STATUS, &status);
-  if (status == GL_FALSE) {
-    GLint log_size;
-    glGetProgramiv(_shader_program.get(), GL_INFO_LOG_LENGTH, &log_size);
-    std::vector<char> log;
-    log.resize(log_size);
-    glGetProgramInfoLog(_shader_program.get(), log_size, nullptr, log.data());
-    throw std::runtime_error{log.data()};
-  }
-  _default_base_color_texture = gl_make_unique_texture(GL_TEXTURE_2D);
-  auto const default_base_color_texture_pixels =
-      std::array<std::uint8_t, 4>{0xFF, 0xFF, 0xFF, 0xFF};
-  glTextureStorage2D(_default_base_color_texture.get(), 1, GL_RGBA8, 1, 1);
-  glTextureSubImage2D(_default_base_color_texture.get(),
-                      0,
-                      0,
-                      0,
-                      1,
-                      1,
-                      GL_RGBA,
-                      GL_UNSIGNED_BYTE,
-                      default_base_color_texture_pixels.data());
+  _default_base_color_texture = make_default_base_color_texture();
 }
 
 Render_target *Gl_graphics::get_default_render_target() noexcept {
