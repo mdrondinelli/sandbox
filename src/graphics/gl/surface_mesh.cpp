@@ -13,7 +13,7 @@
 
 namespace marlon {
 namespace graphics {
-Gl_surface_mesh::Impl::Impl(Surface_mesh_create_info const &create_info)
+Gl_surface_mesh::Gl_surface_mesh(Surface_mesh_create_info const &create_info)
     : _index_count{static_cast<std::uint32_t>(create_info.indices.size())},
       _index_buffer{gl_make_unique_buffer()},
       _vertex_buffer{gl_make_unique_buffer()},
@@ -51,15 +51,12 @@ Gl_surface_mesh::Impl::Impl(Surface_mesh_create_info const &create_info)
   glVertexArrayAttribBinding(_vertex_array.get(), 1, 0);
 }
 
-void Gl_surface_mesh::Impl::bind_vertex_array() const noexcept {
+void Gl_surface_mesh::bind_vertex_array() const noexcept {
   glBindVertexArray(_vertex_array.get());
 }
 
-void Gl_surface_mesh::Impl::draw() const noexcept {
+void Gl_surface_mesh::draw() const noexcept {
   glDrawElements(GL_TRIANGLES, _index_count, GL_UNSIGNED_SHORT, nullptr);
 }
-
-Gl_surface_mesh::Gl_surface_mesh(Surface_mesh_create_info const &create_info)
-    : _impl{create_info} {}
 } // namespace graphics
 } // namespace marlon
