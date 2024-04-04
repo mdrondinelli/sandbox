@@ -291,6 +291,8 @@ void Gl_graphics::render(Render_info const &info) {
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glDepthFunc(GL_LESS);
+  glDisable(GL_BLEND);
   glUseProgram(_surface_shader_program.get());
   gl_source_scene->draw_surfaces(_surface_shader_program.get(),
                                  _default_base_color_texture.get(),
@@ -299,6 +301,10 @@ void Gl_graphics::render(Render_info const &info) {
                                  2,
                                  view_matrix_4x4,
                                  clip_matrix * view_matrix_4x4);
+  glDepthFunc(GL_LEQUAL);
+  glEnable(GL_BLEND);
+  glEnable(GL_LINE_SMOOTH);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glUseProgram(_wireframe_shader_program.get());
   gl_source_scene->draw_wireframes(
       _wireframe_shader_program.get(), 0, 1, clip_matrix * view_matrix_4x4);
