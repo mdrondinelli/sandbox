@@ -218,7 +218,8 @@ public:
                 },
             .world_simulate_info =
                 {
-                    .substep_count = 24,
+                    .delta_time = 1.0f / 64.0f,
+                    .substep_count = 32,
                 },
             .window_extents = {1920, 1080},
         }} {}
@@ -384,6 +385,13 @@ public:
                              get_world()->get_orientation(rigid_body),
                              0.3f);
       _selection_wireframe->set_transform(transform);
+      if (get_world()->is_awake(rigid_body)) {
+        std::cout << "box awake: waking motion = "
+                  << get_world()->get_waking_motion(rigid_body) << "\n";
+      } else {
+        std::cout << "box asleep: waking motion = "
+                  << get_world()->get_waking_motion(rigid_body) << "\n";
+      }
     }
   }
 

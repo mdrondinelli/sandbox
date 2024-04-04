@@ -715,7 +715,7 @@ auto constexpr velocity_damping_factor = 0.99f;
 auto constexpr waking_motion_epsilon = 1.0f / 32.0f;
 auto constexpr waking_motion_initializer = 2.0f * waking_motion_epsilon;
 auto constexpr waking_motion_limit = 8.0f * waking_motion_epsilon;
-auto constexpr waking_motion_smoothing_factor = 1.0f / 2.0f;
+auto constexpr waking_motion_smoothing_factor = 3.0f / 4.0f;
 
 class Contact_cache {
 public:
@@ -1381,12 +1381,20 @@ public:
     _particles.free(particle);
   }
 
+  bool is_awake(Particle_handle particle) const noexcept {
+    return _particles.data(particle)->awake;
+  }
+
+  float get_waking_motion(Particle_handle particle) const noexcept {
+    return _particles.data(particle)->waking_motion;
+  }
+
   math::Vec3f get_position(Particle_handle particle) const noexcept {
     return _particles.data(particle)->position;
   }
 
   Rigid_body_handle
-  create_dynamic_rigid_body(Rigid_body_create_info const &create_info) {
+  create_rigid_body(Rigid_body_create_info const &create_info) {
     auto const transform =
         Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const handle = _rigid_bodies.alloc();
@@ -1411,9 +1419,17 @@ public:
     return handle;
   }
 
-  void destroy_dynamic_rigid_body(Rigid_body_handle handle) {
-    _aabb_tree.destroy_leaf(_rigid_bodies.data(handle)->aabb_tree_node);
-    _rigid_bodies.free(handle);
+  void destroy_rigid_body(Rigid_body_handle rigid_body) {
+    _aabb_tree.destroy_leaf(_rigid_bodies.data(rigid_body)->aabb_tree_node);
+    _rigid_bodies.free(rigid_body);
+  }
+
+  bool is_awake(Rigid_body_handle rigid_body) const noexcept {
+    return _rigid_bodies.data(rigid_body)->awake;
+  }
+
+  float get_waking_motion(Rigid_body_handle rigid_body) const noexcept {
+    return _rigid_bodies.data(rigid_body)->waking_motion;
   }
 
   math::Vec3f get_position(Rigid_body_handle rigid_body) const noexcept {
@@ -1760,7 +1776,9 @@ private:
     auto contains_awake = false;
     auto contains_sleeping = false;
     auto sleepable = true;
-    for (auto i = group_begin; sleepable && i != group_end; ++i) {
+    for (auto i = group_begin;
+         (sleepable || !contains_awake || !contains_sleeping) && i != group_end;
+         ++i) {
       auto const object = _neighbor_groups.object(i);
       std::visit(
           [&](auto &&handle) {
@@ -1801,7 +1819,7 @@ private:
                   auto const data = _particles.data(handle);
                   if (data->awake) {
                     data->velocity = Vec3f::zero();
-                    data->waking_motion = 0.0f;
+                    // data->waking_motion = 0.0f;
                     data->awake = false;
                   }
                 } else {
@@ -1810,7 +1828,7 @@ private:
                   if (data->awake) {
                     data->velocity = Vec3f::zero();
                     data->angular_velocity = Vec3f::zero();
-                    data->waking_motion = 0.0f;
+                    // data->waking_motion = 0.0f;
                     data->awake = false;
                   }
                 }
@@ -3643,17 +3661,33 @@ void World::destroy_particle(Particle_handle particle) {
   _impl->destroy_particle(particle);
 }
 
+bool World::is_awake(Particle_handle particle) const noexcept {
+  return _impl->is_awake(particle);
+}
+
+float World::get_waking_motion(Particle_handle particle) const noexcept {
+  return _impl->get_waking_motion(particle);
+}
+
 math::Vec3f World::get_position(Particle_handle particle) const noexcept {
   return _impl->get_position(particle);
 }
 
 Rigid_body_handle
 World::create_rigid_body(Rigid_body_create_info const &create_info) {
-  return _impl->create_dynamic_rigid_body(create_info);
+  return _impl->create_rigid_body(create_info);
 }
 
 void World::destroy_rigid_body(Rigid_body_handle handle) {
-  _impl->destroy_dynamic_rigid_body(handle);
+  _impl->destroy_rigid_body(handle);
+}
+
+bool World::is_awake(Rigid_body_handle rigid_body) const noexcept {
+  return _impl->is_awake(rigid_body);
+}
+
+float World::get_waking_motion(Rigid_body_handle rigid_body) const noexcept {
+  return _impl->get_waking_motion(rigid_body);
 }
 
 math::Vec3f World::get_position(Rigid_body_handle rigid_body) const noexcept {

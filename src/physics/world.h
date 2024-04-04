@@ -49,12 +49,20 @@ public:
 
   void destroy_particle(Particle_handle particle);
 
+  bool is_awake(Particle_handle particle) const noexcept;
+
+  float get_waking_motion(Particle_handle particle) const noexcept;
+
   math::Vec3f get_position(Particle_handle particle) const noexcept;
 
   Rigid_body_handle
   create_rigid_body(Rigid_body_create_info const &create_info);
 
   void destroy_rigid_body(Rigid_body_handle rigid_body);
+  
+  bool is_awake(Rigid_body_handle rigid_body) const noexcept;
+
+  float get_waking_motion(Rigid_body_handle rigid_body) const noexcept;
 
   math::Vec3f get_position(Rigid_body_handle rigid_body) const noexcept;
 
