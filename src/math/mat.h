@@ -177,29 +177,20 @@ public:
 
   static constexpr auto rotation(Quat<T> const &r) noexcept {
     static_assert(M == 3 || M == 4);
+    auto const m00 = T(1) - T(2) * r.v.y * r.v.y - T(2) * r.v.z * r.v.z;
+    auto const m01 = T(2) * r.v.x * r.v.y - T(2) * r.w * r.v.z;
+    auto const m02 = T(2) * r.v.x * r.v.z + T(2) * r.w * r.v.y;
+    auto const m10 = T(2) * r.v.x * r.v.y + T(2) * r.w * r.v.z;
+    auto const m11 = T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.z * r.v.z;
+    auto const m12 = T(2) * r.v.y * r.v.z - T(2) * r.w * r.v.x;
+    auto const m20 = T(2) * r.v.x * r.v.z - T(2) * r.w * r.v.y;
+    auto const m21 = T(2) * r.v.y * r.v.z + T(2) * r.w * r.v.x;
+    auto const m22 = T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.y * r.v.y;
     if constexpr (M == 3) {
-      return Mat<T, 3, 3>{{T(1) - T(2) * r.v.y * r.v.y - T(2) * r.v.z * r.v.z,
-                           T(2) * r.v.x * r.v.y - T(2) * r.w * r.v.z,
-                           T(2) * r.v.x * r.v.z + T(2) * r.w * r.v.y},
-                          {T(2) * r.v.x * r.v.y + T(2) * r.w * r.v.z,
-                           T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.z * r.v.z,
-                           T(2) * r.v.y * r.v.z - T(2) * r.w * r.v.x},
-                          {T(2) * r.v.x * r.v.z - T(2) * r.w * r.v.y,
-                           T(2) * r.v.y * r.v.z + T(2) * r.w * r.v.x,
-                           T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.y * r.v.y}};
+      return Mat<T, 3, 3>{{m00, m01, m02}, {m10, m11, m12}, {m20, m21, m22}};
     } else {
-      return Mat<T, 3, 4>{{T(1) - T(2) * r.v.y * r.v.y - T(2) * r.v.z * r.v.z,
-                           T(2) * r.v.x * r.v.y - T(2) * r.w * r.v.z,
-                           T(2) * r.v.x * r.v.z + T(2) * r.w * r.v.y,
-                           T(0)},
-                          {T(2) * r.v.x * r.v.y + T(2) * r.w * r.v.z,
-                           T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.z * r.v.z,
-                           T(2) * r.v.y * r.v.z - T(2) * r.w * r.v.x,
-                           T(0)},
-                          {T(2) * r.v.x * r.v.z - T(2) * r.w * r.v.y,
-                           T(2) * r.v.y * r.v.z + T(2) * r.w * r.v.x,
-                           T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.y * r.v.y,
-                           T(0)}};
+      return Mat<T, 3, 4>{
+          {m00, m01, m02, T(0)}, {m10, m11, m12, T(0)}, {m20, m21, m22, T(0)}};
     }
   }
 
@@ -215,35 +206,22 @@ public:
 
   static constexpr auto rigid(Vec3<T> const &t, Quat<T> const &r) noexcept {
     static_assert(M == 4);
-    return Mat<T, 3, 4>{{T(1) - T(2) * r.v.y * r.v.y - T(2) * r.v.z * r.v.z,
-                         T(2) * r.v.x * r.v.y - T(2) * r.w * r.v.z,
-                         T(2) * r.v.x * r.v.z + T(2) * r.w * r.v.y,
-                         t.x},
-                        {T(2) * r.v.x * r.v.y + T(2) * r.w * r.v.z,
-                         T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.z * r.v.z,
-                         T(2) * r.v.y * r.v.z - T(2) * r.w * r.v.x,
-                         t.y},
-                        {T(2) * r.v.x * r.v.z - T(2) * r.w * r.v.y,
-                         T(2) * r.v.y * r.v.z + T(2) * r.w * r.v.x,
-                         T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.y * r.v.y,
-                         t.z}};
+    auto result = rotation(r);
+    result[0][3] = t.x;
+    result[1][3] = t.y;
+    result[2][3] = t.z;
+    return result;
   }
 
   static constexpr auto trs(Vec3<T> const &t, Quat<T> const &r, T s) noexcept {
     static_assert(M == 4);
-    return Mat<T, 3, 4>{
-        {s * (T(1) - T(2) * r.v.y * r.v.y - T(2) * r.v.z * r.v.z),
-         s * (T(2) * r.v.x * r.v.y - T(2) * r.w * r.v.z),
-         s * (T(2) * r.v.x * r.v.z + T(2) * r.w * r.v.y),
-         t.x},
-        {s * (T(2) * r.v.x * r.v.y + T(2) * r.w * r.v.z),
-         s * (T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.z * r.v.z),
-         s * (T(2) * r.v.y * r.v.z - T(2) * r.w * r.v.x),
-         t.y},
-        {s * (T(2) * r.v.x * r.v.z - T(2) * r.w * r.v.y),
-         s * (T(2) * r.v.y * r.v.z + T(2) * r.w * r.v.x),
-         s * (T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.y * r.v.y),
-         t.z}};
+    auto result = rigid(t, r);
+    for (auto i = 0; i < 3; ++i) {
+      for (auto j = 0; j < 3; ++j) {
+        result[i][j] *= s;
+      }
+    }
+    return result;
   }
 
   Mat() = default;
