@@ -106,11 +106,12 @@ void Test_entity_manager::tick(float delta_time) {
 }
 
 void Test_entity_manager::Entity::on_particle_motion(
-    physics::Particle_motion_event const &event) {
+    physics::World const &world, physics::Particle_handle particle) {
+  auto const position = world.get_position(particle);
   auto transform = surface->get_transform();
-  transform[0][3] = event.position.x;
-  transform[1][3] = event.position.y;
-  transform[2][3] = event.position.z;
+  transform[0][3] = position.x;
+  transform[1][3] = position.y;
+  transform[2][3] = position.z;
   surface->set_transform(transform);
 }
 } // namespace client

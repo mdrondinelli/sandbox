@@ -64,10 +64,16 @@ void Dynamic_prop_manager::destroy(Dynamic_prop_handle handle) {
   _entities.erase(it);
 }
 
+physics::Rigid_body_handle
+Dynamic_prop_manager::get_rigid_body(Dynamic_prop_handle prop) const noexcept {
+  return _entities.at(prop.value).body;
+}
+
 void Dynamic_prop_manager::Entity::on_rigid_body_motion(
-    physics::Rigid_body_motion_event const &event) {
-  auto const prop_transform =
-      math::Mat4x4f::rigid(event.position, event.orientation);
+    physics::World const &world, physics::Rigid_body_handle rigid_body) {
+  auto const position = world.get_position(rigid_body);
+  auto const orientation = world.get_orientation(rigid_body);
+  auto const prop_transform = math::Mat4x4f::rigid(position, orientation);
   auto const &surface_pretransform_3x4 = manager->_surface_pretransform_3x4;
   auto const surface_pretransform_4x4 =
       math::Mat4x4f{surface_pretransform_3x4, {0.0f, 0.0f, 0.0f, 1.0}};

@@ -42,7 +42,8 @@ private:
     physics::Particle_handle particle{};
     float time_alive{};
 
-    void on_particle_motion(physics::Particle_motion_event const &event) final;
+    void on_particle_motion(physics::World const &world,
+                            physics::Particle_handle particle) final;
   };
 
   graphics::Scene *_scene;

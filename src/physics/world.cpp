@@ -46,7 +46,8 @@ struct Contact {
   constexpr Contact(Vec3f const &normal,
                     float separation,
                     float separating_velocity) noexcept
-      : normal{normal}, separation{separation},
+      : normal{normal},
+        separation{separation},
         separating_velocity{separating_velocity} {}
 };
 
@@ -60,8 +61,8 @@ struct Particle_particle_contact : Contact {
       float separation,
       float separating_velocity,
       std::array<Particle_handle, 2> const &particles) noexcept
-      : Contact{normal, separation, separating_velocity}, particles{particles} {
-  }
+      : Contact{normal, separation, separating_velocity},
+        particles{particles} {}
 };
 
 struct Particle_rigid_body_contact : Contact {
@@ -78,8 +79,10 @@ struct Particle_rigid_body_contact : Contact {
       Particle_handle particle,
       Rigid_body_handle body,
       Vec3f const &body_relative_position) noexcept
-      : Contact{normal, separation, separating_velocity}, particle{particle},
-        body{body}, relative_position{body_relative_position} {}
+      : Contact{normal, separation, separating_velocity},
+        particle{particle},
+        body{body},
+        relative_position{body_relative_position} {}
 };
 
 struct Particle_static_body_contact : Contact {
@@ -93,7 +96,8 @@ struct Particle_static_body_contact : Contact {
                                          float separating_velocity,
                                          Particle_handle particle,
                                          Static_body_handle body)
-      : Contact{normal, separation, separating_velocity}, particle{particle},
+      : Contact{normal, separation, separating_velocity},
+        particle{particle},
         body{body} {}
 };
 
@@ -109,7 +113,8 @@ struct Rigid_body_rigid_body_contact : Contact {
       float separating_velocity,
       std::array<Rigid_body_handle, 2> const &bodies,
       std::array<Vec3f, 2> const &relative_positions) noexcept
-      : Contact{normal, separation, separating_velocity}, bodies{bodies},
+      : Contact{normal, separation, separating_velocity},
+        bodies{bodies},
         relative_positions{relative_positions} {}
 };
 
@@ -128,7 +133,8 @@ struct Rigid_body_static_body_contact : Contact {
       Static_body_handle static_body,
       Vec3f const &relative_position) noexcept
       : Contact{normal, separation, separating_velocity},
-        rigid_body{dynamic_body}, static_body{static_body},
+        rigid_body{dynamic_body},
+        static_body{static_body},
         relative_position{relative_position} {}
 };
 
@@ -202,7 +208,8 @@ class Particle_storage {
 public:
   explicit Particle_storage(std::size_t size) noexcept
       : _data{std::make_unique<std::byte[]>(size * sizeof(Particle_data))},
-        _free_indices(size), _occupancy_bits(size) {
+        _free_indices(size),
+        _occupancy_bits(size) {
     for (auto i = std::size_t{}; i != size; ++i) {
       _free_indices[i] = static_cast<std::uint32_t>(size - i - 1);
     }
@@ -257,7 +264,8 @@ class Rigid_body_storage {
 public:
   explicit Rigid_body_storage(std::size_t size)
       : _data{std::make_unique<std::byte[]>(size * sizeof(Rigid_body_data))},
-        _free_indices(size), _occupancy_bits(size) {
+        _free_indices(size),
+        _occupancy_bits(size) {
     for (auto i = std::size_t{}; i != size; ++i) {
       _free_indices[i] = static_cast<std::uint32_t>(size - i - 1);
     }
@@ -312,7 +320,8 @@ class Static_body_storage {
 public:
   explicit Static_body_storage(std::size_t size) noexcept
       : _data{std::make_unique<std::byte[]>(size * sizeof(Static_body_data))},
-        _free_indices(size), _occupancy_bits(size) {
+        _free_indices(size),
+        _occupancy_bits(size) {
     for (auto i = std::size_t{}; i != size; ++i) {
       _free_indices[i] = static_cast<std::uint32_t>(size - i - 1);
     }
@@ -915,8 +924,10 @@ private:
           _contact_displacements{
               body_positions[0] + contact.relative_positions[0] -
               body_positions[1] - contact.relative_positions[1]},
-          _contact_body_orientations{body_orientations}, _size{1},
-          _marked{false}, _fresh{true} {}
+          _contact_body_orientations{body_orientations},
+          _size{1},
+          _marked{false},
+          _fresh{true} {}
 
     std::span<Rigid_body_rigid_body_contact const>
     get_contacts() const noexcept {
@@ -1070,8 +1081,10 @@ private:
                                 Quatf const &rigid_body_orientation)
         : _contacts{contact},
           _contact_positions{rigid_body_position + contact.relative_position},
-          _contact_body_orientations{rigid_body_orientation}, _size{1},
-          _marked{false}, _fresh{true} {}
+          _contact_body_orientations{rigid_body_orientation},
+          _size{1},
+          _marked{false},
+          _fresh{true} {}
 
     std::span<Rigid_body_static_body_contact const>
     get_contacts() const noexcept {
@@ -1363,9 +1376,13 @@ public:
     return handle;
   }
 
-  void destroy_particle(Particle_handle handle) {
-    _aabb_tree.destroy_leaf(_particles.data(handle)->aabb_tree_node);
-    _particles.free(handle);
+  void destroy_particle(Particle_handle particle) {
+    _aabb_tree.destroy_leaf(_particles.data(particle)->aabb_tree_node);
+    _particles.free(particle);
+  }
+
+  math::Vec3f get_position(Particle_handle particle) const noexcept {
+    return _particles.data(particle)->position;
   }
 
   Rigid_body_handle
@@ -1399,6 +1416,14 @@ public:
     _rigid_bodies.free(handle);
   }
 
+  math::Vec3f get_position(Rigid_body_handle rigid_body) const noexcept {
+    return _rigid_bodies.data(rigid_body)->position;
+  }
+
+  math::Quatf get_orientation(Rigid_body_handle rigid_body) const noexcept {
+    return _rigid_bodies.data(rigid_body)->orientation;
+  }
+
   Static_body_handle
   create_static_rigid_body(Static_body_create_info const &create_info) {
     auto const transform =
@@ -1421,7 +1446,7 @@ public:
     _static_bodies.free(handle);
   }
 
-  void simulate(World_simulate_info const &simulate_info) {
+  void simulate(World const &world, World_simulate_info const &simulate_info) {
     build_aabb_tree(simulate_info.delta_time);
     clear_neighbor_state();
     find_neighbor_pairs();
@@ -1453,8 +1478,8 @@ public:
         }
       }
     }
-    call_particle_motion_callbacks();
-    call_dynamic_rigid_body_motion_callbacks();
+    call_particle_motion_callbacks(world);
+    call_dynamic_rigid_body_motion_callbacks(world);
   }
 
 private:
@@ -3380,20 +3405,19 @@ private:
     }
   }
 
-  void call_particle_motion_callbacks() {
-    _particles.for_each([&](Particle_handle handle, Particle_data *data) {
+  void call_particle_motion_callbacks(World const &world) {
+    _particles.for_each([&](Particle_handle particle, Particle_data *data) {
       if (data->motion_callback != nullptr) {
-        data->motion_callback->on_particle_motion({handle, data->position});
+        data->motion_callback->on_particle_motion(world, particle);
       }
     });
   }
 
-  void call_dynamic_rigid_body_motion_callbacks() {
+  void call_dynamic_rigid_body_motion_callbacks(World const &world) {
     _rigid_bodies.for_each(
-        [&](Rigid_body_handle handle, Rigid_body_data *data) {
+        [&](Rigid_body_handle rigid_body, Rigid_body_data *data) {
           if (data->motion_callback != nullptr) {
-            data->motion_callback->on_rigid_body_motion(
-                {handle, data->position, data->orientation});
+            data->motion_callback->on_rigid_body_motion(world, rigid_body);
           }
         });
   }
@@ -3619,13 +3643,8 @@ void World::destroy_particle(Particle_handle particle) {
   _impl->destroy_particle(particle);
 }
 
-Static_body_handle
-World::create_static_body(Static_body_create_info const &create_info) {
-  return _impl->create_static_rigid_body(create_info);
-}
-
-void World::destroy_static_body(Static_body_handle static_rigid_body) {
-  _impl->destroy_static_rigid_body(static_rigid_body);
+math::Vec3f World::get_position(Particle_handle particle) const noexcept {
+  return _impl->get_position(particle);
 }
 
 Rigid_body_handle
@@ -3637,8 +3656,26 @@ void World::destroy_rigid_body(Rigid_body_handle handle) {
   _impl->destroy_dynamic_rigid_body(handle);
 }
 
+math::Vec3f World::get_position(Rigid_body_handle rigid_body) const noexcept {
+  return _impl->get_position(rigid_body);
+}
+
+math::Quatf
+World::get_orientation(Rigid_body_handle rigid_body) const noexcept {
+  return _impl->get_orientation(rigid_body);
+}
+
+Static_body_handle
+World::create_static_body(Static_body_create_info const &create_info) {
+  return _impl->create_static_rigid_body(create_info);
+}
+
+void World::destroy_static_body(Static_body_handle static_rigid_body) {
+  _impl->destroy_static_rigid_body(static_rigid_body);
+}
+
 void World::simulate(World_simulate_info const &simulate_info) {
-  return _impl->simulate(simulate_info);
+  return _impl->simulate(*this, simulate_info);
 }
 } // namespace physics
 } // namespace marlon

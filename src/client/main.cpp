@@ -85,35 +85,35 @@ graphics::Unique_surface_mesh_ptr
 create_cube_mesh(graphics::Graphics *graphics) {
   std::vector<graphics::Surface_vertex> const vertices{
       // -x face
-      {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
-      {{-1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}},
-      {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
-      {{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+      {{-1.0f, -1.0f, -1.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+      {{-1.0f, -1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+      {{-1.0f, 1.0f, -1.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+      {{-1.0f, 1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
       // +x face
-      {{1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}},
-      {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
-      {{1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-      {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
+      {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+      {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+      {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+      {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
       // -y face
-      {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
-      {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
-      {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}},
-      {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}},
+      {{-1.0f, -1.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
+      {{1.0f, -1.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+      {{-1.0f, -1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}},
+      {{1.0f, -1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
       // +y face
-      {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
-      {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},
-      {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
-      {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
+      {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+      {{1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+      {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+      {{1.0f, 1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
       // -z face
-      {{1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
-      {{-1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}},
-      {{1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}},
-      {{-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}},
+      {{1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+      {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+      {{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+      {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
       // +z face
-      {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}},
-      {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}},
-      {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-      {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}};
+      {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+      {{1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+      {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+      {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}};
   std::vector<std::uint16_t> const indices{
       0,  1,  2,  3,  2,  1,  4,  5,  6,  7,  6,  5,  8,  9,  10, 11, 10, 9,
       12, 13, 14, 15, 14, 13, 16, 17, 18, 19, 18, 17, 20, 21, 22, 23, 22, 21};
@@ -125,18 +125,18 @@ graphics::Unique_surface_mesh_ptr
 create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
   auto const phi = std::numbers::phi_v<float>;
   std::vector<graphics::Surface_vertex> vertices{
-      {normalize(math::Vec3f{phi, 1.0f, 0.0f}), {}},
-      {normalize(math::Vec3f{phi, -1.0f, 0.0f}), {}},
-      {normalize(math::Vec3f{-phi, -1.0f, 0.0f}), {}},
-      {normalize(math::Vec3f{-phi, 1.0f, 0.0f}), {}},
-      {normalize(math::Vec3f{1.0f, 0.0f, phi}), {}},
-      {normalize(math::Vec3f{-1.0f, 0.0f, phi}), {}},
-      {normalize(math::Vec3f{-1.0f, 0.0f, -phi}), {}},
-      {normalize(math::Vec3f{1.0f, 0.0f, -phi}), {}},
-      {normalize(math::Vec3f{0.0f, phi, 1.0f}), {}},
-      {normalize(math::Vec3f{0.0f, phi, -1.0f}), {}},
-      {normalize(math::Vec3f{0.0f, -phi, -1.0f}), {}},
-      {normalize(math::Vec3f{0.0f, -phi, 1.0f}), {}}};
+      {normalize(math::Vec3f{phi, 1.0f, 0.0f}), {}, {}},
+      {normalize(math::Vec3f{phi, -1.0f, 0.0f}), {}, {}},
+      {normalize(math::Vec3f{-phi, -1.0f, 0.0f}), {}, {}},
+      {normalize(math::Vec3f{-phi, 1.0f, 0.0f}), {}, {}},
+      {normalize(math::Vec3f{1.0f, 0.0f, phi}), {}, {}},
+      {normalize(math::Vec3f{-1.0f, 0.0f, phi}), {}, {}},
+      {normalize(math::Vec3f{-1.0f, 0.0f, -phi}), {}, {}},
+      {normalize(math::Vec3f{1.0f, 0.0f, -phi}), {}, {}},
+      {normalize(math::Vec3f{0.0f, phi, 1.0f}), {}, {}},
+      {normalize(math::Vec3f{0.0f, phi, -1.0f}), {}, {}},
+      {normalize(math::Vec3f{0.0f, -phi, -1.0f}), {}, {}},
+      {normalize(math::Vec3f{0.0f, -phi, 1.0f}), {}, {}}};
   std::vector<std::uint16_t> indices{
       0, 9, 8,  0, 8,  4,  0,  4, 1, 0, 1, 7,  0, 7,  9,  3, 8,  9,  3, 9,
       6, 3, 6,  2, 3,  2,  5,  3, 5, 8, 4, 8,  5, 11, 1,  4, 11, 4,  5, 11,
@@ -152,11 +152,11 @@ create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
       auto const &vertex_1 = vertices[index_1];
       auto const &vertex_2 = vertices[index_2];
       auto const new_vertex_0 = graphics::Surface_vertex{
-          normalize(0.5f * (vertex_0.position + vertex_1.position)), {}};
+          normalize(0.5f * (vertex_0.position + vertex_1.position)), {}, {}};
       auto const new_vertex_1 = graphics::Surface_vertex{
-          normalize(0.5f * (vertex_1.position + vertex_2.position)), {}};
+          normalize(0.5f * (vertex_1.position + vertex_2.position)), {}, {}};
       auto const new_vertex_2 = graphics::Surface_vertex{
-          normalize(0.5f * (vertex_2.position + vertex_0.position)), {}};
+          normalize(0.5f * (vertex_2.position + vertex_0.position)), {}, {}};
       auto const new_vertex_0_index =
           static_cast<std::uint32_t>(vertices.size());
       auto const new_vertex_1_index =
@@ -179,6 +179,9 @@ create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
       indices.emplace_back(new_vertex_1_index);
       indices.emplace_back(new_vertex_2_index);
     }
+  }
+  for (auto &vertex : vertices) {
+    vertex.normal = normalize(vertex.position);
   }
   return graphics->create_surface_mesh_unique({
       .indices = indices,
@@ -217,7 +220,7 @@ public:
                 {
                     .substep_count = 24,
                 },
-            .window_extents = {1600, 900},
+            .window_extents = {1920, 1080},
         }} {}
 
   void pre_loop() final {
@@ -284,10 +287,6 @@ public:
         .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
                                    {0.0f, 0.5f, 0.0f, -0.5f},
                                    {0.0f, 0.0f, 100.0f, 0.0f}},
-    });
-    _test_wireframe = scene->create_wireframe_unique({
-        .mesh = _resources.cube_wireframe_mesh.get(),
-        .color = {1.0f, 0.5f, 0.0f},
     });
     camera->set_position({-10.0f, 3.5f, 10.0f});
     camera->set_zoom(math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f);
@@ -359,7 +358,7 @@ public:
       if (_box_count == 768) {
         _box_spawn_timer = -1000000.0f;
       }
-      _cotton_box_manager->create({
+      auto const new_box = _cotton_box_manager->create({
           .position = math::Vec3f{_box_spawn_offset_x,
                                   _box_spawn_height,
                                   _box_spawn_offset_z},
@@ -368,6 +367,23 @@ public:
                                                  math::deg_to_rad(90.0f)),
           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
       });
+      if (_box_count == 565) {
+        _selection = new_box;
+      }
+    }
+    if (_selection) {
+      if (!_selection_wireframe) {
+        _selection_wireframe = get_scene()->create_wireframe_unique({
+            .mesh = _resources.cube_wireframe_mesh.get(),
+            .color = {1.0f, 0.5f, 0.0f},
+        });
+      }
+      auto const rigid_body = _cotton_box_manager->get_rigid_body(*_selection);
+      auto const transform =
+          math::Mat3x4f::trs(get_world()->get_position(rigid_body),
+                             get_world()->get_orientation(rigid_body),
+                             0.3f);
+      _selection_wireframe->set_transform(transform);
     }
   }
 
@@ -376,7 +392,8 @@ private:
   std::unique_ptr<client::Static_prop_manager> _red_ball_manager;
   std::unique_ptr<client::Dynamic_prop_manager> _cotton_box_manager;
   graphics::Unique_surface_ptr _ground_surface;
-  graphics::Unique_wireframe_ptr _test_wireframe;
+  graphics::Unique_wireframe_ptr _selection_wireframe;
+  std::optional<client::Dynamic_prop_handle> _selection;
   float _camera_yaw{math::deg_to_rad(-45.0f)};
   float _camera_pitch{0.0f};
   int _box_count{0};

@@ -47,12 +47,18 @@ public:
 
   Particle_handle create_particle(Particle_create_info const &create_info);
 
-  void destroy_particle(Particle_handle handle);
+  void destroy_particle(Particle_handle particle);
+
+  math::Vec3f get_position(Particle_handle particle) const noexcept;
 
   Rigid_body_handle
   create_rigid_body(Rigid_body_create_info const &create_info);
 
-  void destroy_rigid_body(Rigid_body_handle handle);
+  void destroy_rigid_body(Rigid_body_handle rigid_body);
+
+  math::Vec3f get_position(Rigid_body_handle rigid_body) const noexcept;
+
+  math::Quatf get_orientation(Rigid_body_handle rigid_body) const noexcept;
 
   Static_body_handle
   create_static_body(Static_body_create_info const &create_info);

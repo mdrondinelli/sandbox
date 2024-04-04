@@ -28,10 +28,12 @@ constexpr auto surface_vertex_shader_source = R"(
 #version 460 core
 
 layout(location = 0) in vec3 model_space_position;
-layout(location = 1) in vec2 texcoord;
+layout(location = 1) in vec3 model_space_normal;
+layout(location = 2) in vec2 texcoord;
 
 out Vertex_data {
   vec3 view_space_position;
+  vec3 view_space_normal;
   vec2 texcoord;
 } vertex_data;
 
@@ -40,6 +42,7 @@ layout(location = 1) uniform mat4 model_view_clip_matrix;
 
 void main() {
   vertex_data.view_space_position = (model_view_matrix * vec4(model_space_position, 1.0)).xyz;
+  vertex_data.view_space_normal = (model_view_matrix * vec4(model_space_normal, 0.0)).xyz;
   vertex_data.texcoord = texcoord;
   gl_Position = model_view_clip_matrix * vec4(model_space_position, 1.0);
 }
@@ -50,6 +53,7 @@ constexpr auto surface_fragment_shader_source = R"(
 
 in Vertex_data {
   vec3 view_space_position;
+  vec3 view_space_normal;
   vec2 texcoord;
 } vertex_data;
 
@@ -70,7 +74,7 @@ vec3 tonemap(vec3 v) {
 
 void main() {
   vec3 base_color = texture(base_color_texture, vertex_data.texcoord).rgb * base_color_tint;
-  vec3 n = normalize(cross(dFdx(vertex_data.view_space_position), dFdy(vertex_data.view_space_position)));
+  vec3 n = normalize(vertex_data.view_space_normal);
   vec3 l = normalize(vec3(-1.0, 1.0, 1.0));
   out_color = vec4(base_color * (max(dot(n, l), 0.0) * 0.9 + 0.1), 1.0);
 }
@@ -289,9 +293,11 @@ void Gl_graphics::render(Render_info const &info) {
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glEnable(GL_POLYGON_OFFSET_FILL);
+  glPolygonOffset(1.0f, 1.0f);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LESS);
-  glDisable(GL_BLEND);
+  // glDisable(GL_BLEND);
   glEnable(GL_FRAMEBUFFER_SRGB);
   glUseProgram(_surface_shader_program.get());
   gl_source_scene->draw_surfaces(_surface_shader_program.get(),
@@ -301,10 +307,13 @@ void Gl_graphics::render(Render_info const &info) {
                                  2,
                                  view_matrix_4x4,
                                  clip_matrix * view_matrix_4x4);
+  // glEnable(GL_POLYGON_OFFSET_LINE);
+  // glPolygonOffset(0.0f, -100.0f);
+  glLineWidth(2.0f);
   glDepthFunc(GL_LEQUAL);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glEnable(GL_LINE_SMOOTH);
+  // glEnable(GL_BLEND);
+  // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  // glEnable(GL_LINE_SMOOTH);
   glUseProgram(_wireframe_shader_program.get());
   gl_source_scene->draw_wireframes(
       _wireframe_shader_program.get(), 0, 1, clip_matrix * view_matrix_4x4);

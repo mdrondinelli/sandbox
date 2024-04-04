@@ -28,16 +28,14 @@ struct Particle_create_info {
   math::Vec3f velocity{math::Vec3f::zero()};
 };
 
-struct Particle_motion_event {
-  Particle_handle handle;
-  math::Vec3f position;
-};
+class World;
 
 class Particle_motion_callback {
 public:
   virtual ~Particle_motion_callback() = default;
 
-  virtual void on_particle_motion(Particle_motion_event const &event) = 0;
+  virtual void on_particle_motion(World const &world,
+                                  Particle_handle particle) = 0;
 };
 
 constexpr bool operator==(Particle_handle lhs, Particle_handle rhs) noexcept {

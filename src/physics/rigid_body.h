@@ -29,17 +29,14 @@ struct Rigid_body_create_info {
   math::Vec3f angular_velocity{math::Vec3f::zero()};
 };
 
-struct Rigid_body_motion_event {
-  Rigid_body_handle handle;
-  math::Vec3f position;
-  math::Quatf orientation;
-};
+class World;
 
 class Rigid_body_motion_callback {
 public:
   virtual ~Rigid_body_motion_callback() = default;
 
-  virtual void on_rigid_body_motion(Rigid_body_motion_event const &event) = 0;
+  virtual void on_rigid_body_motion(World const &world,
+                                    Rigid_body_handle rigid_body) = 0;
 };
 
 constexpr bool operator==(Rigid_body_handle lhs,

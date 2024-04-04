@@ -9,6 +9,7 @@ namespace marlon {
 namespace graphics {
 struct Surface_vertex {
   math::Vec3f position;
+  math::Vec3f normal;
   math::Vec2f texcoord;
 };
 

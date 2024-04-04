@@ -35,6 +35,7 @@ Gl_surface_mesh::Gl_surface_mesh(Surface_mesh_create_info const &create_info)
                                 decltype(create_info.vertices)::element_type)));
   glEnableVertexArrayAttrib(_vertex_array.get(), 0);
   glEnableVertexArrayAttrib(_vertex_array.get(), 1);
+  glEnableVertexArrayAttrib(_vertex_array.get(), 2);
   glVertexArrayAttribFormat(_vertex_array.get(),
                             0,
                             3,
@@ -43,12 +44,19 @@ Gl_surface_mesh::Gl_surface_mesh(Surface_mesh_create_info const &create_info)
                             offsetof(Surface_vertex, position));
   glVertexArrayAttribFormat(_vertex_array.get(),
                             1,
+                            3,
+                            GL_FLOAT,
+                            GL_FALSE,
+                            offsetof(Surface_vertex, normal));
+  glVertexArrayAttribFormat(_vertex_array.get(),
+                            2,
                             2,
                             GL_FLOAT,
                             GL_FALSE,
                             offsetof(Surface_vertex, texcoord));
   glVertexArrayAttribBinding(_vertex_array.get(), 0, 0);
   glVertexArrayAttribBinding(_vertex_array.get(), 1, 0);
+  glVertexArrayAttribBinding(_vertex_array.get(), 2, 0);
 }
 
 void Gl_surface_mesh::bind_vertex_array() const noexcept {
