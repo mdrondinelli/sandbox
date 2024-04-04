@@ -284,15 +284,15 @@ void Gl_graphics::render(Render_info const &info) {
       math::Mat4x4f{view_matrix_3x4, {0.0f, 0.0f, 0.0f, 1.0f}};
   auto const clip_matrix = calculate_clip_matrix(
       info.zoom, info.near_plane_distance, info.far_plane_distance);
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_FRAMEBUFFER_SRGB);
   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
   auto const viewport_extents = gl_target->get_extents();
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LESS);
   glDisable(GL_BLEND);
+  glEnable(GL_FRAMEBUFFER_SRGB);
   glUseProgram(_surface_shader_program.get());
   gl_source_scene->draw_surfaces(_surface_shader_program.get(),
                                  _default_base_color_texture.get(),
@@ -303,8 +303,8 @@ void Gl_graphics::render(Render_info const &info) {
                                  clip_matrix * view_matrix_4x4);
   glDepthFunc(GL_LEQUAL);
   glEnable(GL_BLEND);
-  glEnable(GL_LINE_SMOOTH);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glEnable(GL_LINE_SMOOTH);
   glUseProgram(_wireframe_shader_program.get());
   gl_source_scene->draw_wireframes(
       _wireframe_shader_program.get(), 0, 1, clip_matrix * view_matrix_4x4);
