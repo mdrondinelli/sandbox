@@ -11,6 +11,7 @@
 #include "surface_material.h"
 #include "surface_mesh.h"
 #include "texture.h"
+#include "wireframe_mesh.h"
 
 namespace marlon {
 namespace graphics {
@@ -67,12 +68,24 @@ private:
   Graphics *_owner;
 };
 
+class Wireframe_mesh_deleter {
+public:
+  Wireframe_mesh_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
+
+  void operator()(Wireframe_mesh *wireframe_mesh) const noexcept;
+
+private:
+  Graphics *_owner;
+};
+
 using Unique_scene_ptr = std::unique_ptr<Scene, Scene_deleter>;
 using Unique_surface_material_ptr =
     std::unique_ptr<Surface_material, Surface_material_deleter>;
 using Unique_surface_mesh_ptr =
     std::unique_ptr<Surface_mesh, Surface_mesh_deleter>;
 using Unique_texture_ptr = std::unique_ptr<Texture, Texture_deleter>;
+using Unique_wireframe_mesh_ptr =
+    std::unique_ptr<Wireframe_mesh, Wireframe_mesh_deleter>;
 
 class Graphics {
 public:
@@ -98,6 +111,17 @@ public:
   Unique_surface_mesh_ptr
   create_surface_mesh_unique(Surface_mesh_create_info const &create_info) {
     return Unique_surface_mesh_ptr{create_surface_mesh(create_info), this};
+  }
+
+  virtual Wireframe_mesh *
+  create_wireframe_mesh(Wireframe_mesh_create_info const &create_info) = 0;
+
+  virtual void
+  destroy_wireframe_mesh(Wireframe_mesh *wireframe_mesh) noexcept = 0;
+
+  Unique_wireframe_mesh_ptr
+  create_wireframe_mesh_unique(Wireframe_mesh_create_info const &create_info) {
+    return Unique_wireframe_mesh_ptr{create_wireframe_mesh(create_info), this};
   }
 
   virtual Texture *create_texture(Texture_create_info const &create_info) = 0;
@@ -150,6 +174,13 @@ Surface_mesh_deleter::operator()(Surface_mesh *surface_mesh) const noexcept {
 inline void Texture_deleter::operator()(Texture *texture) const noexcept {
   if (_owner) {
     _owner->destroy_texture(texture);
+  }
+}
+
+inline void Wireframe_mesh_deleter::operator()(
+    Wireframe_mesh *wireframe_mesh) const noexcept {
+  if (_owner) {
+    _owner->destroy_wireframe_mesh(wireframe_mesh);
   }
 }
 } // namespace graphics

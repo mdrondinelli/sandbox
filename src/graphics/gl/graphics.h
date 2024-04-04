@@ -47,6 +47,11 @@ public:
 
   void destroy_surface_mesh(Surface_mesh *surface_mesh) noexcept final;
 
+  Wireframe_mesh *
+  create_wireframe_mesh(Wireframe_mesh_create_info const &create_info) final;
+
+  void destroy_wireframe_mesh(Wireframe_mesh *wireframe_mesh) noexcept final;
+
   Texture *create_texture(Texture_create_info const &create_info) final;
 
   void destroy_texture(Texture *texture) noexcept final;
@@ -55,7 +60,8 @@ public:
 
 private:
   std::unique_ptr<Gl_default_render_target> _default_render_target;
-  Gl_unique_shader_program_handle _shader_program;
+  Gl_unique_shader_program_handle _surface_shader_program;
+  Gl_unique_shader_program_handle _wireframe_shader_program;
   Gl_unique_texture_handle _default_base_color_texture;
 };
 } // namespace graphics

@@ -6,7 +6,7 @@
 
 namespace marlon {
 namespace graphics {
-class Gl_texture : public Texture {
+class Gl_texture final : public Texture {
   friend class Gl_scene;
 
 public:

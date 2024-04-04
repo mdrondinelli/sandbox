@@ -24,7 +24,9 @@
 namespace marlon {
 namespace graphics {
 namespace {
-constexpr auto surface_vertex_shader_source = R"(#version 460 core
+constexpr auto surface_vertex_shader_source = R"(
+#version 460 core
+
 layout(location = 0) in vec3 model_space_position;
 layout(location = 1) in vec2 texcoord;
 
@@ -43,13 +45,15 @@ void main() {
 }
 )";
 
-constexpr auto surface_fragment_shader_source = R"(#version 460 core
+constexpr auto surface_fragment_shader_source = R"(
+#version 460 core
+
 in Vertex_data {
   vec3 view_space_position;
   vec2 texcoord;
 } vertex_data;
 
-layout(location = 0) out vec4 fragColor;
+layout(location = 0) out vec4 out_color;
 
 layout(binding = 0) uniform sampler2D base_color_texture;
 layout(location = 2) uniform vec3 base_color_tint;
@@ -68,7 +72,31 @@ void main() {
   vec3 base_color = texture(base_color_texture, vertex_data.texcoord).rgb * base_color_tint;
   vec3 n = normalize(cross(dFdx(vertex_data.view_space_position), dFdy(vertex_data.view_space_position)));
   vec3 l = normalize(vec3(-1.0, 1.0, 1.0));
-  fragColor = vec4(base_color * (max(dot(n, l), 0.0) * 0.9 + 0.1), 1.0);
+  out_color = vec4(base_color * (max(dot(n, l), 0.0) * 0.9 + 0.1), 1.0);
+}
+)";
+
+constexpr auto wireframe_vertex_shader_source = R"(
+#version 460 core
+
+layout(location = 0) in vec3 model_space_position;
+
+layout(location = 0) uniform mat4 model_view_clip_matrix;
+
+void main() {
+  gl_Position = model_view_clip_matrix * vec4(model_space_position, 1.0);
+}
+)";
+
+constexpr auto wireframe_fragment_shader_source = R"(
+#version 460 core
+
+layout(location = 0) out vec4 out_color;
+
+layout(location = 1) uniform vec3 in_color;
+
+void main() {
+  out_color = vec4(in_color, 1.0);
 }
 )";
 
@@ -100,6 +128,24 @@ void link_shader_program(GLuint shader_program) {
   }
 }
 
+Gl_unique_shader_program_handle
+make_shader_program(char const *vertex_shader_source,
+                    char const *fragment_shader_source) {
+  auto const vertex_shader{gl_make_unique_shader(GL_VERTEX_SHADER)};
+  glShaderSource(vertex_shader.get(), 1, &vertex_shader_source, nullptr);
+  compile_shader(vertex_shader.get());
+  auto const fragment_shader{gl_make_unique_shader(GL_FRAGMENT_SHADER)};
+  glShaderSource(fragment_shader.get(), 1, &fragment_shader_source, nullptr);
+  compile_shader(fragment_shader.get());
+  auto result = gl_make_unique_shader_program();
+  glAttachShader(result.get(), vertex_shader.get());
+  glAttachShader(result.get(), fragment_shader.get());
+  link_shader_program(result.get());
+  glDetachShader(result.get(), vertex_shader.get());
+  glDetachShader(result.get(), fragment_shader.get());
+  return result;
+}
+
 Gl_unique_texture_handle make_default_base_color_texture() {
   auto result = gl_make_unique_texture(GL_TEXTURE_2D);
   auto const pixels = std::array<std::uint8_t, 4>{0xFF, 0xFF, 0xFF, 0xFF};
@@ -118,20 +164,10 @@ Gl_graphics::Gl_graphics(Gl_graphics_create_info const &create_info) {
       Gl_default_render_target_create_info{
           .window = create_info.window,
       });
-  auto const vertex_shader{gl_make_unique_shader(GL_VERTEX_SHADER)};
-  glShaderSource(
-      vertex_shader.get(), 1, &surface_vertex_shader_source, nullptr);
-  compile_shader(vertex_shader.get());
-  auto const fragment_shader{gl_make_unique_shader(GL_FRAGMENT_SHADER)};
-  glShaderSource(
-      fragment_shader.get(), 1, &surface_fragment_shader_source, nullptr);
-  compile_shader(fragment_shader.get());
-  _shader_program = gl_make_unique_shader_program();
-  glAttachShader(_shader_program.get(), vertex_shader.get());
-  glAttachShader(_shader_program.get(), fragment_shader.get());
-  link_shader_program(_shader_program.get());
-  glDetachShader(_shader_program.get(), vertex_shader.get());
-  glDetachShader(_shader_program.get(), fragment_shader.get());
+  _surface_shader_program = make_shader_program(surface_vertex_shader_source,
+                                                surface_fragment_shader_source);
+  _wireframe_shader_program = make_shader_program(
+      wireframe_vertex_shader_source, wireframe_fragment_shader_source);
   _default_base_color_texture = make_default_base_color_texture();
 }
 
@@ -168,6 +204,16 @@ Gl_graphics::create_surface_mesh(Surface_mesh_create_info const &create_info) {
 
 void Gl_graphics::destroy_surface_mesh(Surface_mesh *surface_mesh) noexcept {
   delete static_cast<Gl_surface_mesh *>(surface_mesh);
+}
+
+Wireframe_mesh *Gl_graphics::create_wireframe_mesh(
+    Wireframe_mesh_create_info const &create_info) {
+  return new Gl_wireframe_mesh{create_info};
+}
+
+void Gl_graphics::destroy_wireframe_mesh(
+    Wireframe_mesh *wireframe_mesh) noexcept {
+  delete static_cast<Gl_wireframe_mesh *>(wireframe_mesh);
 }
 
 Texture *Gl_graphics::create_texture(Texture_create_info const &create_info) {
@@ -245,14 +291,17 @@ void Gl_graphics::render(Render_info const &info) {
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  glUseProgram(_shader_program.get());
-  gl_source_scene->draw_surfaces(_shader_program.get(),
+  glUseProgram(_surface_shader_program.get());
+  gl_source_scene->draw_surfaces(_surface_shader_program.get(),
                                  _default_base_color_texture.get(),
                                  0,
                                  1,
                                  2,
                                  view_matrix_4x4,
                                  clip_matrix * view_matrix_4x4);
+  glUseProgram(_wireframe_shader_program.get());
+  gl_source_scene->draw_wireframes(
+      _wireframe_shader_program.get(), 0, 1, clip_matrix * view_matrix_4x4);
 }
 } // namespace graphics
 } // namespace marlon

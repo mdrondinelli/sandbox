@@ -44,6 +44,7 @@ add_library(
   "src/graphics/gl/unique_shader_program_handle.cpp"
   "src/graphics/gl/unique_texture_handle.cpp"
   "src/graphics/gl/unique_vertex_array_handle.cpp"
+  "src/graphics/gl/wireframe_mesh.cpp"
   "src/graphics/glad/gl.cpp"
 )
 add_library(

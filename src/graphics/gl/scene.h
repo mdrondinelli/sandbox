@@ -8,13 +8,11 @@
 #include "../../util/set.h"
 #include "../scene.h"
 #include "surface.h"
+#include "wireframe.h"
 
 namespace marlon {
 namespace graphics {
 class Gl_scene final : public Scene {
-  friend class Gl_graphics;
-  friend class Gl_scene_diff;
-
 public:
   explicit Gl_scene(Scene_create_info const &create_info) noexcept;
 
@@ -24,7 +22,10 @@ public:
 
   void destroy_surface(Surface *surface) noexcept final;
 
-private:
+  Wireframe *create_wireframe(Wireframe_create_info const &create_info) final;
+
+  void destroy_wireframe(Wireframe *wireframe) noexcept final;
+
   void draw_surfaces(std::uint32_t shader_program,
                      std::uint32_t default_base_color_texture,
                      std::int32_t model_view_matrix_location,
@@ -32,10 +33,18 @@ private:
                      std::int32_t base_color_tint_location,
                      math::Mat4x4f const &view_matrix,
                      math::Mat4x4f const &view_clip_matrix);
-  
+
+  void draw_wireframes(std::uint32_t shader_program,
+                       std::int32_t model_view_clip_matrix_location,
+                       std::int32_t color_location,
+                       math::Mat4x4f const &view_clip_matrix);
+
+private:
   util::Block _memory;
   util::Pool<Gl_surface> _surface_pool;
+  util::Pool<Gl_wireframe> _wireframe_pool;
   util::Set<Gl_surface *> _surfaces;
+  util::Set<Gl_wireframe *> _wireframes;
   // std::unique_ptr<Impl> _impl;
 };
 } // namespace graphics

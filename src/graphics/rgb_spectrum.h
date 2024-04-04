@@ -13,6 +13,10 @@ public:
 
   constexpr Rgb_spectrum(float r, float g, float b) noexcept
       : r{r}, g{g}, b{b} {}
+
+  static constexpr Rgb_spectrum black() noexcept {
+    return Rgb_spectrum{0.0f};
+  }
 };
 } // namespace graphics
 } // namespace marlon

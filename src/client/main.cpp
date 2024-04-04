@@ -23,16 +23,20 @@ struct Resources {
   graphics::Unique_surface_mesh_ptr cube_mesh;
   graphics::Unique_surface_mesh_ptr low_quality_sphere_mesh;
   graphics::Unique_surface_mesh_ptr high_quality_sphere_mesh;
+  graphics::Unique_wireframe_mesh_ptr cube_wireframe_mesh;
 };
 
 graphics::Unique_texture_ptr create_texture(graphics::Graphics *graphics,
                                             const char *path);
 
 graphics::Unique_surface_mesh_ptr
-create_cuboid_mesh(graphics::Graphics *graphics);
+create_cube_mesh(graphics::Graphics *graphics);
 
 graphics::Unique_surface_mesh_ptr
 create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions = 0);
+
+graphics::Unique_wireframe_mesh_ptr
+create_wireframe_cube_mesh(graphics::Graphics *graphics);
 
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
@@ -50,9 +54,10 @@ Resources create_resources(graphics::Graphics *graphics) {
       {.base_color_tint = {0.00f, 0.005f, 0.02f}});
   retval.particle_material = graphics->create_surface_material_unique(
       {.base_color_tint = {0.25f, 0.5f, 1.0f}});
-  retval.cube_mesh = create_cuboid_mesh(graphics);
+  retval.cube_mesh = create_cube_mesh(graphics);
   retval.low_quality_sphere_mesh = create_icosphere_mesh(graphics, 1);
   retval.high_quality_sphere_mesh = create_icosphere_mesh(graphics, 3);
+  retval.cube_wireframe_mesh = create_wireframe_cube_mesh(graphics);
   return retval;
 }
 
@@ -77,7 +82,7 @@ graphics::Unique_texture_ptr create_texture(graphics::Graphics *graphics,
 }
 
 graphics::Unique_surface_mesh_ptr
-create_cuboid_mesh(graphics::Graphics *graphics) {
+create_cube_mesh(graphics::Graphics *graphics) {
   std::vector<graphics::Surface_vertex> const vertices{
       // -x face
       {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}},
@@ -181,6 +186,25 @@ create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
   });
 }
 
+graphics::Unique_wireframe_mesh_ptr
+create_wireframe_cube_mesh(graphics::Graphics *graphics) {
+  std::vector<math::Vec3f> const vertices{
+      {1.0f, 1.0f, 1.0f},
+      {-1.0f, 1.0f, 1.0f},
+      {-1.0f, -1.0f, 1.0f},
+      {1.0f, -1.0f, 1.0f},
+      {1.0f, 1.0f, -1.0f},
+      {-1.0f, 1.0f, -1.0f},
+      {-1.0f, -1.0f, -1.0f},
+      {1.0f, -1.0f, -1.0f},
+  };
+  std::vector<std::uint16_t> const indices{
+      0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7,
+  };
+  return graphics->create_wireframe_mesh_unique(
+      {.indices = indices, .vertices = vertices});
+}
+
 class Client : public engine::App {
 public:
   Client()
@@ -254,12 +278,17 @@ public:
             },
         .position = {0.0f, -0.5f, 0.0f},
     });
-    _ground_surface = scene->create_surface_unique(
-        {.mesh = _resources.cube_mesh.get(),
-         .material = _resources.blue_material.get(),
-         .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
-                                    {0.0f, 0.5f, 0.0f, -0.5f},
-                                    {0.0f, 0.0f, 100.0f, 0.0f}}});
+    _ground_surface = scene->create_surface_unique({
+        .mesh = _resources.cube_mesh.get(),
+        .material = _resources.blue_material.get(),
+        .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
+                                   {0.0f, 0.5f, 0.0f, -0.5f},
+                                   {0.0f, 0.0f, 100.0f, 0.0f}},
+    });
+    _test_wireframe = scene->create_wireframe_unique({
+        .mesh = _resources.cube_wireframe_mesh.get(),
+        .color = {1.0f, 0.5f, 0.0f},
+    });
     camera->set_position({-10.0f, 3.5f, 10.0f});
     camera->set_zoom(math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f);
     srand(25);
@@ -347,6 +376,7 @@ private:
   std::unique_ptr<client::Static_prop_manager> _red_ball_manager;
   std::unique_ptr<client::Dynamic_prop_manager> _cotton_box_manager;
   graphics::Unique_surface_ptr _ground_surface;
+  graphics::Unique_wireframe_ptr _test_wireframe;
   float _camera_yaw{math::deg_to_rad(-45.0f)};
   float _camera_pitch{0.0f};
   int _box_count{0};

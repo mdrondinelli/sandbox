@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "surface.h"
+#include "wireframe.h"
 
 namespace marlon {
 namespace graphics {
@@ -24,7 +25,18 @@ private:
   Scene *_owner;
 };
 
+class Wireframe_deleter {
+public:
+  Wireframe_deleter(Scene *owner = nullptr) noexcept : _owner{owner} {}
+
+  void operator()(Wireframe *wireframe) const noexcept;
+
+private:
+  Scene *_owner;
+};
+
 using Unique_surface_ptr = std::unique_ptr<Surface, Surface_deleter>;
+using Unique_wireframe_ptr = std::unique_ptr<Wireframe, Wireframe_deleter>;
 
 class Scene {
 public:
@@ -36,11 +48,27 @@ public:
   create_surface_unique(Surface_create_info const &create_info) {
     return Unique_surface_ptr{create_surface(create_info), this};
   }
+
+  virtual Wireframe *
+  create_wireframe(Wireframe_create_info const &create_info) = 0;
+
+  virtual void destroy_wireframe(Wireframe *wireframe) noexcept = 0;
+
+  Unique_wireframe_ptr
+  create_wireframe_unique(Wireframe_create_info const &create_info) {
+    return Unique_wireframe_ptr{create_wireframe(create_info), this};
+  }
 };
 
 inline void Surface_deleter::operator()(Surface *surface) const noexcept {
   if (_owner) {
     _owner->destroy_surface(surface);
+  }
+}
+
+inline void Wireframe_deleter::operator()(Wireframe *wireframe) const noexcept {
+  if (_owner) {
+    _owner->destroy_wireframe(wireframe);
   }
 }
 } // namespace graphics

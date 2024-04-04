@@ -8,10 +8,11 @@ namespace marlon {
 namespace engine {
 Window::Window(Window_create_info const &create_info)
     : _glfw_window{[&]() {
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         return make_unique_glfw_window(
             create_info.extents.x, create_info.extents.y, create_info.title);
       }()} {
