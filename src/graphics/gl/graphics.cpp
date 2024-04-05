@@ -293,8 +293,8 @@ void Gl_graphics::render(Render_info const &info) {
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  glEnable(GL_POLYGON_OFFSET_FILL);
-  glPolygonOffset(1.0f, 1.0f);
+  // glEnable(GL_POLYGON_OFFSET_FILL);
+  // glPolygonOffset(1.0f, 1.0f);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LESS);
   // glDisable(GL_BLEND);
@@ -307,8 +307,8 @@ void Gl_graphics::render(Render_info const &info) {
                                  2,
                                  view_matrix_4x4,
                                  clip_matrix * view_matrix_4x4);
-  // glEnable(GL_POLYGON_OFFSET_LINE);
-  // glPolygonOffset(0.0f, -100.0f);
+  glEnable(GL_POLYGON_OFFSET_LINE);
+  glPolygonOffset(-1.0f, -1.0f);
   glLineWidth(2.0f);
   glDepthFunc(GL_LEQUAL);
   // glEnable(GL_BLEND);

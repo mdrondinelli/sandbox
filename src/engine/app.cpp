@@ -127,30 +127,41 @@ bool App::is_looping() const noexcept { return _looping; }
 
 void App::stop_looping() noexcept { _looping = false; }
 
-double App::get_delta_time() const noexcept { return _delta_time; }
+double App::get_loop_iteration_wall_time() const noexcept {
+  return _loop_iteration_wall_time;
+}
+
+double App::get_physics_simulation_wall_time() const noexcept {
+  return _physics_simulation_wall_time;
+}
 
 void App::loop() {
   using clock = std::chrono::high_resolution_clock;
   using duration = std::chrono::duration<double>;
-  _delta_time = 0.0;
+  _loop_iteration_wall_time = 0.0;
   auto previous_time = clock::now();
-  auto elapsed_time = 0.0;
+  auto accumulated_time = 0.0;
   _looping = true;
   while (_looping) {
     auto const current_time = clock::now();
-    _delta_time =
+    _loop_iteration_wall_time =
         std::chrono::duration_cast<duration>(current_time - previous_time)
             .count();
     previous_time = current_time;
-    elapsed_time += _delta_time;
+    accumulated_time += _loop_iteration_wall_time;
     _runtime->get_window()->pre_input();
     pre_input();
     glfwPollEvents();
     post_input();
-    if (elapsed_time >= _world_simulate_info.delta_time) {
-      elapsed_time -= _world_simulate_info.delta_time;
+    if (accumulated_time >= _world_simulate_info.delta_time) {
+      accumulated_time -= _world_simulate_info.delta_time;
       pre_physics();
+      auto const physics_begin_time = clock::now();
       _runtime->get_world()->simulate(_world_simulate_info);
+      auto const physics_end_time = clock::now();
+      _physics_simulation_wall_time = std::chrono::duration_cast<duration>(
+                                          physics_end_time - physics_begin_time)
+                                          .count();
       post_physics();
     }
     _runtime->render();

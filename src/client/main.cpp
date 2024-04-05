@@ -67,10 +67,10 @@ graphics::Unique_texture_ptr create_texture(graphics::Graphics *graphics,
   if (in) {
     in.seekg(0, std::ios_base::end);
     auto const file_size = static_cast<std::size_t>(in.tellg());
-    auto data = std::vector<unsigned char>();
+    auto data = std::vector<char>();
     data.resize(file_size);
     in.seekg(0, std::ios_base::beg);
-    in.read(reinterpret_cast<char *>(data.data()), file_size);
+    in.read(data.data(), file_size);
     std::cout << "read " << file_size << " bytes from " << path << std::endl;
     auto retval = graphics->create_texture_unique(
         {.source = graphics::Texture_memory_source{.data = data.data(),
@@ -218,8 +218,7 @@ public:
                 },
             .world_simulate_info =
                 {
-                    .delta_time = 1.0f / 64.0f,
-                    .substep_count = 32,
+                    .delta_time = 1.0f / 128.0f,
                 },
             .window_extents = {1920, 1080},
         }} {}
@@ -329,7 +328,7 @@ public:
       if (movement != math::Vec3f::zero()) {
         movement = 8.0f * normalize(movement);
       }
-      auto const dt = static_cast<float>(get_delta_time());
+      auto const dt = static_cast<float>(get_loop_iteration_wall_time());
       camera->set_position(camera->get_position() + movement * dt);
       _camera_yaw -= window->get_delta_cursor_position().x * 0.002f;
       _camera_pitch -= window->get_delta_cursor_position().y * 0.002f;
@@ -345,9 +344,9 @@ public:
   }
 
   void post_physics() final {
-    _box_spawn_timer += 1.0f / 64.0f;
+    _box_spawn_timer += 1.0f / 128.0f;
     if (_box_spawn_timer > 0.0f) {
-      _box_spawn_timer -= 0.1f;
+      _box_spawn_timer -= 0.01f;
       if (_box_spawn_height > 8.0f) {
         _box_spawn_height = 2.0f;
         _box_spawn_offset_x = 40 * (rand() / (float)RAND_MAX) - 20;
@@ -385,14 +384,9 @@ public:
                              get_world()->get_orientation(rigid_body),
                              0.3f);
       _selection_wireframe->set_transform(transform);
-      if (get_world()->is_awake(rigid_body)) {
-        std::cout << "box awake: waking motion = "
-                  << get_world()->get_waking_motion(rigid_body) << "\n";
-      } else {
-        std::cout << "box asleep: waking motion = "
-                  << get_world()->get_waking_motion(rigid_body) << "\n";
-      }
     }
+    std::cout << "physics: " << get_physics_simulation_wall_time() * 1000.0
+              << " ms\n";
   }
 
 private:

@@ -42,7 +42,9 @@ protected:
 
   void stop_looping() noexcept;
 
-  double get_delta_time() const noexcept;
+  double get_loop_iteration_wall_time() const noexcept;
+
+  double get_physics_simulation_wall_time() const noexcept;
 
   virtual void pre_loop() {}
 
@@ -68,7 +70,8 @@ private:
   Camera_create_info _camera_create_info;
   std::unique_ptr<Runtime> _runtime;
   bool _looping{false};
-  double _delta_time{0.0};
+  double _loop_iteration_wall_time{0.0};
+  double _physics_simulation_wall_time{0.0};
 };
 } // namespace engine
 } // namespace marlon

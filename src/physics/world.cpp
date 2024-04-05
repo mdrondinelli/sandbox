@@ -4,6 +4,8 @@
 
 #include <iostream>
 
+#include <omp.h>
+
 #include "../util/list.h"
 #include "../util/map.h"
 #include "aabb_tree.h"
@@ -215,30 +217,30 @@ public:
     }
   }
 
-  Particle_handle alloc() {
+  Particle_handle create(Particle_data const &data) {
     if (_free_indices.empty()) {
       throw std::runtime_error{"Out of space for particles"};
     }
     auto const index = _free_indices.back();
-    auto const handle = Particle_handle{index};
+    new (_data.get() + sizeof(Particle_data) * index) Particle_data{data};
     _free_indices.pop_back();
     _occupancy_bits[index] = true;
-    return handle;
+    return Particle_handle{index};
   }
 
-  void free(Particle_handle handle) {
-    _free_indices.emplace_back(handle.value);
-    _occupancy_bits[handle.value] = false;
+  void destroy(Particle_handle particle) {
+    _free_indices.emplace_back(particle.value);
+    _occupancy_bits[particle.value] = false;
   }
 
-  Particle_data const *data(Particle_handle handle) const {
-    return reinterpret_cast<Particle_data *>(
-        std::launder(_data.get() + sizeof(Particle_data) * handle.value));
+  Particle_data const *data(Particle_handle handle) const noexcept {
+    return std::launder(reinterpret_cast<Particle_data const *>(
+        _data.get() + sizeof(Particle_data) * handle.value));
   }
 
-  Particle_data *data(Particle_handle handle) {
-    return reinterpret_cast<Particle_data *>(
-        std::launder(_data.get() + sizeof(Particle_data) * handle.value));
+  Particle_data *data(Particle_handle handle) noexcept {
+    return std::launder(reinterpret_cast<Particle_data *>(
+        _data.get() + sizeof(Particle_data) * handle.value));
   }
 
   template <typename F> void for_each(F &&f) {
@@ -271,30 +273,30 @@ public:
     }
   }
 
-  Rigid_body_handle alloc() {
+  Rigid_body_handle create(Rigid_body_data const &data) {
     if (_free_indices.empty()) {
       throw std::runtime_error{"Out of space for static rigid bodies"};
     }
     auto const index = _free_indices.back();
-    auto const handle = Rigid_body_handle{index};
+    new (_data.get() + sizeof(Rigid_body_data) * index) Rigid_body_data{data};
     _free_indices.pop_back();
     _occupancy_bits[index] = true;
-    return handle;
+    return Rigid_body_handle{index};
   }
 
-  void free(Rigid_body_handle handle) {
-    _free_indices.emplace_back(handle.value);
-    _occupancy_bits[handle.value] = false;
+  void destroy(Rigid_body_handle rigid_body) {
+    _free_indices.emplace_back(rigid_body.value);
+    _occupancy_bits[rigid_body.value] = false;
   }
 
-  Rigid_body_data *data(Rigid_body_handle handle) {
-    return reinterpret_cast<Rigid_body_data *>(
-        std::launder(_data.get() + sizeof(Rigid_body_data) * handle.value));
+  Rigid_body_data const *data(Rigid_body_handle handle) const noexcept {
+    return std::launder(reinterpret_cast<Rigid_body_data const *>(
+        _data.get() + sizeof(Rigid_body_data) * handle.value));
   }
 
-  Rigid_body_data const *data(Rigid_body_handle handle) const {
-    return reinterpret_cast<Rigid_body_data const *>(
-        std::launder(_data.get() + sizeof(Rigid_body_data) * handle.value));
+  Rigid_body_data *data(Rigid_body_handle handle) noexcept {
+    return std::launder(reinterpret_cast<Rigid_body_data *>(
+        _data.get() + sizeof(Rigid_body_data) * handle.value));
   }
 
   template <typename F> void for_each(F &&f) {
@@ -327,25 +329,30 @@ public:
     }
   }
 
-  Static_body_handle alloc() {
+  Static_body_handle create(Static_body_data const &data) {
     if (_free_indices.empty()) {
       throw std::runtime_error{"Out of space for static rigid bodies"};
     }
     auto const index = _free_indices.back();
-    auto const handle = Static_body_handle{index};
+    new (_data.get() + sizeof(Static_body_data) * index) Static_body_data{data};
     _free_indices.pop_back();
     _occupancy_bits[index] = true;
-    return handle;
+    return Static_body_handle{index};
   }
 
-  void free(Static_body_handle handle) {
-    _free_indices.emplace_back(handle.value);
-    _occupancy_bits[handle.value] = false;
+  void destroy(Static_body_handle static_body) {
+    _free_indices.emplace_back(static_body.value);
+    _occupancy_bits[static_body.value] = false;
   }
 
-  Static_body_data *data(Static_body_handle handle) {
-    return reinterpret_cast<Static_body_data *>(
-        std::launder(_data.get() + sizeof(Static_body_data) * handle.value));
+  Static_body_data const *data(Static_body_handle handle) const noexcept {
+    return std::launder(reinterpret_cast<Static_body_data const *>(
+        _data.get() + sizeof(Static_body_data) * handle.value));
+  }
+
+  Static_body_data *data(Static_body_handle handle) noexcept {
+    return std::launder(reinterpret_cast<Static_body_data *>(
+        _data.get() + sizeof(Static_body_data) * handle.value));
   }
 
   template <typename F> void for_each(F &&f) {
@@ -715,7 +722,7 @@ auto constexpr velocity_damping_factor = 0.99f;
 auto constexpr waking_motion_epsilon = 1.0f / 32.0f;
 auto constexpr waking_motion_initializer = 2.0f * waking_motion_epsilon;
 auto constexpr waking_motion_limit = 8.0f * waking_motion_epsilon;
-auto constexpr waking_motion_smoothing_factor = 3.0f / 4.0f;
+auto constexpr waking_motion_smoothing_factor = 7.0f / 8.0f;
 
 class Contact_cache {
 public:
@@ -1358,27 +1365,27 @@ public:
     auto const bounds =
         Aabb{create_info.position - Vec3f::all(create_info.radius),
              create_info.position + Vec3f::all(create_info.radius)};
-    auto const handle = _particles.alloc();
-    // TODO: cleanup allocated handle if create_leaf fails
-    new (_particles.data(handle))
-        Particle_data{.aabb_tree_node = _aabb_tree.create_leaf(bounds, handle),
-                      .motion_callback = create_info.motion_callback,
-                      .radius = create_info.radius,
-                      .inverse_mass = 1.0f / create_info.mass,
-                      .material = create_info.material,
-                      .previous_position = create_info.position,
-                      .position = create_info.position,
-                      .velocity = create_info.velocity,
-                      .waking_motion = waking_motion_initializer,
-                      .marked = false,
-                      .visited = false,
-                      .awake = true};
-    return handle;
+    auto const particle = _particles.create({
+        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Particle_handle{}),
+        .motion_callback = create_info.motion_callback,
+        .radius = create_info.radius,
+        .inverse_mass = 1.0f / create_info.mass,
+        .material = create_info.material,
+        .previous_position = create_info.position,
+        .position = create_info.position,
+        .velocity = create_info.velocity,
+        .waking_motion = waking_motion_initializer,
+        .marked = false,
+        .visited = false,
+        .awake = true,
+    });
+    _particles.data(particle)->aabb_tree_node->payload = particle;
+    return particle;
   }
 
   void destroy_particle(Particle_handle particle) {
     _aabb_tree.destroy_leaf(_particles.data(particle)->aabb_tree_node);
-    _particles.free(particle);
+    _particles.destroy(particle);
   }
 
   bool is_awake(Particle_handle particle) const noexcept {
@@ -1397,10 +1404,9 @@ public:
   create_rigid_body(Rigid_body_create_info const &create_info) {
     auto const transform =
         Mat3x4f::rigid(create_info.position, create_info.orientation);
-    auto const handle = _rigid_bodies.alloc();
     auto const bounds = physics::bounds(create_info.shape, transform);
-    new (_rigid_bodies.data(handle)) Rigid_body_data{
-        .aabb_tree_node = _aabb_tree.create_leaf(bounds, handle),
+    auto const rigid_body = _rigid_bodies.create({
+        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Rigid_body_handle{}),
         .motion_callback = create_info.motion_callback,
         .shape = create_info.shape,
         .inverse_mass = 1.0f / create_info.mass,
@@ -1415,13 +1421,15 @@ public:
         .waking_motion = waking_motion_initializer,
         .marked = false,
         .visited = false,
-        .awake = true};
-    return handle;
+        .awake = true,
+    });
+    _rigid_bodies.data(rigid_body)->aabb_tree_node->payload = rigid_body;
+    return rigid_body;
   }
 
   void destroy_rigid_body(Rigid_body_handle rigid_body) {
     _aabb_tree.destroy_leaf(_rigid_bodies.data(rigid_body)->aabb_tree_node);
-    _rigid_bodies.free(rigid_body);
+    _rigid_bodies.destroy(rigid_body);
   }
 
   bool is_awake(Rigid_body_handle rigid_body) const noexcept {
@@ -1445,21 +1453,21 @@ public:
     auto const transform =
         Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const transform_inverse = rigid_inverse(transform);
-    // TODO: cleanup allocated handle if create_leaf fails
-    auto const handle = _static_bodies.alloc();
-    new (_static_bodies.data(handle)) Static_body_data{
-        .aabb_tree_node = _aabb_tree.create_leaf(
-            physics::bounds(create_info.shape, transform), handle),
+    auto const bounds = physics::bounds(create_info.shape, transform);
+    auto const static_body = _static_bodies.create({
+        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Static_body_handle{}),
         .shape = create_info.shape,
         .material = create_info.material,
         .transform = transform,
-        .inverse_transform = transform_inverse};
-    return handle;
+        .inverse_transform = transform_inverse,
+    });
+    _static_bodies.data(static_body)->aabb_tree_node->payload = static_body;
+    return static_body;
   }
 
   void destroy_static_rigid_body(Static_body_handle handle) {
     _aabb_tree.destroy_leaf(_static_bodies.data(handle)->aabb_tree_node);
-    _static_bodies.free(handle);
+    _static_bodies.destroy(handle);
   }
 
   void simulate(World const &world, World_simulate_info const &simulate_info) {
@@ -3389,9 +3397,9 @@ private:
     auto const data = _rigid_bodies.data(body);
     auto const particle_contacts =
         std::span{data->particle_contacts, data->particle_contact_count};
-    auto const dynamic_rigid_body_contacts =
+    auto const rigid_body_contacts =
         std::span{data->rigid_body_contacts, data->rigid_body_contact_count};
-    auto const static_rigid_body_contacts =
+    auto const static_body_contacts =
         std::span{data->static_body_contacts, data->static_body_contact_count};
     for (auto const contact : particle_contacts) {
       auto const delta =
@@ -3400,7 +3408,7 @@ private:
                contact->normal);
       contact->separating_velocity += delta;
     }
-    for (auto const contact : dynamic_rigid_body_contacts) {
+    for (auto const contact : rigid_body_contacts) {
       if (contact->bodies[0] == body) {
         auto const delta =
             dot(velocity_delta + cross(angular_velocity_delta,
@@ -3415,7 +3423,7 @@ private:
         contact->separating_velocity += delta;
       }
     }
-    for (auto const contact : static_rigid_body_contacts) {
+    for (auto const contact : static_body_contacts) {
       auto const delta = dot(velocity_delta + cross(angular_velocity_delta,
                                                     contact->relative_position),
                              contact->normal);

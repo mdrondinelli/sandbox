@@ -18,7 +18,7 @@
 namespace marlon {
 namespace graphics {
 namespace {
-ktxTexture *create_ktx_texture(Texture_create_info const &create_info) {
+ktxTexture2 *create_ktx_texture(Texture_create_info const &create_info) {
   ktxTexture2 *retval{};
   switch (create_info.source.index()) {
   case 0: {
@@ -26,8 +26,10 @@ ktxTexture *create_ktx_texture(Texture_create_info const &create_info) {
     assert(source.data != nullptr);
     assert(source.size != 0);
     auto const result = ktxTexture2_CreateFromMemory(
-        source.data, static_cast<ktx_size_t>(source.size),
-        KTX_TEXTURE_CREATE_NO_FLAGS, &retval);
+        static_cast<ktx_uint8_t const *>(source.data),
+        static_cast<ktx_size_t>(source.size),
+        KTX_TEXTURE_CREATE_NO_FLAGS,
+        &retval);
     if (result != KTX_SUCCESS) {
       throw std::runtime_error{"Failed to create ktx texture"};
     }
@@ -40,10 +42,10 @@ ktxTexture *create_ktx_texture(Texture_create_info const &create_info) {
     throw std::runtime_error{"Unhandled switch case"};
   }
   if (ktxTexture2_NeedsTranscoding(retval)) {
-    ktxTexture2_TranscodeBasis(retval, ktx_transcode_fmt_e::KTX_TTF_ETC2_RGBA,
-                               0);
+    ktxTexture2_TranscodeBasis(
+        retval, ktx_transcode_fmt_e::KTX_TTF_ETC2_RGBA, 0);
   }
-  return reinterpret_cast<ktxTexture *>(retval);
+  return retval;
 }
 } // namespace
 
@@ -52,9 +54,9 @@ Gl_texture::Gl_texture(Texture_create_info const &create_info) {
   // TODO: handle errors here
   GLuint handle{};
   GLenum target{};
-  auto const result =
-      ktxTexture_GLUpload(ktx_texture, &handle, &target, nullptr);
-  ktxTexture_Destroy(ktx_texture);
+  auto const result = ktxTexture_GLUpload(
+      reinterpret_cast<ktxTexture *>(ktx_texture), &handle, &target, nullptr);
+  ktxTexture_Destroy(reinterpret_cast<ktxTexture *>(ktx_texture));
   if (result != KTX_SUCCESS) {
     throw std::runtime_error{"Failed to upload ktx texture."};
   }

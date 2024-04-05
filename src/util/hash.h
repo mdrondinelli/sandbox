@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <bit>
+
 namespace marlon {
 namespace util {
 template <typename T> struct Hash;
@@ -38,7 +40,7 @@ template <> struct Hash<std::nullptr_t> {
 
 template <typename T> struct Hash<T *> {
   constexpr std::size_t operator()(T *ptr) const noexcept {
-    return reinterpret_cast<std::size_t>(ptr);
+    return std::bit_cast<std::size_t>(ptr);
   }
 };
 } // namespace util

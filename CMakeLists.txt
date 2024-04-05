@@ -61,13 +61,10 @@ add_executable(
   "src/client/test_entity.cpp"
   "src/client/main.cpp"
 )
-# add_executable(client_tests ${CLIENT_SOURCES})
 set_target_properties(math_tests util util_tests graphics physics engine client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-# set_target_properties(math_tests util_tests PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 target_include_directories(graphics PRIVATE include)
 target_include_directories(engine PRIVATE include)
 target_include_directories(client PRIVATE include)
-# target_include_directories(client_tests PRIVATE include)
 target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)
 target_link_libraries(math_tests Catch2::Catch2WithMain)
 target_link_libraries(util_tests util Catch2::Catch2WithMain)
@@ -75,4 +72,3 @@ target_link_libraries(physics util)
 target_link_libraries(graphics util ${CMAKE_SOURCE_DIR}/lib/ktx.lib)
 target_link_libraries(engine physics graphics glfw)
 target_link_libraries(client engine)
-# target_link_libraries(client_tests glfw Catch2::Catch2WithMain)

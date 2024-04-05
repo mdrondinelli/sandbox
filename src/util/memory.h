@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdlib>
 
+#include <bit>
 #include <functional>
 #include <new>
 #include <span>
@@ -29,8 +30,7 @@ constexpr std::size_t align(std::size_t size, std::size_t alignment) noexcept {
 }
 
 inline std::ptrdiff_t ptrdiff(void const *p1, void const *p2) noexcept {
-  return reinterpret_cast<std::uintptr_t>(p1) -
-         reinterpret_cast<std::uintptr_t>(p2);
+  return std::bit_cast<std::uintptr_t>(p1) - std::bit_cast<std::uintptr_t>(p2);
 }
 
 class Unique_block;

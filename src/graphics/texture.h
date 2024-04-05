@@ -10,7 +10,7 @@
 namespace marlon {
 namespace graphics {
 struct Texture_memory_source {
-  std::uint8_t const *data;
+  void const *data;
   std::size_t size;
 };
 
