@@ -276,7 +276,14 @@ public:
     _impl.construct();
   }
 
-  ~Allocating_queue() {}
+  ~Allocating_queue() {
+    if (_impl->data() != nullptr) {
+      auto const block = make_block(
+          _impl->data(), Queue<T>::memory_requirement(_impl->max_size()));
+      _impl.destruct();
+      _allocator.free(block);
+    }
+  }
 
   T const &front() const noexcept { return _impl->front(); }
 
@@ -341,9 +348,7 @@ public:
     return _impl->emplace_front(std::forward<Args>(args)...);
   }
 
-  void pop_front() noexcept {
-    _impl->pop_front();
-  }
+  void pop_front() noexcept { _impl->pop_front(); }
 
   void push_back(T const &object) {
     prepare_for_new_element();
@@ -355,9 +360,7 @@ public:
     return _impl->emplace_back(std::forward<Args>(args)...);
   }
 
-  void pop_back() noexcept {
-    _impl->pop_back();
-  }
+  void pop_back() noexcept { _impl->pop_back(); }
 
 private:
   void prepare_for_new_element() {
