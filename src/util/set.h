@@ -697,17 +697,14 @@ public:
   void clear() noexcept { _impl->clear(); }
 
   template <typename K> std::pair<Iterator, bool> insert(K &&x) {
-    if (size() == _impl->max_size()) {
-      reserve(size() != 0 ? size() * 2 : 1);
-    }
+    
+    prepare_for_new_element();
     return _impl->insert(std::forward<K>(x));
   }
 
   template <typename... Args>
   std::pair<Iterator, bool> emplace(Args &&...args) {
-    if (size() == _impl->max_size()) {
-      reserve(size() != 0 ? size() * 2 : 1);
-    }
+    prepare_for_new_element();
     return _impl->emplace(std::forward<Args>(args)...);
   }
 
@@ -756,7 +753,7 @@ public:
       for (auto &object : *_impl) {
         temp.emplace(std::move(object));
       }
-      if (_impl->max_bucket_count() > 0) {
+      if (_impl->data() != nullptr) {
         auto const block =
             make_block(_impl->data(),
                        Set<T, Hash, Equal>::memory_requirement(
@@ -777,6 +774,12 @@ public:
   }
 
 private:
+  void prepare_for_new_element() {
+    if (size() == _impl->max_size()) {
+      reserve(size() != 0 ? size() * 2 : 1);
+    }
+  }
+
   Allocator _allocator;
   Lifetime_box<Set<T, Hash, Equal>> _impl;
 };
