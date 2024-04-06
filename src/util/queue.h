@@ -51,6 +51,7 @@ public:
 
   private:
     friend class Const_iterator;
+    friend class Queue;
 
     explicit Iterator(std::span<T> slots,
                       std::size_t index,
@@ -101,6 +102,8 @@ public:
     }
 
   private:
+    friend class Queue;
+
     std::span<T const> _slots;
     std::size_t _index;
     std::size_t _offset;
@@ -120,7 +123,7 @@ public:
       : _slots{static_cast<T *>(block), max_size} {}
 
   Queue(Queue<T> &&other) noexcept
-      : _slots{std::exchange(other._data, std::span<T>{})},
+      : _slots{std::exchange(other._slots, std::span<T>{})},
         _size{std::exchange(other._size, std::size_t{})},
         _head{std::exchange(other._head, std::size_t{})},
         _tail{std::exchange(other._tail, std::size_t{})} {}
@@ -145,9 +148,9 @@ public:
     return _slots[(_tail + _slots.size() - 1) % _slots.size()];
   }
 
-  void const *data() const noexcept { _slots.data(); }
+  void const *data() const noexcept { return _slots.data(); }
 
-  void *data() noexcept { _slots.data(); }
+  void *data() noexcept { return _slots.data(); }
 
   Const_iterator cbegin() const noexcept {
     return Const_iterator{_slots, _head, 0};
@@ -163,7 +166,7 @@ public:
 
   Const_iterator end() const noexcept { return cend(); }
 
-  Iterator end() const noexcept { return Iterator{_slots, _tail, _size}; }
+  Iterator end() noexcept { return Iterator{_slots, _tail, _size}; }
 
   bool empty() const noexcept { return size() == 0; }
 
@@ -264,7 +267,7 @@ template <typename T, class Allocator = Polymorphic_allocator>
 class Allocating_queue {
 public:
   using Iterator = typename Queue<T>::Iterator;
-  using Const_iterator = typename Queue<T>::Cosnt_iterator;
+  using Const_iterator = typename Queue<T>::Const_iterator;
 
   Allocating_queue() { _impl.construct(); }
 
@@ -285,7 +288,7 @@ public:
 
   void const *data() const noexcept { return _impl->data(); }
 
-  void *data() const noexcept { return _impl->data(); }
+  void *data() noexcept { return _impl->data(); }
 
   Const_iterator cbegin() const noexcept { return _impl->cbegin(); }
 
@@ -297,7 +300,7 @@ public:
 
   Const_iterator end() const noexcept { return _impl->end(); }
 
-  Iterator end() const noexcept { return _impl->end(); }
+  Iterator end() noexcept { return _impl->end(); }
 
   bool empty() const noexcept { return _impl->empty(); }
 
@@ -307,7 +310,7 @@ public:
     return return std::numeric_limits<std::size_t>::max();
   }
 
-  std::size_t capacity() const noexcept { return _impl->capacity() }
+  std::size_t capacity() const noexcept { return _impl->capacity(); }
 
   void reserve(std::size_t capacity) {
     if (capacity > _impl->capacity()) {
