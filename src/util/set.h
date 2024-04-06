@@ -229,7 +229,7 @@ public:
     _head = nullptr;
     while (node) {
       node->value().~T();
-      auto const next = node->next;
+      auto const next = node->next();
       _nodes.free(make_block(node, sizeof(Node)));
       node = next;
       --_size;
@@ -274,7 +274,7 @@ public:
         if (it->hash == hash) {
           if (Equal{}(it->value(), x)) {
             return std::pair{Iterator{it}, false};
-          } else if (it->next == nullptr) {
+          } else if (it->next() == nullptr) {
             auto const block = [&]() {
               if (size() < max_size()) {
                 return _nodes.alloc(sizeof(Node));
@@ -302,7 +302,7 @@ public:
             it = it->next();
           }
         } else if ((hash_index(it->hash)) == index) {
-          if (it->next == nullptr) {
+          if (it->next() == nullptr) {
             auto const block = [&]() {
               if (size() < max_size()) {
                 return _nodes.alloc(sizeof(Node));
