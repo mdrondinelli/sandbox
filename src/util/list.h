@@ -24,7 +24,8 @@ public:
       : List{block.begin, max_size} {}
 
   explicit List(void *block_begin, std::size_t max_size) noexcept
-      : _begin{static_cast<T *>(block_begin)}, _stack_end{_begin},
+      : _begin{static_cast<T *>(block_begin)},
+        _stack_end{_begin},
         _buffer_end{_begin + max_size} {}
 
   List(List<T> &&other)
@@ -78,7 +79,7 @@ public:
 
   std::size_t capacity() const noexcept { return max_size(); }
 
-  void clear() {
+  void clear() noexcept {
     auto const begin = _begin;
     auto const end = _stack_end;
     for (auto it = begin; it != end; ++it) {
@@ -89,7 +90,8 @@ public:
 
   void push_back(T const &object) {
     if (_stack_end != _buffer_end) {
-      new (_stack_end++) T(object);
+      new (_stack_end) T(object);
+      ++_stack_end;
     } else {
       throw Capacity_error{};
     }
@@ -97,7 +99,9 @@ public:
 
   template <typename... Args> T &emplace_back(Args &&...args) {
     if (_stack_end != _buffer_end) {
-      return *(new (_stack_end++) T(std::forward<Args>(args)...));
+      auto &result = *new (_stack_end) T(std::forward<Args>(args)...);
+      ++_stack_end;
+      return result;
     } else {
       throw Capacity_error{};
     }
@@ -155,12 +159,12 @@ public:
 
   Allocating_list() : _allocator{} { _impl.construct(); }
 
-  explicit Allocating_list(const Allocator &allocator) : _allocator{allocator} {
+  explicit Allocating_list(Allocator const &allocator) : _allocator{allocator} {
     _impl.construct();
   }
 
   ~Allocating_list() {
-    if (_impl->max_size() != 0) {
+    if (_impl->data() != nullptr) {
       auto const block =
           make_block(_impl->data(), _impl->data() + _impl->max_size());
       _impl.destruct();
@@ -206,26 +210,30 @@ public:
     return static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max());
   }
 
-  void reserve(std::size_t new_cap) {
-    if (new_cap > _impl->capacity()) {
-      auto temp = make_list<T>(_allocator, new_cap).second;
+  std::size_t capacity() const noexcept { return _impl->capacity(); }
+
+  void reserve(std::size_t capacity) {
+    if (capacity > _impl->capacity()) {
+      auto temp = make_list<T>(_allocator, capacity).second;
       for (auto &object : *_impl) {
         temp.emplace_back(std::move(object));
       }
-      auto const block =
-          make_block(_impl->data(), _impl->data() + _impl->max_size());
-      *_impl = std::move(temp);
-      _allocator.free(block);
+      if (_impl->data() != nullptr) {
+        auto const block =
+            make_block(_impl->data(), _impl->data() + _impl->max_size());
+        *_impl = std::move(temp);
+        _allocator.free(block);
+      } else {
+        *_impl = std::move(temp);
+      }
     }
   }
-
-  std::size_t capacity() const noexcept { return _impl->capacity(); }
 
   void clear() { _impl->clear(); }
 
   void push_back(T const &object) {
     if (size() == capacity()) {
-      reserve(size() * 2);
+      reserve(size() != 0 ? size() * 2 : 1);
     }
     _impl->push_back(object);
   }
