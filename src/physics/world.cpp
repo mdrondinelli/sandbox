@@ -1214,38 +1214,6 @@ private:
     bool _fresh;
   };
 
-  // void
-  // _update_rigid_body_rigid_body_pairs(Rigid_body_storage const &rigid_bodies)
-  // {
-  //   auto it = _rigid_body_rigid_body_pairs.begin();
-  //   while (it != _rigid_body_rigid_body_pairs.end()) {
-  //     auto &node = it->second;
-  //     if (node.is_marked()) {
-  //       node.set_marked(false);
-  //       node.update(rigid_bodies);
-  //       ++it;
-  //     } else {
-  //       it = _rigid_body_rigid_body_pairs.erase(it);
-  //     }
-  //   }
-  // }
-
-  // void
-  // _update_rigid_body_static_body_pairs(Rigid_body_storage const
-  // &rigid_bodies) {
-  //   auto it = _rigid_body_static_body_pairs.begin();
-  //   while (it != _rigid_body_static_body_pairs.end()) {
-  //     auto &node = it->second;
-  //     if (node.is_marked()) {
-  //       node.set_marked(false);
-  //       node.update(rigid_bodies);
-  //       ++it;
-  //     } else {
-  //       it = _rigid_body_static_body_pairs.erase(it);
-  //     }
-  //   }
-  // }
-
   util::Map<std::uint64_t, Rigid_body_rigid_body_pair>
       _rigid_body_rigid_body_pairs;
   util::Map<std::uint64_t, Rigid_body_static_body_pair>
