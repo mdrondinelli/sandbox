@@ -344,6 +344,7 @@ public:
   }
 
   void post_physics() final {
+    _total_physics_wall_time += get_physics_simulation_wall_time();
     _box_spawn_timer += 1.0f / 128.0f;
     if (_box_spawn_timer > 0.0f) {
       _box_spawn_timer -= 0.01f;
@@ -357,6 +358,8 @@ public:
       ++_box_count;
       if (_box_count == 768) {
         _box_spawn_timer = -1000000.0f;
+        std::cout << "total physics wall time: " << _total_physics_wall_time
+                  << "\n";
       }
       auto const new_box = _cotton_box_manager->create({
           .position = math::Vec3f{_box_spawn_offset_x,
@@ -385,8 +388,9 @@ public:
                              0.3f);
       _selection_wireframe->set_transform(transform);
     }
-    std::cout << "physics: " << get_physics_simulation_wall_time() * 1000.0
-              << " ms\n";
+
+    // std::cout << "physics: " << get_physics_simulation_wall_time() * 1000.0
+    //           << " ms\n";
   }
 
 private:
@@ -403,6 +407,7 @@ private:
   float _box_spawn_height{0.5f};
   float _box_spawn_offset_x{0.0f};
   float _box_spawn_offset_z{0.0f};
+  double _total_physics_wall_time{0.0};
 };
 
 int main() { return Client{}.run(); }
