@@ -249,7 +249,7 @@ public:
 
   void resize(std::size_t count) {
     if (capacity() < count) {
-      auto new_cap = capacity();
+      auto new_cap = std::max(capacity(), std::size_t{1});
       while (new_cap < count) {
         new_cap *= 2;
       }
