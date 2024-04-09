@@ -1,9 +1,140 @@
 #include "thread_pool.h"
 
+#include <iostream>
+#include <random>
+#include <stop_token>
+
 namespace marlon {
 namespace util {
-Thread_pool::Thread_pool(void const *block_begin, std::size_t thread_count,
-                         std::size_t max_queue_size,
-                         Synchronization_policy synchronization_policy) {}
+Thread_pool::Thread_pool(unsigned thread_count) : _push_index{std::size_t{}} {
+  auto block = Block{};
+  std::tie(block, _threads) =
+      make_list<Thread>(*System_allocator::instance(), thread_count);
+  try {
+    for (std::size_t i = 0; i != thread_count; ++i) {
+      _threads.emplace_back(_threads.data(), thread_count, i);
+    }
+  } catch (...) {
+    _threads = {};
+    System_allocator::instance()->free(block);
+    throw;
+  }
+}
+
+Thread_pool::~Thread_pool() {
+  auto const block = make_block(
+      _threads.data(), List<Thread>::memory_requirement(_threads.max_size()));
+  _threads = {};
+  System_allocator::instance()->free(block);
+}
+
+std::size_t Thread_pool::size() const noexcept { return _threads.size(); }
+
+void Thread_pool::push(Task *task) {
+  auto const base = _push_index++;
+  for (auto offset = std::size_t{}; offset != 2 * _threads.size(); ++offset) {
+    auto const index = (base + offset) % _threads.size();
+    if (_threads[index].try_push(task)) {
+      return;
+    }
+  }
+  _threads[base % _threads.size()].push(task);
+}
+
+Thread_pool::Thread::Thread(Thread *threads,
+                            unsigned thread_count,
+                            unsigned index)
+    : _threads{threads},
+      _thread_count{thread_count},
+      _index{index},
+      _queue{System_allocator::instance()},
+      _thread{[this](std::stop_token stop_token) {
+        {
+          auto const lock = std::scoped_lock{_mutex};
+          _queue.reserve(1024);
+        }
+        auto rng = std::mt19937_64{std::random_device{}()};
+        for (;;) {
+          // try to steal from our own queue
+          auto task = (Task *)nullptr;
+          if (auto lock = std::unique_lock{_mutex, std::try_to_lock}) {
+            if (!_queue.empty()) {
+              task = _queue.back();
+              _queue.pop_back();
+            }
+          }
+          // try to steal from other queues
+          if (!task && _thread_count > 1) {
+            auto d = std::uniform_int_distribution<std::size_t>{
+                std::size_t{1}, _thread_count - 1};
+            for (auto attempt = 0u; attempt != _thread_count - 1; ++attempt) {
+              auto const offset = d(rng);
+              auto const index = (_index + offset) % _thread_count;
+              auto &thread = _threads[index];
+              if (auto lock =
+                      std::unique_lock{thread._mutex, std::try_to_lock}) {
+                if (!thread._queue.empty()) {
+                  task = thread._queue.front();
+                  thread._queue.pop_front();
+                  break;
+                }
+              }
+            }
+          }
+          // just wait for work
+          if (!task) {
+            auto lock = std::unique_lock{_mutex};
+            _condvar.wait(lock, [&] {
+              return !_queue.empty() || stop_token.stop_requested();
+            });
+            if (!_queue.empty()) {
+              task = _queue.back();
+              _queue.pop_back();
+            }
+          }
+          if (task) {
+            try {
+              task->run(_index);
+            } catch (std::exception &e) {
+              std::cerr << "Exception in Task::run: " << e.what() << "\n";
+            } catch (...) {
+              std::cerr << "Exception in Task::run\n";
+            }
+          } else {
+            break;
+          }
+          // if (!_queue.empty()) {
+          //   auto const task = _queue.back();
+          //   _queue.pop_back();
+          //   lock.unlock();
+          // } else {
+          //   break;
+          // }
+        }
+      }} {}
+
+Thread_pool::Thread::~Thread() {
+  _thread.request_stop();
+  _condvar.notify_one();
+}
+
+void Thread_pool::Thread::push(Task *task) {
+  {
+    auto const lock = std::scoped_lock{_mutex};
+    _queue.push_back(task);
+  }
+  _condvar.notify_one();
+}
+
+bool Thread_pool::Thread::try_push(Task *task) {
+  if (auto lock = std::unique_lock{_mutex, std::try_to_lock}) {
+    _queue.push_back(task);
+    lock.unlock();
+    _condvar.notify_one();
+    return true;
+  } else {
+    return false;
+  }
+}
 } // namespace util
 } // namespace marlon

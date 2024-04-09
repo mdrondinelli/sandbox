@@ -1,46 +1,55 @@
 #ifndef MARLON_UTIL_THREAD_POOL_H
 #define MARLON_UTIL_THREAD_POOL_H
 
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 
-#include "array.h"
+#include "list.h"
+#include "queue.h"
 
 namespace marlon {
 namespace util {
+class Task {
+public:
+  virtual ~Task() {}
+
+  virtual void run(unsigned thread_index) = 0;
+};
+
 class Thread_pool {
 public:
-  enum class Synchronization_policy { spin, block };
+  explicit Thread_pool(unsigned thread_count);
 
-  class Task {
-  public:
-    virtual ~Task() {}
+  ~Thread_pool();
 
-    virtual void run() = 0;
-  };
+  std::size_t size() const noexcept;
 
-  static constexpr std::size_t memory_requirement(std::size_t thread_count,
-                                                  std::size_t max_queue_size) {}
-
-  explicit Thread_pool(Block block, std::size_t thread_count,
-                       std::size_t max_queue_size,
-                       Synchronization_policy synchronization_policy)
-      : Thread_pool{block.begin, thread_count, max_queue_size,
-                     synchronization_policy} {}
-
-  explicit Thread_pool(void const *block_begin, std::size_t thread_count,
-                       std::size_t max_queue_size,
-                       Synchronization_policy synchronization_policy);
+  void push(Task *task);
 
 private:
-  class Node {
+  class Thread {
   public:
-    Node();
+    explicit Thread(Thread *threads, unsigned thread_count, unsigned index);
+
+    ~Thread();
+
+    void push(Task *task);
+
+    bool try_push(Task *task);
 
   private:
-    std::thread _thread;
+    Thread *_threads;
+    unsigned _thread_count;
+    unsigned _index;
+    Allocating_queue<Task *> _queue;
+    std::mutex _mutex;
+    std::condition_variable _condvar;
+    std::jthread _thread;
   };
 
-  List<Node> _nodes;
+  List<Thread> _threads;
+  std::atomic<std::size_t> _push_index;
 };
 } // namespace util
 } // namespace marlon
