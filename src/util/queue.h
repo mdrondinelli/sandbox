@@ -22,7 +22,7 @@ public:
     T *operator->() const noexcept { return &_slots[_index]; }
 
     Iterator &operator++() noexcept {
-      _index = (_index + 1) % _slots.size();
+      _index = (_index + 1) & (_slots.size() - 1);
       ++_offset;
       return *this;
     }
@@ -34,7 +34,7 @@ public:
     }
 
     Iterator &operator--() noexcept {
-      _index = (_index + _slots.size() - 1) % _slots.size();
+      _index = (_index + _slots.size() - 1) & (_slots.size() - 1);
       --_offset;
       return *this;
     }
@@ -73,7 +73,7 @@ public:
     T const *operator->() const noexcept { return &_slots[_index]; }
 
     Const_iterator &operator++() noexcept {
-      _index = (_index + 1) % _slots.size();
+      _index = (_index + 1) & (_slots.size() - 1);
       ++_offset;
       return *this;
     }
@@ -85,7 +85,7 @@ public:
     }
 
     Const_iterator &operator--() noexcept {
-      _index = (_index + _slots.size() - 1) % _slots.size();
+      _index = (_index + _slots.size() - 1) & (_slots.size() - 1);
       --_offset;
       return *this;
     }
@@ -111,7 +111,11 @@ public:
 
   static constexpr std::size_t
   memory_requirement(std::size_t max_size) noexcept {
-    return sizeof(T) * max_size;
+    if (max_size != 0) {
+      return sizeof(T) * std::bit_ceil(max_size);
+    } else {
+      return 0;
+    }
   }
 
   constexpr Queue() noexcept = default;
@@ -120,7 +124,8 @@ public:
       : Queue{block.begin, max_size} {}
 
   explicit Queue(void *block, std::size_t max_size) noexcept
-      : _slots{static_cast<T *>(block), max_size} {}
+      : _slots{static_cast<T *>(block),
+               max_size != 0 ? std::bit_ceil(max_size) : 0} {}
 
   Queue(Queue<T> &&other) noexcept
       : _slots{std::exchange(other._slots, std::span<T>{})},
@@ -141,11 +146,11 @@ public:
   T &front() noexcept { return _slots[_head]; }
 
   T const &back() const noexcept {
-    return _slots[(_tail + _slots.size() - 1) % _slots.size()];
+    return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)];
   }
 
   T &back() noexcept {
-    return _slots[(_tail + _slots.size() - 1) % _slots.size()];
+    return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)];
   }
 
   void const *data() const noexcept { return _slots.data(); }
@@ -178,7 +183,7 @@ public:
 
   void clear() noexcept {
     for (std::size_t i = 0; i != _size; ++i) {
-      _slots[(_head + i) % _slots.size()].~T();
+      _slots[(_head + i) & (_slots.size() - 1)].~T();
     }
     _size = {};
     _head = {};
@@ -187,7 +192,7 @@ public:
 
   void push_front(T const &object) {
     if (_size != _slots.size()) {
-      auto const index = (_head + _slots.size() - 1) % _slots.size();
+      auto const index = (_head + _slots.size() - 1) & (_slots.size() - 1);
       new (&_slots[index]) T(object);
       ++_size;
       _head = index;
@@ -198,7 +203,7 @@ public:
 
   template <typename... Args> T &emplace_front(Args &&...args) {
     if (_size != _slots.size()) {
-      auto const index = (_head + _slots.size() - 1) % _slots.size();
+      auto const index = (_head + _slots.size() - 1) & (_slots.size() - 1);
       auto &result = *new (&_slots[index]) T(std::forward<Args>(args)...);
       ++_size;
       _head = index;
@@ -211,14 +216,14 @@ public:
   void pop_front() noexcept {
     _slots[_head].~T();
     --_size;
-    _head = (_head + 1) % _slots.size();
+    _head = (_head + 1) & (_slots.size() - 1);
   }
 
   void push_back(T const &object) {
     if (_size != _slots.size()) {
       new (&_slots[_tail]) T(object);
       ++_size;
-      _tail = (_tail + 1) % _slots.size();
+      _tail = (_tail + 1) & (_slots.size() - 1);
     } else {
       throw Capacity_error{};
     }
@@ -228,7 +233,7 @@ public:
     if (_size != _slots.size()) {
       auto &result = *new (&_slots[_tail]) T(std::forward<Args>(args)...);
       ++_size;
-      _tail = (_tail + 1) % _slots.size();
+      _tail = (_tail + 1) & (_slots.size() - 1);
       return result;
     } else {
       throw Capacity_error{};
@@ -236,7 +241,7 @@ public:
   }
 
   void pop_back() noexcept {
-    auto const index = (_tail + _slots.size() - 1) % _slots.size();
+    auto const index = (_tail + _slots.size() - 1) & (_slots.size() - 1);
     _slots[index].~T();
     --_size;
     _tail = index;
@@ -314,7 +319,7 @@ public:
   std::size_t size() const noexcept { return _impl->size(); }
 
   std::size_t max_size() const noexcept {
-    return return std::numeric_limits<std::size_t>::max();
+    return std::numeric_limits<std::size_t>::max();
   }
 
   std::size_t capacity() const noexcept { return _impl->capacity(); }
