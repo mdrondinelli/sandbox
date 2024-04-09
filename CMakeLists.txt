@@ -18,6 +18,7 @@ add_executable(
 add_library(
   util
   "src/util/memory.cpp"
+  "src/util/thread_pool.cpp"
 )
 add_executable(
   util_tests
