@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "../util/thread_pool.h"
 #include "particle.h"
 #include "rigid_body.h"
 #include "static_body.h"
@@ -27,6 +28,7 @@ struct World_create_info {
 };
 
 struct World_simulate_info {
+  util::Thread_pool *thread_pool;
   float delta_time{1.0f / 64.0f};
   int substep_count{16};
   int min_desired_position_iterations_per_contact{1};

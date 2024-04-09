@@ -29,7 +29,8 @@ public:
   explicit Runtime(physics::World_create_info const &world_create_info,
                    Window_create_info const &window_create_info,
                    Camera_create_info const &camera_create_info)
-      : _world{world_create_info},
+      : _threads{std::thread::hardware_concurrency()},
+        _world{world_create_info},
         _window{window_create_info},
         _camera{camera_create_info},
         _graphics{[&]() {
@@ -41,6 +42,8 @@ public:
           }};
         }()},
         _scene{_graphics.create_scene_unique({})} {}
+
+  util::Thread_pool *get_threads() noexcept { return &_threads; }
 
   physics::World *get_world() noexcept { return &_world; }
 
@@ -70,6 +73,7 @@ public:
   }
 
 private:
+  util::Thread_pool _threads;
   physics::World _world;
   Glfw_init_guard _glfw_init_guard;
   Window _window;
@@ -157,7 +161,9 @@ void App::loop() {
       accumulated_time -= _world_simulate_info.delta_time;
       pre_physics();
       auto const physics_begin_time = clock::now();
-      _runtime->get_world()->simulate(_world_simulate_info);
+      auto world_simulate_info = _world_simulate_info;
+      world_simulate_info.thread_pool = _runtime->get_threads();
+      _runtime->get_world()->simulate(world_simulate_info);
       auto const physics_end_time = clock::now();
       _physics_simulation_wall_time = std::chrono::duration_cast<duration>(
                                           physics_end_time - physics_begin_time)

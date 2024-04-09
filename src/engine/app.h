@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 
+#include "../util/thread_pool.h"
 #include "../graphics/graphics.h"
 #include "../physics/physics.h"
 #include "camera.h"
