@@ -518,21 +518,21 @@ public:
   void clear() noexcept {
     _objects.clear();
     _groups.clear();
-    _index = 0;
   }
 
-  void begin_group() { _groups.push_back({_index, _index}); }
+  void begin_group() {
+    auto const index = static_cast<std::uint32_t>(_objects.size());
+    _groups.push_back({index, index});
+  }
 
   void add_to_group(Particle_handle object) {
     _objects.push_back(object);
     ++_groups.back().end;
-    ++_index;
   }
 
   void add_to_group(Rigid_body_handle object) {
     _objects.push_back(object);
     ++_groups.back().end;
-    ++_index;
   }
 
   void add_to_group(std::variant<Particle_handle, Rigid_body_handle> object) {
@@ -547,7 +547,6 @@ private:
 
   Dynamic_object_list _objects;
   List<Group> _groups;
-  std::uint32_t _index{};
 };
 
 class Contact_list {
