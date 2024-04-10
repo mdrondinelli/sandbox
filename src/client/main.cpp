@@ -357,8 +357,10 @@ public:
       }
       ++_box_count;
       if (_box_count == 768) {
-        _box_spawn_timer = -1000000.0f;
+        _box_spawn_timer = -std::numeric_limits<float>::infinity();
         std::cout << "total physics wall time: " << _total_physics_wall_time
+                  << "\n";
+        std::cout << "total physics simulated time: " << _box_count * 0.01f
                   << "\n";
       }
       auto const new_box = _cotton_box_manager->create({
@@ -391,6 +393,11 @@ public:
 
     // std::cout << "physics: " << get_physics_simulation_wall_time() * 1000.0
     //           << " ms\n";
+  }
+
+  void post_loop() {
+    _ground_surface = {};
+    _selection_wireframe = {};
   }
 
 private:

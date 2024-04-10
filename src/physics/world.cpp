@@ -558,6 +558,8 @@ public:
          List<Contact *>::memory_requirement(capacity)});
   }
 
+  constexpr Contact_list() noexcept = default;
+
   explicit Contact_list(Block block, std::size_t const capacity) noexcept
       : _impl{[&]() {
           auto allocator = Stack_allocator{block};
@@ -605,10 +607,14 @@ public:
                              Particle_static_body_contact *,
                              Rigid_body_rigid_body_contact *,
                              Rigid_body_static_body_contact *>>
-  select_contact_position_solve(float max_separation) const noexcept {
+  select_contact_position_solve(float max_separation,
+                                std::size_t first,
+                                std::size_t last) const noexcept {
     auto result = static_cast<Contact *const *>(nullptr);
     auto result_separation = max_separation;
-    for (auto const &contact : _impl.contacts) {
+    auto const contacts =
+        std::span{_impl.contacts.data() + first, _impl.contacts.data() + last};
+    for (auto const &contact : contacts) {
       if (contact->separation < result_separation) {
         result = &contact;
         result_separation = contact->separation;
@@ -640,10 +646,14 @@ public:
                              Particle_static_body_contact *,
                              Rigid_body_rigid_body_contact *,
                              Rigid_body_static_body_contact *>>
-  select_contact_velocity_solve(float max_separating_velocity) const noexcept {
+  select_contact_velocity_solve(float max_separating_velocity,
+                                std::size_t first,
+                                std::size_t last) const noexcept {
     auto result = static_cast<Contact *const *>(nullptr);
     auto result_separating_velocity = max_separating_velocity;
-    for (auto const &contact : _impl.contacts) {
+    auto const contacts =
+        std::span{_impl.contacts.data() + first, _impl.contacts.data() + last};
+    for (auto const &contact : contacts) {
       if (contact->separating_velocity < result_separating_velocity) {
         result = &contact;
         result_separating_velocity = contact->separating_velocity;
@@ -706,8 +716,16 @@ private:
     List<Contact *> contacts;
   };
 
-  Impl _impl;
+  Impl _impl{};
 };
+
+template <typename Allocator>
+std::pair<Block, Contact_list> make_contact_list(Allocator &allocator,
+                                                 std::size_t capacity) {
+  auto const block =
+      allocator.alloc(Contact_list::memory_requirement(capacity));
+  return {block, Contact_list{block, capacity}};
+}
 
 // caching constants
 auto constexpr max_cached_contacts_per_object_pair = 4;
@@ -1217,6 +1235,138 @@ private:
       _rigid_body_static_body_pairs;
 };
 
+class Contact_group_storage {
+  using Allocator = Stack_allocator<>;
+
+public:
+  static constexpr std::size_t memory_requirement(std::size_t max_contact_count,
+                                                  std::size_t max_group_count) {
+    return Allocator::memory_requirement(
+        {decltype(_contacts)::memory_requirement(max_contact_count),
+         decltype(_groups)::memory_requirement(max_group_count)});
+  }
+
+  constexpr Contact_group_storage() = default;
+
+  explicit Contact_group_storage(Block block,
+                                 std::size_t max_contact_count,
+                                 std::size_t max_group_count)
+      : Contact_group_storage{block.begin, max_contact_count, max_group_count} {
+  }
+
+  explicit Contact_group_storage(void *block,
+                                 std::size_t max_contact_count,
+                                 std::size_t max_group_count) {
+    auto allocator = Allocator{make_block(
+        block, memory_requirement(max_contact_count, max_group_count))};
+    _contacts = make_contact_list(allocator, max_contact_count).second;
+    _groups = util::make_list<Group>(allocator, max_group_count).second;
+  }
+
+  std::size_t contact_count() const noexcept { return _contacts.size(); }
+
+  std::variant<Particle_particle_contact *,
+               Particle_rigid_body_contact *,
+               Particle_static_body_contact *,
+               Rigid_body_rigid_body_contact *,
+               Rigid_body_static_body_contact *>
+  contact(std::size_t object_index) const noexcept {
+    return _contacts.at(object_index);
+  }
+
+  std::size_t group_count() const noexcept { return _groups.size(); }
+
+  std::size_t group_begin(std::size_t group_index) const noexcept {
+    return _groups[group_index].begin;
+  }
+
+  std::size_t group_end(std::size_t group_index) const noexcept {
+    return _groups[group_index].end;
+  }
+
+  void clear() noexcept {
+    _contacts.clear();
+    _groups.clear();
+  }
+
+  void begin_group() {
+    auto const index = static_cast<std::uint32_t>(_contacts.size());
+    _groups.push_back({index, index});
+  }
+
+  void add_to_group(Particle_particle_contact *contact) {
+    _contacts.push_back(contact);
+    ++_groups.back().end;
+  }
+
+  void add_to_group(Particle_rigid_body_contact *contact) {
+    _contacts.push_back(contact);
+    ++_groups.back().end;
+  }
+
+  void add_to_group(Particle_static_body_contact *contact) {
+    _contacts.push_back(contact);
+    ++_groups.back().end;
+  }
+
+  void add_to_group(Rigid_body_rigid_body_contact *contact) {
+    _contacts.push_back(contact);
+    ++_groups.back().end;
+  }
+
+  void add_to_group(Rigid_body_static_body_contact *contact) {
+    _contacts.push_back(contact);
+    ++_groups.back().end;
+  }
+
+  void add_to_group(std::variant<Particle_particle_contact *,
+                                 Particle_rigid_body_contact *,
+                                 Particle_static_body_contact *,
+                                 Rigid_body_rigid_body_contact *,
+                                 Rigid_body_static_body_contact *> contact) {
+    std::visit([this](auto &&arg) { add_to_group(arg); }, contact);
+  }
+
+  std::optional<std::variant<Particle_particle_contact *,
+                             Particle_rigid_body_contact *,
+                             Particle_static_body_contact *,
+                             Rigid_body_rigid_body_contact *,
+                             Rigid_body_static_body_contact *>>
+  select_contact_position_solve(std::size_t group_index,
+                                float max_separation) const noexcept {
+    return _contacts.select_contact_position_solve(
+        max_separation, group_begin(group_index), group_end(group_index));
+  }
+
+  std::optional<std::variant<Particle_particle_contact *,
+                             Particle_rigid_body_contact *,
+                             Particle_static_body_contact *,
+                             Rigid_body_rigid_body_contact *,
+                             Rigid_body_static_body_contact *>>
+  select_contact_velocity_solve(std::size_t group_index,
+                                float max_separating_velocity) const noexcept {
+    return _contacts.select_contact_velocity_solve(max_separating_velocity,
+                                                   group_begin(group_index),
+                                                   group_end(group_index));
+  }
+
+private:
+  struct Group {
+    std::uint32_t begin;
+    std::uint32_t end;
+  };
+
+  Contact_list _contacts;
+  List<Group> _groups;
+};
+
+class Contact_group_solve_task : public util::Task {
+public:
+  void run(unsigned) final {}
+
+private:
+};
+
 // solving constants
 auto constexpr max_rotational_displacement_factor = 0.2f;
 } // namespace
@@ -1318,12 +1468,19 @@ public:
         _rigid_body_static_body_contact_ptrs{
             rigid_body_static_body_contact_ptrs_block,
             create_info.max_rigid_body_static_body_neighbor_pairs},
-        _contact_group_fringe{contact_group_fringe_block,
-                              create_info.max_contact_group_fringe_size},
-        _contact_group{contact_group_block, create_info.max_contact_group_size},
         _contact_cache{contact_cache_block,
                        create_info.max_rigid_body_rigid_body_neighbor_pairs,
                        create_info.max_rigid_body_static_body_neighbor_pairs},
+        _contact_groups{
+            contact_group_block,
+            create_info.max_particle_particle_neighbor_pairs +
+                create_info.max_particle_rigid_body_neighbor_pairs +
+                create_info.max_particle_static_body_neighbor_pairs +
+                create_info.max_rigid_body_rigid_body_neighbor_pairs +
+                create_info.max_rigid_body_static_body_neighbor_pairs,
+            create_info.max_neighbor_groups},
+        _contact_group_fringe{contact_group_fringe_block,
+                              create_info.max_contact_group_fringe_size},
         _gravitational_acceleration{create_info.gravitational_acceleration} {}
 
   Particle_handle create_particle(Particle_create_info const &create_info) {
@@ -1442,7 +1599,7 @@ public:
     allocate_neighbors();
     assign_neighbors();
     find_neighbor_groups();
-    _contact_cache.clear_unmarked();
+    clear_contact_state();
     auto const h = simulate_info.delta_time / simulate_info.substep_count;
     auto const time_compensated_velocity_damping_factor =
         std::pow(velocity_damping_factor, h);
@@ -1451,11 +1608,15 @@ public:
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
       for (auto j = std::size_t{}; j != _neighbor_groups.group_count(); ++j) {
         if (update_neighbor_group_awake_states(j)) {
-          simulate_neighbor_group(
+          integrate_neighbor_group(
               j,
               h,
               time_compensated_velocity_damping_factor,
-              time_compensating_waking_motion_smoothing_factor,
+              time_compensating_waking_motion_smoothing_factor);
+          find_neighbor_group_contacts(j);
+          solve_neighbor_group(
+              j,
+              h,
               simulate_info.min_desired_position_iterations_per_contact,
               simulate_info.max_desired_position_iterations_per_contact,
               simulate_info.max_position_iterations_per_contact_group,
@@ -1472,6 +1633,135 @@ public:
   }
 
 private:
+  bool is_marked(Particle_handle particle) const {
+    return _particles.data(particle)->marked;
+  }
+
+  bool is_marked(Rigid_body_handle rigid_body) const {
+    return _rigid_bodies.data(rigid_body)->marked;
+  }
+
+  void set_marked(Particle_handle particle, bool marked = true) {
+    _particles.data(particle)->marked = marked;
+  }
+
+  void set_marked(Rigid_body_handle rigid_body, bool marked = true) {
+    _rigid_bodies.data(rigid_body)->marked = marked;
+  }
+
+  void set_unmarked(Particle_handle particle) { set_marked(particle, false); }
+
+  void set_unmarked(Rigid_body_handle rigid_body) {
+    set_marked(rigid_body, false);
+  }
+
+  bool is_visited(Particle_handle particle) const {
+    return _particles.data(particle)->visited;
+  }
+
+  bool is_visited(Rigid_body_handle rigid_body) const {
+    return _rigid_bodies.data(rigid_body)->visited;
+  }
+
+  void set_visited(Particle_handle particle, bool visited = true) {
+    _particles.data(particle)->visited = visited;
+  }
+
+  void set_visited(Rigid_body_handle rigid_body, bool visited = true) {
+    _rigid_bodies.data(rigid_body)->visited = visited;
+  }
+
+  void set_unvisited(Particle_handle particle) { set_visited(particle, false); }
+
+  void set_unvisited(Rigid_body_handle rigid_body) {
+    set_visited(rigid_body, false);
+  }
+
+  std::span<Particle_handle> get_particle_neighbors(Particle_handle particle) {
+    auto const data = _particles.data(particle);
+    return {data->particle_neighbors, data->particle_neighbor_count};
+  }
+
+  std::span<Particle_handle>
+  get_particle_neighbors(Rigid_body_handle rigid_body) {
+    auto const data = _rigid_bodies.data(rigid_body);
+    return {data->particle_neighbors, data->particle_neighbor_count};
+  }
+
+  std::span<Rigid_body_handle>
+  get_rigid_body_neighbors(Particle_handle particle) {
+    auto const data = _particles.data(particle);
+    return {data->rigid_body_neighbors, data->rigid_body_neighbor_count};
+  }
+
+  std::span<Rigid_body_handle>
+  get_rigid_body_neighbors(Rigid_body_handle rigid_body) {
+    auto const data = _rigid_bodies.data(rigid_body);
+    return {data->rigid_body_neighbors, data->rigid_body_neighbor_count};
+  }
+
+  std::span<Static_body_handle>
+  get_static_body_neighbors(Particle_handle particle) {
+    auto const data = _particles.data(particle);
+    return {data->static_body_neighbors, data->static_body_neighbor_count};
+  }
+
+  std::span<Static_body_handle>
+  get_static_body_neighbors(Rigid_body_handle rigid_body) {
+    auto const data = _rigid_bodies.data(rigid_body);
+    return {data->static_body_neighbors, data->static_body_neighbor_count};
+  }
+
+  std::span<Particle_particle_contact *>
+  get_particle_contacts(Particle_handle particle) {
+    auto const data = _particles.data(particle);
+    return {data->particle_contacts, data->particle_contact_count};
+  }
+
+  std::span<Particle_rigid_body_contact *>
+  get_particle_contacts(Rigid_body_handle rigid_body) {
+    auto const data = _rigid_bodies.data(rigid_body);
+    return {data->particle_contacts, data->particle_contact_count};
+  }
+
+  std::span<Particle_rigid_body_contact *>
+  get_rigid_body_contacts(Particle_handle particle) {
+    auto const data = _particles.data(particle);
+    return {data->rigid_body_contacts, data->rigid_body_contact_count};
+  }
+
+  std::span<Rigid_body_rigid_body_contact *>
+  get_rigid_body_contacts(Rigid_body_handle rigid_body) {
+    auto const data = _rigid_bodies.data(rigid_body);
+    return {data->rigid_body_contacts, data->rigid_body_contact_count};
+  }
+
+  std::span<Particle_static_body_contact *>
+  get_static_body_contacts(Particle_handle particle) {
+    auto const data = _particles.data(particle);
+    return {data->static_body_contacts, data->static_body_contact_count};
+  }
+
+  std::span<Rigid_body_static_body_contact *>
+  get_static_body_contacts(Rigid_body_handle rigid_body) {
+    auto const data = _rigid_bodies.data(rigid_body);
+    return {data->static_body_contacts, data->static_body_contact_count};
+  }
+
+  void reset_contact_counts(Particle_handle particle) {
+    auto const data = _particles.data(particle);
+    data->particle_contact_count = 0;
+    data->rigid_body_contact_count = 0;
+    data->static_body_contact_count = 0;
+  }
+
+  void reset_contact_counts(Rigid_body_handle rigid_body) {
+    auto const data = _rigid_bodies.data(rigid_body);
+    data->particle_contact_count = 0;
+    data->rigid_body_contact_count = 0;
+    data->static_body_contact_count = 0;
+  }
+
   void build_aabb_tree(float delta_time) {
     auto const constant_safety_term = 1.0f / 16.0f;
     auto const velocity_safety_factor = 2.0f;
@@ -1743,6 +2033,21 @@ private:
         });
   }
 
+  void clear_contact_state() {
+    _particle_particle_contacts.clear();
+    _particle_rigid_body_contacts.clear();
+    _particle_static_body_contacts.clear();
+    _rigid_body_rigid_body_contact_pairs.clear();
+    _rigid_body_static_body_contact_pairs.clear();
+    _particle_particle_contact_ptrs.clear();
+    _particle_rigid_body_contact_ptrs.clear();
+    _particle_static_body_contact_ptrs.clear();
+    _rigid_body_rigid_body_contact_ptrs.clear();
+    _rigid_body_static_body_contact_ptrs.clear();
+    _contact_cache.clear_unmarked();
+    _contact_groups.clear();
+  }
+
   bool update_neighbor_group_awake_states(std::size_t group_index) {
     auto const group_begin = _neighbor_groups.group_begin(group_index);
     auto const group_end = _neighbor_groups.group_end(group_index);
@@ -1839,29 +2144,15 @@ private:
     }
   }
 
-  void simulate_neighbor_group(std::size_t group_index,
-                               float delta_time,
-                               float velocity_damping_factor,
-                               float waking_motion_smoothing_factor,
-                               int min_desired_position_iterations_per_contact,
-                               int max_desired_position_iterations_per_contact,
-                               int max_position_iterations_per_contact_group,
-                               int min_desired_velocity_iterations_per_contact,
-                               int max_desired_velocity_iterations_per_contact,
-                               int max_velocity_iterations_per_contact_group,
-                               float early_out_contact_separation,
-                               float early_out_contact_separating_velocity) {
+  void integrate_neighbor_group(std::size_t group_index,
+                                float delta_time,
+                                float velocity_damping_factor,
+                                float waking_motion_smoothing_factor) {
     auto const group_begin = _neighbor_groups.group_begin(group_index);
     auto const group_end = _neighbor_groups.group_end(group_index);
-    auto const gravitational_velocity_delta =
-        _gravitational_acceleration * delta_time;
-    auto const separating_velocity_epsilon =
-        -2.0f * length(gravitational_velocity_delta);
     for (auto i = group_begin; i != group_end; ++i) {
       std::visit(
           [&](auto &&object) {
-            set_unmarked(object);
-            reset_contact_counts(object);
             integrate(object,
                       delta_time,
                       velocity_damping_factor,
@@ -1869,251 +2160,6 @@ private:
           },
           _neighbor_groups.object(i));
     }
-    clear_contacts();
-    for (auto i = group_begin; i != group_end; ++i) {
-      std::visit(
-          [&](auto &&object) {
-            set_marked(object);
-            for (auto const particle : get_particle_neighbors(object)) {
-              if (!is_marked(particle)) {
-                find_contact({object, particle});
-              }
-            }
-            for (auto const rigid_body : get_rigid_body_neighbors(object)) {
-              if (!is_marked(rigid_body)) {
-                find_contact({object, rigid_body});
-              }
-            }
-            for (auto const static_body : get_static_body_neighbors(object)) {
-              find_contact({object, static_body});
-            }
-            alloc_contact_ptrs(object);
-            reset_contact_counts(object);
-          },
-          _neighbor_groups.object(i));
-    }
-    assign_neighbor_group_contact_ptrs();
-    for (auto i = group_begin; i != group_end; ++i) {
-      std::visit(
-          [&](auto &&object) {
-            set_unmarked(object);
-            set_unvisited(object);
-          },
-          _neighbor_groups.object(i));
-    }
-    for (auto i = group_begin; i != group_end; ++i) {
-      std::visit(
-          [&, this](auto &&seed_object) {
-            if (!is_marked(seed_object)) {
-              set_marked(seed_object);
-              _contact_group.clear();
-              _contact_group_fringe.clear();
-              _contact_group_fringe.push_back(seed_object);
-              do {
-                auto const fringe_object = _contact_group_fringe.back();
-                _contact_group_fringe.pop_back();
-                std::visit(
-                    [&](auto &&fringe_object) {
-                      using T = std::decay_t<decltype(fringe_object)>;
-                      set_visited(fringe_object);
-                      for (auto const contact :
-                           get_particle_contacts(fringe_object)) {
-                        if constexpr (std::is_same_v<T, Particle_handle>) {
-                          auto const other_object =
-                              contact->particles[contact->particles[0] ==
-                                                 fringe_object];
-                          if (!is_marked(other_object)) {
-                            set_marked(other_object);
-                            _contact_group_fringe.push_back(other_object);
-                          }
-                          if (!is_visited(other_object)) {
-                            _contact_group.push_back(contact);
-                          }
-                        } else {
-                          auto const other_object = contact->particle;
-                          if (!is_marked(other_object)) {
-                            set_marked(other_object);
-                            _contact_group_fringe.push_back(other_object);
-                          }
-                          if (!is_visited(other_object)) {
-                            _contact_group.push_back(contact);
-                          }
-                        }
-                      }
-                      for (auto const contact :
-                           get_rigid_body_contacts(fringe_object)) {
-                        if constexpr (std::is_same_v<T, Rigid_body_handle>) {
-                          auto const other_object =
-                              contact
-                                  ->bodies[contact->bodies[0] == fringe_object];
-                          if (!is_marked(other_object)) {
-                            set_marked(other_object);
-                            _contact_group_fringe.push_back(other_object);
-                          }
-                          if (!is_visited(other_object)) {
-                            _contact_group.push_back(contact);
-                          }
-                        } else {
-                          auto const other_object = contact->body;
-                          if (!is_marked(other_object)) {
-                            set_marked(other_object);
-                            _contact_group_fringe.push_back(other_object);
-                          }
-                          if (!is_visited(other_object)) {
-                            _contact_group.push_back(contact);
-                          }
-                        }
-                      }
-                      for (auto const contact :
-                           get_static_body_contacts(fringe_object)) {
-                        _contact_group.push_back(contact);
-                      }
-                    },
-                    fringe_object);
-              } while (!_contact_group_fringe.empty());
-              solve_contact_group(min_desired_position_iterations_per_contact,
-                                  max_desired_position_iterations_per_contact,
-                                  max_position_iterations_per_contact_group,
-                                  min_desired_velocity_iterations_per_contact,
-                                  max_desired_velocity_iterations_per_contact,
-                                  max_velocity_iterations_per_contact_group,
-                                  early_out_contact_separation,
-                                  early_out_contact_separating_velocity,
-                                  gravitational_velocity_delta,
-                                  separating_velocity_epsilon);
-            }
-          },
-          _neighbor_groups.object(i));
-    }
-  }
-
-  bool is_marked(Particle_handle particle) const {
-    return _particles.data(particle)->marked;
-  }
-
-  bool is_marked(Rigid_body_handle rigid_body) const {
-    return _rigid_bodies.data(rigid_body)->marked;
-  }
-
-  void set_marked(Particle_handle particle, bool marked = true) {
-    _particles.data(particle)->marked = marked;
-  }
-
-  void set_marked(Rigid_body_handle rigid_body, bool marked = true) {
-    _rigid_bodies.data(rigid_body)->marked = marked;
-  }
-
-  void set_unmarked(Particle_handle particle) { set_marked(particle, false); }
-
-  void set_unmarked(Rigid_body_handle rigid_body) {
-    set_marked(rigid_body, false);
-  }
-
-  bool is_visited(Particle_handle particle) const {
-    return _particles.data(particle)->visited;
-  }
-
-  bool is_visited(Rigid_body_handle rigid_body) const {
-    return _rigid_bodies.data(rigid_body)->visited;
-  }
-
-  void set_visited(Particle_handle particle, bool visited = true) {
-    _particles.data(particle)->visited = visited;
-  }
-
-  void set_visited(Rigid_body_handle rigid_body, bool visited = true) {
-    _rigid_bodies.data(rigid_body)->visited = visited;
-  }
-
-  void set_unvisited(Particle_handle particle) { set_visited(particle, false); }
-
-  void set_unvisited(Rigid_body_handle rigid_body) {
-    set_visited(rigid_body, false);
-  }
-
-  std::span<Particle_handle> get_particle_neighbors(Particle_handle particle) {
-    auto const data = _particles.data(particle);
-    return {data->particle_neighbors, data->particle_neighbor_count};
-  }
-
-  std::span<Particle_handle>
-  get_particle_neighbors(Rigid_body_handle rigid_body) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    return {data->particle_neighbors, data->particle_neighbor_count};
-  }
-
-  std::span<Rigid_body_handle>
-  get_rigid_body_neighbors(Particle_handle particle) {
-    auto const data = _particles.data(particle);
-    return {data->rigid_body_neighbors, data->rigid_body_neighbor_count};
-  }
-
-  std::span<Rigid_body_handle>
-  get_rigid_body_neighbors(Rigid_body_handle rigid_body) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    return {data->rigid_body_neighbors, data->rigid_body_neighbor_count};
-  }
-
-  std::span<Static_body_handle>
-  get_static_body_neighbors(Particle_handle particle) {
-    auto const data = _particles.data(particle);
-    return {data->static_body_neighbors, data->static_body_neighbor_count};
-  }
-
-  std::span<Static_body_handle>
-  get_static_body_neighbors(Rigid_body_handle rigid_body) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    return {data->static_body_neighbors, data->static_body_neighbor_count};
-  }
-
-  std::span<Particle_particle_contact *>
-  get_particle_contacts(Particle_handle particle) {
-    auto const data = _particles.data(particle);
-    return {data->particle_contacts, data->particle_contact_count};
-  }
-
-  std::span<Particle_rigid_body_contact *>
-  get_particle_contacts(Rigid_body_handle rigid_body) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    return {data->particle_contacts, data->particle_contact_count};
-  }
-
-  std::span<Particle_rigid_body_contact *>
-  get_rigid_body_contacts(Particle_handle particle) {
-    auto const data = _particles.data(particle);
-    return {data->rigid_body_contacts, data->rigid_body_contact_count};
-  }
-
-  std::span<Rigid_body_rigid_body_contact *>
-  get_rigid_body_contacts(Rigid_body_handle rigid_body) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    return {data->rigid_body_contacts, data->rigid_body_contact_count};
-  }
-
-  std::span<Particle_static_body_contact *>
-  get_static_body_contacts(Particle_handle particle) {
-    auto const data = _particles.data(particle);
-    return {data->static_body_contacts, data->static_body_contact_count};
-  }
-
-  std::span<Rigid_body_static_body_contact *>
-  get_static_body_contacts(Rigid_body_handle rigid_body) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    return {data->static_body_contacts, data->static_body_contact_count};
-  }
-
-  void reset_contact_counts(Particle_handle particle) {
-    auto const data = _particles.data(particle);
-    data->particle_contact_count = 0;
-    data->rigid_body_contact_count = 0;
-    data->static_body_contact_count = 0;
-  }
-
-  void reset_contact_counts(Rigid_body_handle rigid_body) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    data->particle_contact_count = 0;
-    data->rigid_body_contact_count = 0;
-    data->static_body_contact_count = 0;
   }
 
   void integrate(Particle_handle particle,
@@ -2154,17 +2200,76 @@ private:
                  waking_motion_limit);
   }
 
-  void clear_contacts() {
-    _particle_particle_contacts.clear();
-    _particle_rigid_body_contacts.clear();
-    _particle_static_body_contacts.clear();
-    _rigid_body_rigid_body_contact_pairs.clear();
-    _rigid_body_static_body_contact_pairs.clear();
-    _particle_particle_contact_ptrs.clear();
-    _particle_rigid_body_contact_ptrs.clear();
-    _particle_static_body_contact_ptrs.clear();
-    _rigid_body_rigid_body_contact_ptrs.clear();
-    _rigid_body_static_body_contact_ptrs.clear();
+  void find_neighbor_group_contacts(std::size_t group_index) {
+    auto const group_begin = _neighbor_groups.group_begin(group_index);
+    auto const group_end = _neighbor_groups.group_end(group_index);
+    for (auto i = group_begin; i != group_end; ++i) {
+      std::visit(
+          [&](auto &&object) {
+            set_unmarked(object);
+            reset_contact_counts(object);
+          },
+          _neighbor_groups.object(i));
+    }
+    auto const particle_particle_contacts_begin =
+        _particle_particle_contacts.data() + _particle_particle_contacts.size();
+    auto const particle_rigid_body_contacts_begin =
+        _particle_rigid_body_contacts.data() +
+        _particle_rigid_body_contacts.size();
+    auto const particle_static_body_contacts_begin =
+        _particle_static_body_contacts.data() +
+        _particle_static_body_contacts.size();
+    auto const rigid_body_rigid_body_contact_pairs_begin =
+        _rigid_body_rigid_body_contact_pairs.data() +
+        _rigid_body_rigid_body_contact_pairs.size();
+    auto const rigid_body_static_body_contact_pairs_begin =
+        _rigid_body_static_body_contact_pairs.data() +
+        _rigid_body_static_body_contact_pairs.size();
+    for (auto i = group_begin; i != group_end; ++i) {
+      std::visit(
+          [&](auto &&object) {
+            set_marked(object);
+            for (auto const particle : get_particle_neighbors(object)) {
+              if (!is_marked(particle)) {
+                find_contact({object, particle});
+              }
+            }
+            for (auto const rigid_body : get_rigid_body_neighbors(object)) {
+              if (!is_marked(rigid_body)) {
+                find_contact({object, rigid_body});
+              }
+            }
+            for (auto const static_body : get_static_body_neighbors(object)) {
+              find_contact({object, static_body});
+            }
+            alloc_contact_ptrs(object);
+            reset_contact_counts(object);
+          },
+          _neighbor_groups.object(i));
+    }
+    auto const particle_particle_contacts_end =
+        _particle_particle_contacts.data() + _particle_particle_contacts.size();
+    auto const particle_rigid_body_contacts_end =
+        _particle_rigid_body_contacts.data() +
+        _particle_rigid_body_contacts.size();
+    auto const particle_static_body_contacts_end =
+        _particle_static_body_contacts.data() +
+        _particle_static_body_contacts.size();
+    auto const rigid_body_rigid_body_contact_pairs_end =
+        _rigid_body_rigid_body_contact_pairs.data() +
+        _rigid_body_rigid_body_contact_pairs.size();
+    auto const rigid_body_static_body_contact_pairs_end =
+        _rigid_body_static_body_contact_pairs.data() +
+        _rigid_body_static_body_contact_pairs.size();
+    assign_neighbor_group_contact_ptrs(
+        {particle_particle_contacts_begin, particle_particle_contacts_end},
+        {particle_rigid_body_contacts_begin, particle_rigid_body_contacts_end},
+        {particle_static_body_contacts_begin,
+         particle_static_body_contacts_end},
+        {rigid_body_rigid_body_contact_pairs_begin,
+         rigid_body_rigid_body_contact_pairs_end},
+        {rigid_body_static_body_contact_pairs_begin,
+         rigid_body_static_body_contact_pairs_end});
   }
 
   bool find_contact(std::pair<Particle_handle, Particle_handle> objects) {
@@ -2379,14 +2484,21 @@ private:
         data->static_body_contact_count);
   }
 
-  void assign_neighbor_group_contact_ptrs() {
-    for (auto &contact : _particle_particle_contacts) {
+  void assign_neighbor_group_contact_ptrs(
+      std::span<Particle_particle_contact> particle_particle_contacts,
+      std::span<Particle_rigid_body_contact> particle_rigid_body_contacts,
+      std::span<Particle_static_body_contact> particle_static_body_contacts,
+      std::span<std::pair<Rigid_body_handle, Rigid_body_handle> const>
+          rigid_body_rigid_body_contact_pairs,
+      std::span<std::pair<Rigid_body_handle, Static_body_handle> const>
+          rigid_body_static_body_contact_pairs) {
+    for (auto &contact : particle_particle_contacts) {
       for (auto i = 0; i != 2; ++i) {
         auto const data = _particles.data(contact.particles[i]);
         data->particle_contacts[data->particle_contact_count++] = &contact;
       }
     }
-    for (auto &contact : _particle_rigid_body_contacts) {
+    for (auto &contact : particle_rigid_body_contacts) {
       auto const particle_data = _particles.data(contact.particle);
       auto const rigid_body_data = _rigid_bodies.data(contact.body);
       particle_data
@@ -2396,13 +2508,13 @@ private:
           ->particle_contacts[rigid_body_data->particle_contact_count++] =
           &contact;
     }
-    for (auto &contact : _particle_static_body_contacts) {
+    for (auto &contact : particle_static_body_contacts) {
       auto const particle_data = _particles.data(contact.particle);
       particle_data
           ->static_body_contacts[particle_data->static_body_contact_count++] =
           &contact;
     }
-    for (auto const &pair : _rigid_body_rigid_body_contact_pairs) {
+    for (auto const &pair : rigid_body_rigid_body_contact_pairs) {
       for (auto &contact : _contact_cache.get_contacts(pair)) {
         auto const data = std::array<Rigid_body_data *, 2>{
             _rigid_bodies.data(contact.bodies[0]),
@@ -2413,7 +2525,7 @@ private:
         }
       }
     }
-    for (auto const &pair : _rigid_body_static_body_contact_pairs) {
+    for (auto const &pair : rigid_body_static_body_contact_pairs) {
       for (auto &contact : _contact_cache.get_contacts(pair)) {
         auto const data = _rigid_bodies.data(contact.rigid_body);
         data->static_body_contacts[data->static_body_contact_count++] =
@@ -2422,7 +2534,124 @@ private:
     }
   }
 
-  void solve_contact_group(int min_desired_position_iterations_per_contact,
+  void solve_neighbor_group(std::size_t group_index,
+                            float delta_time,
+                            int min_desired_position_iterations_per_contact,
+                            int max_desired_position_iterations_per_contact,
+                            int max_position_iterations_per_contact_group,
+                            int min_desired_velocity_iterations_per_contact,
+                            int max_desired_velocity_iterations_per_contact,
+                            int max_velocity_iterations_per_contact_group,
+                            float early_out_contact_separation,
+                            float early_out_contact_separating_velocity) {
+    auto const group_begin = _neighbor_groups.group_begin(group_index);
+    auto const group_end = _neighbor_groups.group_end(group_index);
+    for (auto i = group_begin; i != group_end; ++i) {
+      std::visit(
+          [&](auto &&object) {
+            set_unmarked(object);
+            set_unvisited(object);
+          },
+          _neighbor_groups.object(i));
+    }
+    auto const gravitational_velocity_delta =
+        _gravitational_acceleration * delta_time;
+    auto const separating_velocity_epsilon =
+        -2.0f * length(gravitational_velocity_delta);
+    for (auto i = group_begin; i != group_end; ++i) {
+      std::visit(
+          [&, this](auto &&seed_object) {
+            if (!is_marked(seed_object)) {
+              find_contact_group(seed_object);
+              solve_contact_group(_contact_groups.group_count() - 1,
+                                  min_desired_position_iterations_per_contact,
+                                  max_desired_position_iterations_per_contact,
+                                  max_position_iterations_per_contact_group,
+                                  min_desired_velocity_iterations_per_contact,
+                                  max_desired_velocity_iterations_per_contact,
+                                  max_velocity_iterations_per_contact_group,
+                                  early_out_contact_separation,
+                                  early_out_contact_separating_velocity,
+                                  gravitational_velocity_delta,
+                                  separating_velocity_epsilon);
+            }
+          },
+          _neighbor_groups.object(i));
+    }
+  }
+
+  void find_contact_group(
+      std::variant<Particle_handle, Rigid_body_handle> seed_object) {
+    std::visit(
+        [&](auto &&seed_object) {
+          set_marked(seed_object);
+          // _contact_group.clear();
+          _contact_groups.begin_group();
+          _contact_group_fringe.clear();
+          _contact_group_fringe.push_back(seed_object);
+        },
+        seed_object);
+    do {
+      auto const fringe_object = _contact_group_fringe.back();
+      _contact_group_fringe.pop_back();
+      std::visit(
+          [&](auto &&fringe_object) {
+            using T = std::decay_t<decltype(fringe_object)>;
+            set_visited(fringe_object);
+            for (auto const contact : get_particle_contacts(fringe_object)) {
+              if constexpr (std::is_same_v<T, Particle_handle>) {
+                auto const other_object =
+                    contact->particles[contact->particles[0] == fringe_object];
+                if (!is_marked(other_object)) {
+                  set_marked(other_object);
+                  _contact_group_fringe.push_back(other_object);
+                }
+                if (!is_visited(other_object)) {
+                  _contact_groups.add_to_group(contact);
+                }
+              } else {
+                auto const other_object = contact->particle;
+                if (!is_marked(other_object)) {
+                  set_marked(other_object);
+                  _contact_group_fringe.push_back(other_object);
+                }
+                if (!is_visited(other_object)) {
+                  _contact_groups.add_to_group(contact);
+                }
+              }
+            }
+            for (auto const contact : get_rigid_body_contacts(fringe_object)) {
+              if constexpr (std::is_same_v<T, Rigid_body_handle>) {
+                auto const other_object =
+                    contact->bodies[contact->bodies[0] == fringe_object];
+                if (!is_marked(other_object)) {
+                  set_marked(other_object);
+                  _contact_group_fringe.push_back(other_object);
+                }
+                if (!is_visited(other_object)) {
+                  _contact_groups.add_to_group(contact);
+                }
+              } else {
+                auto const other_object = contact->body;
+                if (!is_marked(other_object)) {
+                  set_marked(other_object);
+                  _contact_group_fringe.push_back(other_object);
+                }
+                if (!is_visited(other_object)) {
+                  _contact_groups.add_to_group(contact);
+                }
+              }
+            }
+            for (auto const contact : get_static_body_contacts(fringe_object)) {
+              _contact_groups.add_to_group(contact);
+            }
+          },
+          fringe_object);
+    } while (!_contact_group_fringe.empty());
+  }
+
+  void solve_contact_group(std::size_t group_index,
+                           int min_desired_position_iterations_per_contact,
                            int max_desired_position_iterations_per_contact,
                            int max_position_iterations,
                            int min_desired_velocity_iterations_per_contact,
@@ -2433,14 +2662,17 @@ private:
                            Vec3f const &gravitational_velocity_delta,
                            float max_separating_velocity_for_bounce) {
     auto position_iterations = 0;
+    auto const group_begin = _contact_groups.group_begin(group_index);
+    auto const group_end = _contact_groups.group_end(group_index);
+    auto const group_size = group_end - group_begin;
     auto const min_desired_position_iterations =
-        min_desired_position_iterations_per_contact * _contact_group.size();
+        min_desired_position_iterations_per_contact * group_size;
     for (auto i = std::size_t{};
          position_iterations < max_position_iterations &&
          i != min_desired_position_iterations;
          ++i) {
-      if (auto const contact =
-              _contact_group.select_contact_position_solve(0.0f)) {
+      if (auto const contact = _contact_groups.select_contact_position_solve(
+              group_index, 0.0f)) {
         std::visit([this](auto &&arg) { resolve_contact_position(arg); },
                    *contact);
         ++position_iterations;
@@ -2451,13 +2683,13 @@ private:
     auto const optional_desired_position_iterations =
         (max_desired_position_iterations_per_contact -
          min_desired_position_iterations_per_contact) *
-        _contact_group.size();
+        group_size;
     for (auto i = std::size_t{};
          position_iterations < max_position_iterations &&
          i != optional_desired_position_iterations;
          ++i) {
-      if (auto const contact = _contact_group.select_contact_position_solve(
-              early_out_contact_separation)) {
+      if (auto const contact = _contact_groups.select_contact_position_solve(
+              group_index, early_out_contact_separation)) {
         std::visit([this](auto &&arg) { resolve_contact_position(arg); },
                    *contact);
         ++position_iterations;
@@ -2467,13 +2699,13 @@ private:
     }
     auto velocity_iterations = 0;
     auto const min_desired_velocity_iterations =
-        min_desired_velocity_iterations_per_contact * _contact_group.size();
+        min_desired_velocity_iterations_per_contact * group_size;
     for (auto i = std::size_t{};
          velocity_iterations < max_velocity_iterations &&
          i != min_desired_velocity_iterations;
          ++i) {
-      if (auto const contact =
-              _contact_group.select_contact_velocity_solve(0.0f)) {
+      if (auto const contact = _contact_groups.select_contact_velocity_solve(
+              group_index, 0.0f)) {
         std::visit(
             [=, this](auto &&arg) {
               using T = std::decay_t<decltype(arg)>;
@@ -2497,12 +2729,13 @@ private:
     auto const optional_desired_velocity_iterations =
         (max_desired_velocity_iterations_per_contact -
          min_desired_velocity_iterations_per_contact) *
-        (int)_contact_group.size();
-    for (auto i = 0; velocity_iterations < max_velocity_iterations &&
-                     i != optional_desired_velocity_iterations;
+        group_size;
+    for (auto i = std::size_t{};
+         velocity_iterations < max_velocity_iterations &&
+         i != optional_desired_velocity_iterations;
          ++i) {
-      if (auto const contact = _contact_group.select_contact_velocity_solve(
-              early_out_contact_separating_velocity)) {
+      if (auto const contact = _contact_groups.select_contact_velocity_solve(
+              group_index, early_out_contact_separating_velocity)) {
         std::visit(
             [=, this](auto &&arg) {
               using T = std::decay_t<decltype(arg)>;
@@ -3440,9 +3673,10 @@ private:
   List<Particle_static_body_contact *> _particle_static_body_contact_ptrs;
   List<Rigid_body_rigid_body_contact *> _rigid_body_rigid_body_contact_ptrs;
   List<Rigid_body_static_body_contact *> _rigid_body_static_body_contact_ptrs;
-  Dynamic_object_list _contact_group_fringe;
-  Contact_list _contact_group;
   Contact_cache _contact_cache;
+  Contact_group_storage _contact_groups;
+  Dynamic_object_list _contact_group_fringe;
+  // Contact_list _contact_group;
   Vec3f _gravitational_acceleration;
 };
 
@@ -3527,9 +3761,14 @@ World::World(World_create_info const &create_info)
         auto const contact_group_fringe_memory_requirement =
             decltype(Impl::_contact_group_fringe)::memory_requirement(
                 create_info.max_contact_group_fringe_size);
-        auto const contact_group_memory_requirement =
-            decltype(Impl::_contact_group)::memory_requirement(
-                create_info.max_contact_group_size);
+        auto const contact_groups_memory_requirement =
+            decltype(Impl::_contact_groups)::memory_requirement(
+                create_info.max_particle_particle_neighbor_pairs +
+                    create_info.max_particle_rigid_body_neighbor_pairs +
+                    create_info.max_particle_static_body_neighbor_pairs +
+                    create_info.max_rigid_body_rigid_body_neighbor_pairs +
+                    create_info.max_rigid_body_static_body_neighbor_pairs,
+                create_info.max_neighbor_groups);
         auto const contact_cache_memory_requirement =
             decltype(Impl::_contact_cache)::memory_requirement(
                 create_info.max_rigid_body_rigid_body_neighbor_pairs,
@@ -3557,7 +3796,7 @@ World::World(World_create_info const &create_info)
                  rigid_body_rigid_body_contact_pointers_memory_requirement,
                  rigid_body_static_body_contact_pointers_memory_requirement,
                  contact_group_fringe_memory_requirement,
-                 contact_group_memory_requirement,
+                 contact_groups_memory_requirement,
                  contact_cache_memory_requirement});
         auto system_allocation =
             std::make_unique<std::byte[]>(total_memory_requirement);
@@ -3615,7 +3854,7 @@ World::World(World_create_info const &create_info)
                     rigid_body_static_body_contact_pointers_memory_requirement)
                 .begin,
             allocator.alloc(contact_group_fringe_memory_requirement).begin,
-            allocator.alloc(contact_group_memory_requirement).begin,
+            allocator.alloc(contact_groups_memory_requirement).begin,
             allocator.alloc(contact_cache_memory_requirement).begin);
       }()} {}
 
