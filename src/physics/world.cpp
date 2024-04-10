@@ -421,8 +421,6 @@ public:
   }
 
   std::variant<Particle_handle, Rigid_body_handle> back() const noexcept {
-    // assert(!empty());
-    // assert(_object_types.size() === _object_handles.size());
     assert(&_object_types.back() == &_object_types[size() - 1]);
     return at(size() - 1);
   }
@@ -1795,7 +1793,6 @@ private:
                   auto const data = _particles.data(handle);
                   if (data->awake) {
                     data->velocity = Vec3f::zero();
-                    // data->waking_motion = 0.0f;
                     data->awake = false;
                   }
                 } else {
@@ -1804,7 +1801,6 @@ private:
                   if (data->awake) {
                     data->velocity = Vec3f::zero();
                     data->angular_velocity = Vec3f::zero();
-                    // data->waking_motion = 0.0f;
                     data->awake = false;
                   }
                 }
@@ -2165,8 +2161,6 @@ private:
     _particle_static_body_contacts.clear();
     _rigid_body_rigid_body_contact_pairs.clear();
     _rigid_body_static_body_contact_pairs.clear();
-    // _rigid_body_rigid_body_contacts.clear();
-    // _rigid_body_static_body_contacts.clear();
     _particle_particle_contact_ptrs.clear();
     _particle_rigid_body_contact_ptrs.clear();
     _particle_static_body_contact_ptrs.clear();
