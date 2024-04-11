@@ -5,7 +5,6 @@
 #include <span>
 #include <utility>
 #include <variant>
-#include <vector>
 
 #include "../util/list.h"
 #include "../util/memory.h"
@@ -32,16 +31,19 @@ public:
         decltype(_leaf_node_pool)::memory_requirement(leaf_node_capacity),
         decltype(_leaf_node_set)::memory_requirement(leaf_node_capacity),
         decltype(_leaf_node_array)::memory_requirement(leaf_node_capacity),
-        decltype(_internal_nodes)::memory_requirement(
-            internal_node_capacity),
+        decltype(_internal_nodes)::memory_requirement(internal_node_capacity),
     });
   }
 
-  explicit Aabb_tree(util::Block block, std::size_t leaf_node_capacity,
+  constexpr Aabb_tree() = default;
+
+  explicit Aabb_tree(util::Block block,
+                     std::size_t leaf_node_capacity,
                      std::size_t internal_node_capacity)
       : Aabb_tree{block.begin, leaf_node_capacity, internal_node_capacity} {}
 
-  explicit Aabb_tree(void *block, std::size_t leaf_node_capacity,
+  explicit Aabb_tree(void *block,
+                     std::size_t leaf_node_capacity,
                      std::size_t internal_node_capacity) {
     auto allocator = util::Stack_allocator<alignof(Node)>{make_block(
         block, memory_requirement(leaf_node_capacity, internal_node_capacity))};
@@ -179,7 +181,8 @@ private:
     }
   }
 
-  auto partition(std::span<Node *> leaf_nodes, int axis_index,
+  auto partition(std::span<Node *> leaf_nodes,
+                 int axis_index,
                  float split_position) noexcept {
     assert(!leaf_nodes.empty());
     auto const double_split_position = 2.0f * split_position;
@@ -206,8 +209,8 @@ private:
     assert(root != nullptr);
     if (root->payload.index() == 0) {
       auto const &children = std::get<0>(root->payload);
-      for_each_overlapping_leaf_pair(children[0], children[1],
-                                     std::forward<F>(f));
+      for_each_overlapping_leaf_pair(
+          children[0], children[1], std::forward<F>(f));
       for_each_overlapping_leaf_pair(children[0], std::forward<F>(f));
       for_each_overlapping_leaf_pair(children[1], std::forward<F>(f));
     }
@@ -223,19 +226,19 @@ private:
         if (right->payload.index() == 0) {
           // right is internal
           auto const &right_children = std::get<0>(right->payload);
-          for_each_overlapping_leaf_pair(left_children[0], right_children[0],
-                                         std::forward<F>(f));
-          for_each_overlapping_leaf_pair(left_children[0], right_children[1],
-                                         std::forward<F>(f));
-          for_each_overlapping_leaf_pair(left_children[1], right_children[0],
-                                         std::forward<F>(f));
-          for_each_overlapping_leaf_pair(left_children[1], right_children[1],
-                                         std::forward<F>(f));
+          for_each_overlapping_leaf_pair(
+              left_children[0], right_children[0], std::forward<F>(f));
+          for_each_overlapping_leaf_pair(
+              left_children[0], right_children[1], std::forward<F>(f));
+          for_each_overlapping_leaf_pair(
+              left_children[1], right_children[0], std::forward<F>(f));
+          for_each_overlapping_leaf_pair(
+              left_children[1], right_children[1], std::forward<F>(f));
         } else {
           // right is leaf
           for (auto const left_child : left_children) {
-            for_each_overlapping_leaf_pair(left_child, right,
-                                           std::forward<F>(f));
+            for_each_overlapping_leaf_pair(
+                left_child, right, std::forward<F>(f));
           }
         }
       } else {
@@ -244,8 +247,8 @@ private:
           // right is internal
           auto const &right_children = std::get<0>(right->payload);
           for (auto const right_child : right_children) {
-            for_each_overlapping_leaf_pair(left, right_child,
-                                           std::forward<F>(f));
+            for_each_overlapping_leaf_pair(
+                left, right_child, std::forward<F>(f));
           }
         } else {
           // right is leaf
@@ -261,6 +264,18 @@ private:
   util::List<Node> _internal_nodes;
   Node *_root_node{};
 };
+
+template <typename Payload, typename Allocator>
+std::pair<util::Block, Aabb_tree<Payload>>
+make_aabb_tree(Allocator &allocator,
+               std::size_t leaf_node_capacity,
+               std::size_t internal_node_capacity) {
+  auto const block = allocator.alloc(Aabb_tree<Payload>::memory_requirement(
+      leaf_node_capacity, internal_node_capacity));
+  return {
+      block,
+      Aabb_tree<Payload>{block, leaf_node_capacity, internal_node_capacity}};
+}
 } // namespace physics
 } // namespace marlon
 
