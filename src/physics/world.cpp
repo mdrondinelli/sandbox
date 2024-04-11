@@ -3,8 +3,7 @@
 #include <cstdint>
 
 #include <iostream>
-
-#include <omp.h>
+#include <latch>
 
 #include "../util/list.h"
 #include "../util/map.h"
@@ -1261,6 +1260,942 @@ make_contact_cache(Allocator &allocator,
                         max_rigid_body_static_body_pairs}};
 }
 
+struct Positional_constraint_problem {
+  Vec3f direction;
+  float distance;
+  std::array<Vec3f, 2> position;
+  std::array<float, 2> inverse_mass;
+  std::array<Mat3x3f, 2> inverse_inertia_tensor;
+};
+
+struct Positional_constraint_solution {
+  std::array<Vec3f, 2> delta_position;
+  std::array<Vec3f, 2> delta_orientation;
+  float lambda;
+};
+
+auto constexpr max_rotational_displacement_factor = 0.2f;
+
+Positional_constraint_solution
+solve_positional_constraint(Positional_constraint_problem const &problem) {
+  auto const angular_impulse_per_impulse =
+      std::array<Vec3f, 2>{cross(problem.position[0], problem.direction),
+                           cross(problem.position[1], problem.direction)};
+  auto const angular_displacement_per_impulse = std::array<Vec3f, 2>{
+      problem.inverse_inertia_tensor[0] * angular_impulse_per_impulse[0],
+      problem.inverse_inertia_tensor[1] * angular_impulse_per_impulse[1]};
+  auto const rotational_displacement_per_impulse = std::array<Vec3f, 2>{
+      cross(angular_displacement_per_impulse[0], problem.position[0]),
+      cross(angular_displacement_per_impulse[1], problem.position[1])};
+  auto const correcting_rotational_displacement_per_impulse =
+      std::array<float, 2>{
+          dot(rotational_displacement_per_impulse[0], problem.direction),
+          dot(rotational_displacement_per_impulse[1], problem.direction)};
+  auto const correcting_translational_displacement_per_impulse =
+      std::array<float, 2>{problem.inverse_mass[0], problem.inverse_mass[1]};
+  auto const correcting_displacement_per_impulse =
+      correcting_translational_displacement_per_impulse[0] +
+      correcting_translational_displacement_per_impulse[1] +
+      correcting_rotational_displacement_per_impulse[0] +
+      correcting_rotational_displacement_per_impulse[1];
+  auto const impulse_per_correcting_displacement =
+      1.0f / correcting_displacement_per_impulse;
+  auto const impulse = problem.distance * impulse_per_correcting_displacement;
+  auto correcting_translational_displacement = std::array<float, 2>{
+      impulse * correcting_translational_displacement_per_impulse[0],
+      impulse * -correcting_translational_displacement_per_impulse[1]};
+  auto correcting_rotational_displacement = std::array<float, 2>{
+      impulse * correcting_rotational_displacement_per_impulse[0],
+      impulse * -correcting_rotational_displacement_per_impulse[1]};
+  auto const max_rotational_displacement = std::array<float, 2>{
+      max_rotational_displacement_factor * length(problem.position[0]),
+      max_rotational_displacement_factor * length(problem.position[1])};
+  for (auto i = 0; i != 2; ++i) {
+    if (std::abs(correcting_rotational_displacement[i]) >
+        max_rotational_displacement[i]) {
+      auto const total_displacement = correcting_translational_displacement[i] +
+                                      correcting_rotational_displacement[i];
+      correcting_rotational_displacement[i] =
+          std::signbit(correcting_rotational_displacement[i])
+              ? -max_rotational_displacement[i]
+              : max_rotational_displacement[i];
+      correcting_translational_displacement[i] =
+          total_displacement - correcting_rotational_displacement[i];
+    }
+  }
+  auto const delta_position = std::array<Vec3f, 2>{
+      problem.direction * correcting_translational_displacement[0],
+      problem.direction * correcting_translational_displacement[1],
+  };
+  auto const angular_displacement_per_correcting_rotational_displacement =
+      std::array<Vec3f, 2>{
+          angular_displacement_per_impulse[0] /
+              correcting_rotational_displacement_per_impulse[0],
+          angular_displacement_per_impulse[1] /
+              correcting_rotational_displacement_per_impulse[1]};
+  auto const delta_orientation = std::array<Vec3f, 2>{
+      angular_displacement_per_correcting_rotational_displacement[0] *
+          correcting_rotational_displacement[0],
+      angular_displacement_per_correcting_rotational_displacement[1] *
+          correcting_rotational_displacement[1]};
+  return {.delta_position = delta_position,
+          .delta_orientation = delta_orientation,
+          .lambda = impulse};
+}
+
+class Contact_group_storage;
+
+class Contact_group_solve_task : public util::Task {
+public:
+  struct Intrinsic_state {
+    std::latch *latch;
+    Particle_storage *particles;
+    Rigid_body_storage *rigid_bodies;
+    Static_body_storage *static_bodies;
+    Contact_group_storage const *contact_groups;
+    int min_desired_position_iterations_per_contact;
+    int max_desired_position_iterations_per_contact;
+    int max_position_iterations;
+    int min_desired_velocity_iterations_per_contact;
+    int max_desired_velocity_iterations_per_contact;
+    int max_velocity_iterations;
+    float early_out_contact_separation;
+    float early_out_contact_separating_velocity;
+    math::Vec3f gravitational_delta_velocity;
+    float restitution_max_separating_velocity;
+  };
+
+  constexpr Contact_group_solve_task(Intrinsic_state const *intrinsic_state,
+                                     std::size_t group_index) noexcept
+      : _intrinsic_state{intrinsic_state}, _group_index{group_index} {}
+
+  void run(unsigned) final;
+
+  Intrinsic_state const *get_intrinsic_state() { return _intrinsic_state; }
+
+  void set_instrinsic_state(Intrinsic_state const *intrinsic_state) noexcept {
+    _intrinsic_state = intrinsic_state;
+  }
+
+private:
+  void resolve_contact_position(Particle_particle_contact *contact) {
+    auto const particles = contact->particles;
+    auto const particle_datas = std::array<Particle_data *, 2>{
+        _intrinsic_state->particles->data(particles[0]),
+        _intrinsic_state->particles->data(particles[1]),
+    };
+    auto const distance_per_impulse =
+        particle_datas[0]->inverse_mass + particle_datas[1]->inverse_mass;
+    auto const impulse_per_distance = 1.0f / distance_per_impulse;
+    auto const impulse =
+        -contact->separation * impulse_per_distance * contact->normal;
+    auto const particle_position_deltas =
+        std::array<Vec3f, 2>{impulse * particle_datas[0]->inverse_mass,
+                             impulse * -particle_datas[1]->inverse_mass};
+    particle_datas[0]->position += particle_position_deltas[0];
+    particle_datas[1]->position += particle_position_deltas[1];
+    for (auto i = 0; i != 2; ++i) {
+      update_separations(particles[i], particle_position_deltas[i]);
+    }
+  }
+
+  void resolve_contact_position(Particle_rigid_body_contact *contact) {
+    auto const particle_data =
+        _intrinsic_state->particles->data(contact->particle);
+    auto const body_data = _intrinsic_state->rigid_bodies->data(contact->body);
+    auto const rotation = Mat3x3f::rotation(body_data->orientation);
+    auto const inverse_rotation = transpose(rotation);
+    auto const inverse_inertia_tensor =
+        rotation * body_data->inverse_inertia_tensor * inverse_rotation;
+    auto const separation_solution = solve_positional_constraint({
+        .direction = contact->normal,
+        .distance = -contact->separation,
+        .position = {Vec3f::zero(), contact->relative_position},
+        .inverse_mass = {particle_data->inverse_mass, body_data->inverse_mass},
+        .inverse_inertia_tensor = {Mat3x3f::zero(), inverse_inertia_tensor},
+    });
+    auto const contact_movement =
+        (particle_data->position - particle_data->previous_position) -
+        ((body_data->position + contact->relative_position) -
+         (body_data->previous_position +
+          Mat3x3f::rotation(body_data->previous_orientation) *
+              inverse_rotation * contact->relative_position));
+    auto const tangential_contact_movement =
+        perp_unit(contact_movement, contact->normal);
+    auto delta_position = separation_solution.delta_position;
+    auto delta_orientation = separation_solution.delta_orientation[1];
+    if (tangential_contact_movement != Vec3f::zero()) {
+      auto const correction_distance = length(tangential_contact_movement);
+      auto const correction_direction =
+          tangential_contact_movement / -correction_distance;
+      auto const friction_solution = solve_positional_constraint({
+          .direction = correction_direction,
+          .distance = correction_distance,
+          .position = {Vec3f::zero(), contact->relative_position},
+          .inverse_mass = {particle_data->inverse_mass,
+                           body_data->inverse_mass},
+          .inverse_inertia_tensor = {Mat3x3f::zero(), inverse_inertia_tensor},
+      });
+      auto const static_friction_coefficient =
+          0.5f * (particle_data->material.static_friction_coefficient +
+                  body_data->material.static_friction_coefficient);
+      if (friction_solution.lambda <
+          static_friction_coefficient * separation_solution.lambda) {
+        delta_position[0] += friction_solution.delta_position[0];
+        delta_position[1] += friction_solution.delta_position[1];
+        delta_orientation += friction_solution.delta_orientation[1];
+      }
+    }
+    apply_positional_correction(contact->particle, delta_position[0]);
+    apply_positional_correction(
+        contact->body, delta_position[1], delta_orientation);
+    update_separations(contact->particle, delta_position[0]);
+    update_separations(contact->body, delta_position[1], delta_orientation);
+  }
+
+  void resolve_contact_position(Particle_static_body_contact *contact) {
+    auto const particle_data =
+        _intrinsic_state->particles->data(contact->particle);
+    auto const body_data = _intrinsic_state->static_bodies->data(contact->body);
+    auto const separation_solution = solve_positional_constraint({
+        .direction = contact->normal,
+        .distance = -contact->separation,
+        .position = {Vec3f::zero(), Vec3f::zero()},
+        .inverse_mass = {particle_data->inverse_mass, 0.0f},
+        .inverse_inertia_tensor = {Mat3x3f::zero(), Mat3x3f::zero()},
+    });
+    auto const contact_movement =
+        particle_data->position - particle_data->previous_position;
+    auto const tangential_contact_movement =
+        perp_unit(contact_movement, contact->normal);
+    auto delta_position = separation_solution.delta_position[0];
+    if (tangential_contact_movement != Vec3f::zero()) {
+      auto const correction_distance = length(tangential_contact_movement);
+      auto const correction_direction =
+          tangential_contact_movement / -correction_distance;
+      auto const friction_solution = solve_positional_constraint({
+          .direction = correction_direction,
+          .distance = correction_distance,
+          .position = {Vec3f::zero(), Vec3f::zero()},
+          .inverse_mass = {particle_data->inverse_mass, 0.0f},
+          .inverse_inertia_tensor = {Mat3x3f::zero(), Mat3x3f::zero()},
+      });
+      auto const static_friction_coefficient =
+          0.5f * (particle_data->material.static_friction_coefficient +
+                  body_data->material.static_friction_coefficient);
+      if (friction_solution.lambda <
+          static_friction_coefficient * separation_solution.lambda) {
+        delta_position += friction_solution.delta_position[0];
+      }
+    }
+    apply_positional_correction(contact->particle, delta_position);
+    update_separations(contact->particle, delta_position);
+  }
+
+  void resolve_contact_position(Rigid_body_rigid_body_contact *contact) {
+    auto const data = std::array<Rigid_body_data *, 2>{
+        _intrinsic_state->rigid_bodies->data(contact->bodies[0]),
+        _intrinsic_state->rigid_bodies->data(contact->bodies[1]),
+    };
+    auto const rotation = std::array<Mat3x3f, 2>{
+        Mat3x3f::rotation(data[0]->orientation),
+        Mat3x3f::rotation(data[1]->orientation),
+    };
+    auto const inverse_rotation = std::array<Mat3x3f, 2>{
+        transpose(rotation[0]),
+        transpose(rotation[1]),
+    };
+    auto const inverse_inertia_tensor = std::array<Mat3x3f, 2>{
+        rotation[0] * data[0]->inverse_inertia_tensor * inverse_rotation[0],
+        rotation[1] * data[1]->inverse_inertia_tensor * inverse_rotation[1],
+    };
+    auto const separation_solution = solve_positional_constraint({
+        .direction = contact->normal,
+        .distance = -contact->separation,
+        .position = contact->relative_positions,
+        .inverse_mass = {data[0]->inverse_mass, data[1]->inverse_mass},
+        .inverse_inertia_tensor = inverse_inertia_tensor,
+    });
+    auto const relative_contact_movement =
+        ((data[0]->position + contact->relative_positions[0]) -
+         (data[0]->previous_position +
+          Mat3x3f::rotation(data[0]->previous_orientation) *
+              inverse_rotation[0] * contact->relative_positions[0])) -
+        ((data[1]->position + contact->relative_positions[1]) -
+         (data[1]->previous_position +
+          Mat3x3f::rotation(data[1]->previous_orientation) *
+              inverse_rotation[1] * contact->relative_positions[1]));
+    auto const tangential_relative_contact_movement =
+        perp_unit(relative_contact_movement, contact->normal);
+    auto delta_position = separation_solution.delta_position;
+    auto delta_orientation = separation_solution.delta_orientation;
+    if (tangential_relative_contact_movement != Vec3f::zero()) {
+      auto const correction_distance =
+          length(tangential_relative_contact_movement);
+      auto const correction_direction =
+          tangential_relative_contact_movement / -correction_distance;
+      auto const friction_solution = solve_positional_constraint(
+          {.direction = correction_direction,
+           .distance = correction_distance,
+           .position = contact->relative_positions,
+           .inverse_mass = {data[0]->inverse_mass, data[1]->inverse_mass},
+           .inverse_inertia_tensor = inverse_inertia_tensor});
+      auto const static_friction_coefficient =
+          0.5f * (data[0]->material.static_friction_coefficient +
+                  data[1]->material.static_friction_coefficient);
+      if (friction_solution.lambda <
+          static_friction_coefficient * separation_solution.lambda) {
+        for (auto i = 0; i != 2; ++i) {
+          delta_position[i] += friction_solution.delta_position[i];
+          delta_orientation[i] += friction_solution.delta_orientation[i];
+        }
+      }
+    }
+    for (auto i = 0; i != 2; ++i) {
+      apply_positional_correction(
+          contact->bodies[i], delta_position[i], delta_orientation[i]);
+      update_separations(
+          contact->bodies[i], delta_position[i], delta_orientation[i]);
+    }
+  }
+
+  void resolve_contact_position(Rigid_body_static_body_contact *contact) {
+    auto const dynamic_body_data =
+        _intrinsic_state->rigid_bodies->data(contact->rigid_body);
+    auto const static_body_data =
+        _intrinsic_state->static_bodies->data(contact->static_body);
+    auto const rotation = Mat3x3f::rotation(dynamic_body_data->orientation);
+    auto const inverse_rotation = transpose(rotation);
+    auto const inverse_inertia_tensor =
+        rotation * dynamic_body_data->inverse_inertia_tensor * inverse_rotation;
+    auto const separation_solution = solve_positional_constraint(
+        {.direction = contact->normal,
+         .distance = -contact->separation,
+         .position = {contact->relative_position, Vec3f::zero()},
+         .inverse_mass = {dynamic_body_data->inverse_mass, 0.0f},
+         .inverse_inertia_tensor = {inverse_inertia_tensor, Mat3x3f::zero()}});
+    auto const contact_movement =
+        (dynamic_body_data->position + contact->relative_position) -
+        (dynamic_body_data->previous_position +
+         Mat3x3f::rotation(dynamic_body_data->previous_orientation) *
+             inverse_rotation * contact->relative_position);
+    auto const tangential_contact_movement =
+        perp_unit(contact_movement, contact->normal);
+    auto delta_position = separation_solution.delta_position[0];
+    auto delta_orientation = separation_solution.delta_orientation[0];
+    if (tangential_contact_movement != Vec3f::zero()) {
+      auto const correction_distance = length(tangential_contact_movement);
+      auto const correction_direction =
+          tangential_contact_movement / -correction_distance;
+      auto const friction_solution = solve_positional_constraint(
+          {.direction = correction_direction,
+           .distance = correction_distance,
+           .position = {contact->relative_position, Vec3f::zero()},
+           .inverse_mass = {dynamic_body_data->inverse_mass, 0.0f},
+           .inverse_inertia_tensor = {inverse_inertia_tensor,
+                                      Mat3x3f::zero()}});
+      auto const static_friction_coefficient =
+          0.5f * (dynamic_body_data->material.static_friction_coefficient +
+                  static_body_data->material.static_friction_coefficient);
+      if (friction_solution.lambda <
+          static_friction_coefficient * separation_solution.lambda) {
+        delta_position += friction_solution.delta_position[0];
+        delta_orientation += friction_solution.delta_orientation[0];
+      }
+    }
+    apply_positional_correction(
+        contact->rigid_body, delta_position, delta_orientation);
+    update_separations(contact->rigid_body, delta_position, delta_orientation);
+  }
+
+  void apply_positional_correction(Particle_handle particle_handle,
+                                   Vec3f const &delta_position) noexcept {
+    auto const particle_data =
+        _intrinsic_state->particles->data(particle_handle);
+    particle_data->position += delta_position;
+  }
+
+  void apply_positional_correction(Rigid_body_handle body_handle,
+                                   Vec3f const &delta_position,
+                                   Vec3f const &delta_orientation) noexcept {
+    auto const body_data = _intrinsic_state->rigid_bodies->data(body_handle);
+    body_data->position += delta_position;
+    body_data->orientation +=
+        0.5f * Quatf{0.0f, delta_orientation} * body_data->orientation;
+    body_data->orientation = normalize(body_data->orientation);
+  }
+
+  void update_separations(Particle_handle particle,
+                          Vec3f const &position_delta) {
+    auto const data = _intrinsic_state->particles->data(particle);
+    auto const particle_contacts =
+        std::span{data->particle_contacts, data->particle_contact_count};
+    auto const dynamic_rigid_body_contacts =
+        std::span{data->rigid_body_contacts, data->rigid_body_contact_count};
+    auto const static_rigid_body_contacts =
+        std::span{data->static_body_contacts, data->static_body_contact_count};
+    for (auto const contact : particle_contacts) {
+      auto const delta = (contact->particles[0] == particle ? 1.0f : -1.0f) *
+                         dot(position_delta, contact->normal);
+      contact->separation += delta;
+    }
+    for (auto const contact : dynamic_rigid_body_contacts) {
+      auto const delta = dot(position_delta, contact->normal);
+      contact->separation += delta;
+    }
+    for (auto const contact : static_rigid_body_contacts) {
+      auto const delta = dot(position_delta, contact->normal);
+      contact->separation += delta;
+    }
+  }
+
+  void update_separations(Rigid_body_handle body,
+                          Vec3f const &position_delta,
+                          Vec3f const &orientation_delta) {
+    auto const data = _intrinsic_state->rigid_bodies->data(body);
+    auto const particle_contacts =
+        std::span{data->particle_contacts, data->particle_contact_count};
+    auto const dynamic_rigid_body_contacts =
+        std::span{data->rigid_body_contacts, data->rigid_body_contact_count};
+    auto const static_rigid_body_contacts =
+        std::span{data->static_body_contacts, data->static_body_contact_count};
+    for (auto const contact : particle_contacts) {
+      auto const delta = -dot(
+          position_delta + cross(orientation_delta, contact->relative_position),
+          contact->normal);
+      contact->separation += delta;
+    }
+    for (auto const contact : dynamic_rigid_body_contacts) {
+      if (contact->bodies[0] == body) {
+        auto const delta =
+            dot(position_delta +
+                    cross(orientation_delta, contact->relative_positions[0]),
+                contact->normal);
+        contact->separation += delta;
+      } else {
+        auto const delta =
+            -dot(position_delta +
+                     cross(orientation_delta, contact->relative_positions[1]),
+                 contact->normal);
+        contact->separation += delta;
+      }
+    }
+    for (auto const contact : static_rigid_body_contacts) {
+      auto const delta = dot(
+          position_delta + cross(orientation_delta, contact->relative_position),
+          contact->normal);
+      contact->separation += delta;
+    }
+  }
+
+  void resolve_contact_velocity(Particle_particle_contact *contact,
+                                float max_separating_velocity_for_bounce) {
+    auto const particles = contact->particles;
+    auto const particle_datas = std::array<Particle_data *, 2>{
+        _intrinsic_state->particles->data(particles[0]),
+        _intrinsic_state->particles->data(particles[1]),
+    };
+    auto const normal = contact->normal;
+    auto const separating_velocity = contact->separating_velocity;
+    auto const velocity_per_impulse =
+        particle_datas[0]->inverse_mass + particle_datas[1]->inverse_mass;
+    auto const impulse_per_velocity = 1.0f / velocity_per_impulse;
+    auto const restitution_coefficient =
+        separating_velocity < max_separating_velocity_for_bounce
+            ? 0.5f * (particle_datas[0]->material.restitution_coefficient +
+                      particle_datas[1]->material.restitution_coefficient)
+            : 0.0f;
+    auto const delta_separating_velocity =
+        -separating_velocity * (1.0f + restitution_coefficient);
+    auto const separating_impulse_length =
+        delta_separating_velocity * impulse_per_velocity;
+    auto const separating_impulse = separating_impulse_length * normal;
+    auto const frictional_impulse = [&]() {
+      auto const relative_velocity =
+          particle_datas[0]->velocity - particle_datas[1]->velocity;
+      auto const sliding_velocity =
+          relative_velocity - separating_velocity * normal;
+      auto const sliding_speed_squared = length_squared(sliding_velocity);
+      if (sliding_speed_squared != 0.0f) {
+        auto const sliding_speed = std::sqrt(sliding_speed_squared);
+        auto const sliding_direction = sliding_velocity / sliding_speed;
+        auto const frictional_impulse_direction = -sliding_direction;
+        auto const static_friction_coefficient =
+            0.5f * (particle_datas[0]->material.static_friction_coefficient +
+                    particle_datas[1]->material.static_friction_coefficient);
+        auto const dynamic_friction_coefficient =
+            0.5f * (particle_datas[0]->material.dynamic_friction_coefficient +
+                    particle_datas[1]->material.dynamic_friction_coefficient);
+        auto const max_static_frictional_impulse_length =
+            static_friction_coefficient * separating_impulse_length;
+        auto const max_dynamic_frictional_impulse_length =
+            dynamic_friction_coefficient * separating_impulse_length;
+        auto const stopping_impulse_length =
+            impulse_per_velocity * sliding_speed;
+        if (stopping_impulse_length <= max_static_frictional_impulse_length) {
+          return stopping_impulse_length * frictional_impulse_direction;
+        } else {
+          return max_dynamic_frictional_impulse_length *
+                 frictional_impulse_direction;
+        }
+      } else {
+        return Vec3f::zero();
+      }
+    }();
+    auto const impulse = separating_impulse + frictional_impulse;
+    auto const particle_velocity_deltas =
+        std::array<Vec3f, 2>{impulse * particle_datas[0]->inverse_mass,
+                             impulse * -particle_datas[1]->inverse_mass};
+    particle_datas[0]->velocity += particle_velocity_deltas[0];
+    particle_datas[1]->velocity += particle_velocity_deltas[1];
+    for (auto i = 0; i != 2; ++i) {
+      update_separating_velocities(particles[i], particle_velocity_deltas[i]);
+    }
+  }
+
+  void resolve_contact_velocity(Particle_rigid_body_contact *contact,
+                                float max_separating_velocity_for_bounce) {
+    auto const particle = contact->particle;
+    auto const particle_data = _intrinsic_state->particles->data(particle);
+    auto const body = contact->body;
+    auto const body_data = _intrinsic_state->rigid_bodies->data(body);
+    auto const body_relative_contact_position = contact->relative_position;
+    auto const normal = contact->normal;
+    auto const separating_velocity = contact->separating_velocity;
+    auto const body_rotation = Mat3x3f::rotation(body_data->orientation);
+    auto const body_inverse_rotation = transpose(body_rotation);
+    auto const body_inverse_inertia_tensor = body_rotation *
+                                             body_data->inverse_inertia_tensor *
+                                             body_inverse_rotation;
+    auto const body_angular_impulse_per_separating_impulse =
+        cross(body_relative_contact_position, normal);
+    auto const body_angular_velocity_per_separating_impulse =
+        body_inverse_inertia_tensor *
+        body_angular_impulse_per_separating_impulse;
+    auto const separating_velocity_per_separating_impulse =
+        particle_data->inverse_mass + body_data->inverse_mass +
+        dot(cross(body_angular_velocity_per_separating_impulse,
+                  body_relative_contact_position),
+            normal);
+    auto const separating_impulse_per_separating_velocity =
+        1.0f / separating_velocity_per_separating_impulse;
+    auto const restitution_coefficient =
+        separating_velocity < max_separating_velocity_for_bounce
+            ? 0.5f * (particle_data->material.restitution_coefficient +
+                      body_data->material.restitution_coefficient)
+            : 0.0f;
+    auto const delta_separating_velocity =
+        -separating_velocity * (1.0f + restitution_coefficient);
+    auto const separating_impulse_length =
+        delta_separating_velocity * separating_impulse_per_separating_velocity;
+    auto const separating_impulse = separating_impulse_length * normal;
+    auto const relative_velocity =
+        particle_data->velocity -
+        (body_data->velocity +
+         cross(body_data->angular_velocity, body_relative_contact_position));
+    auto const sliding_velocity =
+        relative_velocity - separating_velocity * normal;
+    auto const sliding_speed_squared = length_squared(sliding_velocity);
+    auto const frictional_impulse = [&]() {
+      if (sliding_speed_squared != 0.0f) {
+        auto const sliding_speed = std::sqrt(sliding_speed_squared);
+        auto const sliding_direction = sliding_velocity / sliding_speed;
+        auto const frictional_impulse_direction = -sliding_direction;
+        auto const body_angular_impulse_per_frictional_impulse =
+            cross(body_relative_contact_position, frictional_impulse_direction);
+        auto const body_angular_velocity_per_frictional_impulse =
+            body_inverse_inertia_tensor *
+            body_angular_impulse_per_frictional_impulse;
+        auto const sliding_velocity_per_frictional_impulse =
+            particle_data->inverse_mass + body_data->inverse_mass +
+            dot(cross(body_angular_velocity_per_frictional_impulse,
+                      body_relative_contact_position),
+                frictional_impulse_direction);
+        auto const frictional_impulse_per_sliding_velocity =
+            1.0f / sliding_velocity_per_frictional_impulse;
+        auto const static_friction_coefficient =
+            0.5f * (particle_data->material.static_friction_coefficient +
+                    body_data->material.static_friction_coefficient);
+        auto const dynamic_friction_coefficient =
+            0.5f * (particle_data->material.dynamic_friction_coefficient +
+                    body_data->material.dynamic_friction_coefficient);
+        auto const max_static_friction_impulse_length =
+            static_friction_coefficient * separating_impulse_length;
+        auto const max_dynamic_friction_impulse_length =
+            dynamic_friction_coefficient * separating_impulse_length;
+        auto const stopping_impulse_length =
+            frictional_impulse_per_sliding_velocity * sliding_speed;
+        if (stopping_impulse_length <= max_static_friction_impulse_length) {
+          return stopping_impulse_length * frictional_impulse_direction;
+        } else {
+          return max_dynamic_friction_impulse_length *
+                 frictional_impulse_direction;
+        }
+      } else {
+        return Vec3f::zero();
+      }
+    }();
+    auto const impulse = separating_impulse + frictional_impulse;
+    auto const particle_velocity_delta = impulse * particle_data->inverse_mass;
+    auto const body_velocity_delta = -impulse * body_data->inverse_mass;
+    auto const body_angular_velocity_delta =
+        body_inverse_inertia_tensor *
+        cross(body_relative_contact_position, -impulse);
+    particle_data->velocity += particle_velocity_delta;
+    body_data->velocity += body_velocity_delta;
+    body_data->angular_velocity += body_angular_velocity_delta;
+    update_separating_velocities(particle, particle_velocity_delta);
+    update_separating_velocities(
+        body, body_velocity_delta, body_angular_velocity_delta);
+  }
+
+  void resolve_contact_velocity(Particle_static_body_contact *contact,
+                                Vec3f const &gravitational_velocity_delta,
+                                float max_separating_velocity_for_bounce) {
+    auto const particle = contact->particle;
+    auto const particle_data = _intrinsic_state->particles->data(particle);
+    auto const body = contact->body;
+    auto const body_data = _intrinsic_state->static_bodies->data(body);
+    auto const normal = contact->normal;
+    auto const separating_velocity = contact->separating_velocity;
+    auto const restitution_coefficient =
+        separating_velocity < max_separating_velocity_for_bounce
+            ? 0.5f * (particle_data->material.restitution_coefficient +
+                      body_data->material.restitution_coefficient)
+            : 0.0f;
+    auto const delta_separating_velocity =
+        -separating_velocity -
+        std::min(separating_velocity -
+                     dot(gravitational_velocity_delta, normal),
+                 0.0f) *
+            restitution_coefficient;
+    auto const relative_velocity = particle_data->velocity;
+    auto const sliding_velocity =
+        relative_velocity - separating_velocity * normal;
+    auto const sliding_velocity_length_squared =
+        length_squared(sliding_velocity);
+    auto const static_friction_coefficient =
+        0.5f * (particle_data->material.static_friction_coefficient +
+                body_data->material.static_friction_coefficient);
+    auto const dynamic_friction_coefficient =
+        0.5f * (particle_data->material.dynamic_friction_coefficient +
+                body_data->material.dynamic_friction_coefficient);
+    auto const max_static_friction_delta_sliding_velocity =
+        static_friction_coefficient * delta_separating_velocity;
+    auto const max_static_friction_delta_sliding_velocity_squared =
+        max_static_friction_delta_sliding_velocity *
+        max_static_friction_delta_sliding_velocity;
+    auto const max_dynamic_friction_delta_sliding_velocity =
+        dynamic_friction_coefficient * delta_separating_velocity;
+    auto const delta_sliding_velocity =
+        sliding_velocity_length_squared != 0.0f
+            ? (sliding_velocity_length_squared <=
+                       max_static_friction_delta_sliding_velocity_squared
+                   ? -sliding_velocity
+                   : -sliding_velocity *
+                         max_dynamic_friction_delta_sliding_velocity /
+                         std::sqrt(sliding_velocity_length_squared))
+            : Vec3f::zero();
+    auto const particle_velocity_delta =
+        delta_separating_velocity * normal + delta_sliding_velocity;
+    particle_data->velocity += particle_velocity_delta;
+    update_separating_velocities(particle, particle_velocity_delta);
+  }
+
+  void resolve_contact_velocity(Rigid_body_rigid_body_contact *contact,
+                                float max_separating_velocity_for_bounce) {
+    auto const bodies = contact->bodies;
+    auto const datas = std::array<Rigid_body_data *, 2>{
+        _intrinsic_state->rigid_bodies->data(bodies[0]),
+        _intrinsic_state->rigid_bodies->data(bodies[1]),
+    };
+    auto const relative_positions = contact->relative_positions;
+    auto const normal = contact->normal;
+    auto const separating_velocity = contact->separating_velocity;
+    auto const rotations = std::array<Mat3x3f, 2>{
+        Mat3x3f::rotation(datas[0]->orientation),
+        Mat3x3f::rotation(datas[1]->orientation),
+    };
+    auto const inverse_rotations = std::array<Mat3x3f, 2>{
+        transpose(rotations[0]),
+        transpose(rotations[1]),
+    };
+    auto const inverse_inertia_tensors = std::array<Mat3x3f, 2>{
+        rotations[0] * datas[0]->inverse_inertia_tensor * inverse_rotations[0],
+        rotations[1] * datas[1]->inverse_inertia_tensor * inverse_rotations[1],
+    };
+    auto const angular_impulses_per_separating_impulse = std::array<Vec3f, 2>{
+        cross(relative_positions[0], normal),
+        cross(relative_positions[1], normal),
+    };
+    auto const angular_velocities_per_separating_impulse = std::array<Vec3f, 2>{
+        inverse_inertia_tensors[0] * angular_impulses_per_separating_impulse[0],
+        inverse_inertia_tensors[1] * angular_impulses_per_separating_impulse[1],
+    };
+    auto const separating_velocity_per_separating_impulse =
+        datas[0]->inverse_mass + datas[1]->inverse_mass +
+        dot(cross(angular_velocities_per_separating_impulse[0],
+                  relative_positions[0]) +
+                cross(angular_velocities_per_separating_impulse[1],
+                      relative_positions[1]),
+            normal);
+    auto const separating_impulse_per_separating_velocity =
+        1.0f / separating_velocity_per_separating_impulse;
+    auto const restitution_coefficient =
+        separating_velocity < max_separating_velocity_for_bounce
+            ? 0.5f * (datas[0]->material.restitution_coefficient +
+                      datas[1]->material.restitution_coefficient)
+            : 0.0f;
+    auto const delta_separating_velocity =
+        -separating_velocity * (1.0f + restitution_coefficient);
+    auto const separating_impulse_length =
+        delta_separating_velocity * separating_impulse_per_separating_velocity;
+    auto const separating_impulse = separating_impulse_length * normal;
+    auto const frictional_impulse = [&]() {
+      auto const relative_velocity =
+          (datas[0]->velocity +
+           cross(datas[0]->angular_velocity, relative_positions[0])) -
+          (datas[1]->velocity +
+           cross(datas[1]->angular_velocity, relative_positions[1]));
+      auto const sliding_velocity =
+          relative_velocity - separating_velocity * normal;
+      auto const sliding_speed_squared = length_squared(sliding_velocity);
+      if (sliding_speed_squared != 0.0f) {
+        auto const sliding_speed = std::sqrt(sliding_speed_squared);
+        auto const sliding_direction = sliding_velocity / sliding_speed;
+        auto const frictional_impulse_direction = -sliding_direction;
+        auto const angular_impulses_per_frictional_impulse =
+            std::array<Vec3f, 2>{
+                cross(relative_positions[0], frictional_impulse_direction),
+                cross(relative_positions[1], frictional_impulse_direction),
+            };
+        auto const angular_velocities_per_frictional_impulse =
+            std::array<Vec3f, 2>{
+                inverse_inertia_tensors[0] *
+                    angular_impulses_per_frictional_impulse[0],
+                inverse_inertia_tensors[1] *
+                    angular_impulses_per_frictional_impulse[1],
+            };
+        auto const sliding_velocity_per_frictional_impulse =
+            datas[0]->inverse_mass + datas[1]->inverse_mass +
+            dot(cross(angular_velocities_per_frictional_impulse[0],
+                      relative_positions[0]),
+                cross(angular_velocities_per_frictional_impulse[1],
+                      relative_positions[1]));
+        auto const frictional_impulse_per_sliding_velocity =
+            1.0f / sliding_velocity_per_frictional_impulse;
+        auto const static_friction_coefficient =
+            0.5f * (datas[0]->material.static_friction_coefficient +
+                    datas[1]->material.static_friction_coefficient);
+        auto const dynamic_friction_coefficient =
+            0.5f * (datas[0]->material.dynamic_friction_coefficient +
+                    datas[1]->material.dynamic_friction_coefficient);
+        auto const max_static_friction_impulse_length =
+            static_friction_coefficient * separating_impulse_length;
+        auto const max_dynamic_friction_impulse_length =
+            dynamic_friction_coefficient * separating_impulse_length;
+        auto const stopping_impulse_length =
+            frictional_impulse_per_sliding_velocity * sliding_speed;
+        if (stopping_impulse_length <= max_static_friction_impulse_length) {
+          return stopping_impulse_length * frictional_impulse_direction;
+        } else {
+          return max_dynamic_friction_impulse_length *
+                 frictional_impulse_direction;
+        }
+      } else {
+        return Vec3f::zero();
+      }
+    }();
+    auto const impulse = separating_impulse + frictional_impulse;
+    auto const body_velocity_deltas = std::array<Vec3f, 2>{
+        impulse * datas[0]->inverse_mass,
+        -impulse * datas[1]->inverse_mass,
+    };
+    auto const body_angular_velocity_deltas = std::array<Vec3f, 2>{
+        inverse_inertia_tensors[0] * cross(relative_positions[0], impulse),
+        inverse_inertia_tensors[1] * cross(relative_positions[1], -impulse),
+    };
+    for (auto i = 0; i != 2; ++i) {
+      datas[i]->velocity += body_velocity_deltas[i];
+      datas[i]->angular_velocity += body_angular_velocity_deltas[i];
+      update_separating_velocities(
+          bodies[i], body_velocity_deltas[i], body_angular_velocity_deltas[i]);
+    }
+  }
+
+  void resolve_contact_velocity(Rigid_body_static_body_contact *contact,
+                                Vec3f const &gravitational_velocity_delta,
+                                float max_separating_velocity_for_bounce) {
+    auto const dynamic_body = contact->rigid_body;
+    auto const dynamic_body_data =
+        _intrinsic_state->rigid_bodies->data(dynamic_body);
+    auto const static_body = contact->static_body;
+    auto const static_body_data =
+        _intrinsic_state->static_bodies->data(static_body);
+    auto const dynamic_body_relative_contact_position =
+        contact->relative_position;
+    auto const normal = contact->normal;
+    auto const separating_velocity = contact->separating_velocity;
+    auto const dynamic_body_rotation =
+        Mat3x3f::rotation(dynamic_body_data->orientation);
+    auto const dynamic_body_inverse_rotation = transpose(dynamic_body_rotation);
+    auto const dynamic_body_inverse_inertia_tensor =
+        dynamic_body_rotation * dynamic_body_data->inverse_inertia_tensor *
+        dynamic_body_inverse_rotation;
+    auto const angular_impulse_per_separating_impulse =
+        cross(dynamic_body_relative_contact_position, normal);
+    auto const angular_velocity_per_separating_impulse =
+        dynamic_body_inverse_inertia_tensor *
+        angular_impulse_per_separating_impulse;
+    auto const separating_velocity_per_separating_impulse =
+        dynamic_body_data->inverse_mass +
+        dot(cross(angular_velocity_per_separating_impulse,
+                  dynamic_body_relative_contact_position),
+            normal);
+    auto const separating_impulse_per_separating_velocity =
+        1.0f / separating_velocity_per_separating_impulse;
+    auto const restitution_coefficient =
+        separating_velocity < max_separating_velocity_for_bounce
+            ? 0.5f * (static_body_data->material.restitution_coefficient +
+                      dynamic_body_data->material.restitution_coefficient)
+            : 0.0f;
+    auto const delta_separating_velocity =
+        -separating_velocity -
+        std::min(separating_velocity -
+                     dot(gravitational_velocity_delta, normal),
+                 0.0f) *
+            restitution_coefficient;
+    auto const separating_impulse_length =
+        delta_separating_velocity * separating_impulse_per_separating_velocity;
+    auto const separating_impulse = separating_impulse_length * normal;
+    auto const frictional_impulse = [&]() {
+      auto const relative_velocity =
+          dynamic_body_data->velocity +
+          cross(dynamic_body_data->angular_velocity,
+                dynamic_body_relative_contact_position);
+      auto const sliding_velocity =
+          relative_velocity - separating_velocity * normal;
+      auto const sliding_speed_squared = length_squared(sliding_velocity);
+      if (sliding_speed_squared != 0.0f) {
+        auto const sliding_speed = std::sqrt(sliding_speed_squared);
+        auto const sliding_direction = sliding_velocity / sliding_speed;
+        auto const frictional_impulse_direction = -sliding_direction;
+        auto const angular_impulse_per_frictional_impulse =
+            cross(dynamic_body_relative_contact_position,
+                  frictional_impulse_direction);
+        auto const angular_velocity_per_frictional_impulse =
+            dynamic_body_inverse_inertia_tensor *
+            angular_impulse_per_frictional_impulse;
+        auto const sliding_velocity_per_frictional_impulse =
+            dynamic_body_data->inverse_mass +
+            dot(cross(angular_velocity_per_frictional_impulse,
+                      dynamic_body_relative_contact_position),
+                frictional_impulse_direction);
+        auto const frictional_impulse_per_sliding_velocity =
+            1.0f / sliding_velocity_per_frictional_impulse;
+        auto const static_friction_coefficient =
+            0.5f * (dynamic_body_data->material.static_friction_coefficient +
+                    static_body_data->material.static_friction_coefficient);
+        auto const dynamic_friction_coefficient =
+            0.5f * (dynamic_body_data->material.dynamic_friction_coefficient +
+                    static_body_data->material.dynamic_friction_coefficient);
+        auto const max_static_friction_impulse_length =
+            static_friction_coefficient * separating_impulse_length;
+        auto const max_dynamic_friction_impulse_length =
+            dynamic_friction_coefficient * separating_impulse_length;
+        auto const stopping_impulse_length =
+            frictional_impulse_per_sliding_velocity * sliding_speed;
+        if (stopping_impulse_length <= max_static_friction_impulse_length) {
+          return stopping_impulse_length * frictional_impulse_direction;
+        } else {
+          return max_dynamic_friction_impulse_length *
+                 frictional_impulse_direction;
+        }
+      } else {
+        return Vec3f::zero();
+      }
+    }();
+    auto const impulse = separating_impulse + frictional_impulse;
+    auto const dynamic_body_velocity_delta =
+        dynamic_body_data->inverse_mass * impulse;
+    auto const dynamic_body_angular_velocity_delta =
+        dynamic_body_inverse_inertia_tensor *
+        cross(dynamic_body_relative_contact_position, impulse);
+    dynamic_body_data->velocity += dynamic_body_velocity_delta;
+    dynamic_body_data->angular_velocity += dynamic_body_angular_velocity_delta;
+    update_separating_velocities(dynamic_body,
+                                 dynamic_body_velocity_delta,
+                                 dynamic_body_angular_velocity_delta);
+  }
+
+  void update_separating_velocities(Particle_handle particle,
+                                    Vec3f const &velocity_delta) {
+    auto const data = _intrinsic_state->particles->data(particle);
+    auto const particle_contacts =
+        std::span{data->particle_contacts, data->particle_contact_count};
+    auto const dynamic_rigid_body_contacts =
+        std::span{data->rigid_body_contacts, data->rigid_body_contact_count};
+    auto const static_rigid_body_contacts =
+        std::span{data->static_body_contacts, data->static_body_contact_count};
+    for (auto const contact : particle_contacts) {
+      auto const delta = (contact->particles[0] == particle ? 1.0f : -1.0f) *
+                         dot(velocity_delta, contact->normal);
+      contact->separating_velocity += delta;
+    }
+    for (auto const contact : dynamic_rigid_body_contacts) {
+      auto const delta = dot(velocity_delta, contact->normal);
+      contact->separating_velocity += delta;
+    }
+    for (auto const contact : static_rigid_body_contacts) {
+      auto const delta = dot(velocity_delta, contact->normal);
+      contact->separating_velocity += delta;
+    }
+  }
+
+  void update_separating_velocities(Rigid_body_handle body,
+                                    Vec3f const &velocity_delta,
+                                    Vec3f const &angular_velocity_delta) {
+    auto const data = _intrinsic_state->rigid_bodies->data(body);
+    auto const particle_contacts =
+        std::span{data->particle_contacts, data->particle_contact_count};
+    auto const rigid_body_contacts =
+        std::span{data->rigid_body_contacts, data->rigid_body_contact_count};
+    auto const static_body_contacts =
+        std::span{data->static_body_contacts, data->static_body_contact_count};
+    for (auto const contact : particle_contacts) {
+      auto const delta =
+          -dot(velocity_delta +
+                   cross(angular_velocity_delta, contact->relative_position),
+               contact->normal);
+      contact->separating_velocity += delta;
+    }
+    for (auto const contact : rigid_body_contacts) {
+      if (contact->bodies[0] == body) {
+        auto const delta =
+            dot(velocity_delta + cross(angular_velocity_delta,
+                                       contact->relative_positions[0]),
+                contact->normal);
+        contact->separating_velocity += delta;
+      } else {
+        auto const delta =
+            -dot(velocity_delta + cross(angular_velocity_delta,
+                                        contact->relative_positions[1]),
+                 contact->normal);
+        contact->separating_velocity += delta;
+      }
+    }
+    for (auto const contact : static_body_contacts) {
+      auto const delta = dot(velocity_delta + cross(angular_velocity_delta,
+                                                    contact->relative_position),
+                             contact->normal);
+      contact->separating_velocity += delta;
+    }
+  }
+
+  Intrinsic_state const *_intrinsic_state;
+  std::size_t _group_index;
+};
+
 class Contact_group_storage {
   using Allocator = Stack_allocator<>;
 
@@ -1310,6 +2245,15 @@ public:
     return _groups[group_index].end;
   }
 
+  Contact_group_solve_task const *
+  group_solve_task(std::size_t group_index) const noexcept {
+    return &_groups[group_index].solve_task;
+  }
+
+  Contact_group_solve_task *group_solve_task(std::size_t group_index) noexcept {
+    return &_groups[group_index].solve_task;
+  }
+
   void clear() noexcept {
     _contacts.clear();
     _groups.clear();
@@ -1317,7 +2261,7 @@ public:
 
   void begin_group() {
     auto const index = static_cast<std::uint32_t>(_contacts.size());
-    _groups.push_back({index, index});
+    _groups.push_back({index, index, {nullptr, _groups.size()}});
   }
 
   void add_to_group(Particle_particle_contact *contact) {
@@ -1380,6 +2324,7 @@ private:
   struct Group {
     std::uint32_t begin;
     std::uint32_t end;
+    Contact_group_solve_task solve_task;
   };
 
   Contact_list _contacts;
@@ -1397,15 +2342,119 @@ make_contact_group_storage(Allocator &allocator,
           Contact_group_storage{block, max_contact_count, max_group_count}};
 }
 
-class Contact_group_solve_task : public util::Task {
-public:
-  void run(unsigned) final {}
-
-private:
-};
-
-// solving constants
-auto constexpr max_rotational_displacement_factor = 0.2f;
+void Contact_group_solve_task::run(unsigned) {
+  auto const &_contact_groups = *_intrinsic_state->contact_groups;
+  auto const min_desired_position_iterations_per_contact =
+      _intrinsic_state->min_desired_position_iterations_per_contact;
+  auto const max_desired_position_iterations_per_contact =
+      _intrinsic_state->max_desired_position_iterations_per_contact;
+  auto const max_position_iterations =
+      _intrinsic_state->max_position_iterations;
+  auto const min_desired_velocity_iterations_per_contact =
+      _intrinsic_state->min_desired_velocity_iterations_per_contact;
+  auto const max_desired_velocity_iterations_per_contact =
+      _intrinsic_state->max_desired_velocity_iterations_per_contact;
+  auto const max_velocity_iterations =
+      _intrinsic_state->max_velocity_iterations;
+  auto const early_out_contact_separation =
+      _intrinsic_state->early_out_contact_separation;
+  auto const early_out_contact_separating_velocity =
+      _intrinsic_state->early_out_contact_separating_velocity;
+  auto const gravitational_delta_velocity =
+      _intrinsic_state->gravitational_delta_velocity;
+  auto const restitution_max_separating_velocity =
+      _intrinsic_state->restitution_max_separating_velocity;
+  auto position_iterations = 0;
+  auto const group_begin = _contact_groups.group_begin(_group_index);
+  auto const group_end = _contact_groups.group_end(_group_index);
+  auto const group_size = group_end - group_begin;
+  auto const min_desired_position_iterations =
+      min_desired_position_iterations_per_contact * group_size;
+  for (auto i = std::size_t{}; position_iterations < max_position_iterations &&
+                               i != min_desired_position_iterations;
+       ++i) {
+    if (auto const contact =
+            _contact_groups.select_contact_position_solve(_group_index, 0.0f)) {
+      std::visit([this](auto &&arg) { resolve_contact_position(arg); },
+                 *contact);
+      ++position_iterations;
+    } else {
+      break;
+    }
+  }
+  auto const optional_desired_position_iterations =
+      (max_desired_position_iterations_per_contact -
+       min_desired_position_iterations_per_contact) *
+      group_size;
+  for (auto i = std::size_t{}; position_iterations < max_position_iterations &&
+                               i != optional_desired_position_iterations;
+       ++i) {
+    if (auto const contact = _contact_groups.select_contact_position_solve(
+            _group_index, early_out_contact_separation)) {
+      std::visit([this](auto &&arg) { resolve_contact_position(arg); },
+                 *contact);
+      ++position_iterations;
+    } else {
+      break;
+    }
+  }
+  auto velocity_iterations = 0;
+  auto const min_desired_velocity_iterations =
+      min_desired_velocity_iterations_per_contact * group_size;
+  for (auto i = std::size_t{}; velocity_iterations < max_velocity_iterations &&
+                               i != min_desired_velocity_iterations;
+       ++i) {
+    if (auto const contact =
+            _contact_groups.select_contact_velocity_solve(_group_index, 0.0f)) {
+      std::visit(
+          [=, this](auto &&arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, Particle_static_body_contact *> ||
+                          std::is_same_v<T, Rigid_body_static_body_contact *>) {
+              resolve_contact_velocity(arg,
+                                       gravitational_delta_velocity,
+                                       restitution_max_separating_velocity);
+            } else {
+              resolve_contact_velocity(arg,
+                                       restitution_max_separating_velocity);
+            }
+          },
+          *contact);
+      ++velocity_iterations;
+    } else {
+      break;
+    }
+  }
+  auto const optional_desired_velocity_iterations =
+      (max_desired_velocity_iterations_per_contact -
+       min_desired_velocity_iterations_per_contact) *
+      group_size;
+  for (auto i = std::size_t{}; velocity_iterations < max_velocity_iterations &&
+                               i != optional_desired_velocity_iterations;
+       ++i) {
+    if (auto const contact = _contact_groups.select_contact_velocity_solve(
+            _group_index, early_out_contact_separating_velocity)) {
+      std::visit(
+          [=, this](auto &&arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, Particle_static_body_contact *> ||
+                          std::is_same_v<T, Rigid_body_static_body_contact *>) {
+              resolve_contact_velocity(arg,
+                                       gravitational_delta_velocity,
+                                       restitution_max_separating_velocity);
+            } else {
+              resolve_contact_velocity(arg,
+                                       restitution_max_separating_velocity);
+            }
+          },
+          *contact);
+      ++velocity_iterations;
+    } else {
+      break;
+    }
+  }
+  _intrinsic_state->latch->count_down();
+}
 } // namespace
 
 class World::Impl {
@@ -1735,13 +2784,17 @@ public:
     allocate_neighbors();
     assign_neighbors();
     find_neighbor_groups();
-    clear_contact_state();
     auto const h = simulate_info.delta_time / simulate_info.substep_count;
     auto const time_compensated_velocity_damping_factor =
         std::pow(velocity_damping_factor, h);
     auto const time_compensating_waking_motion_smoothing_factor =
         1.0f - std::pow(1.0f - waking_motion_smoothing_factor, h);
+    auto const gravitational_delta_velocity = _gravitational_acceleration * h;
+    auto const restitution_max_separating_velocity =
+        -2.0f * length(gravitational_delta_velocity);
+    _contact_cache.clear_unmarked();
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
+      clear_contact_state();
       for (auto j = std::size_t{}; j != _neighbor_groups.group_count(); ++j) {
         if (update_neighbor_group_awake_states(j)) {
           integrate_neighbor_group(
@@ -1750,19 +2803,43 @@ public:
               time_compensated_velocity_damping_factor,
               time_compensating_waking_motion_smoothing_factor);
           find_neighbor_group_contacts(j);
-          solve_neighbor_group(
-              j,
-              h,
-              simulate_info.min_desired_position_iterations_per_contact,
-              simulate_info.max_desired_position_iterations_per_contact,
-              simulate_info.max_position_iterations_per_contact_group,
-              simulate_info.min_desired_velocity_iterations_per_contact,
-              simulate_info.max_desired_velocity_iterations_per_contact,
-              simulate_info.max_velocity_iterations_per_contact_group,
-              simulate_info.early_out_contact_separation,
-              simulate_info.early_out_contact_separating_velocity);
+          find_neighbor_group_contact_groups(j);
         }
       }
+      auto latch = std::latch{
+          static_cast<std::ptrdiff_t>(_contact_groups.group_count())};
+      auto const intrinsic_state = Contact_group_solve_task::Intrinsic_state{
+          .latch = &latch,
+          .particles = &_particles,
+          .rigid_bodies = &_rigid_bodies,
+          .static_bodies = &_static_bodies,
+          .contact_groups = &_contact_groups,
+          .min_desired_position_iterations_per_contact =
+              simulate_info.min_desired_position_iterations_per_contact,
+          .max_desired_position_iterations_per_contact =
+              simulate_info.max_desired_position_iterations_per_contact,
+          .max_position_iterations =
+              simulate_info.max_position_iterations_per_contact_group,
+          .min_desired_velocity_iterations_per_contact =
+              simulate_info.min_desired_velocity_iterations_per_contact,
+          .max_desired_velocity_iterations_per_contact =
+              simulate_info.max_desired_velocity_iterations_per_contact,
+          .max_velocity_iterations =
+              simulate_info.max_velocity_iterations_per_contact_group,
+          .early_out_contact_separation =
+              simulate_info.early_out_contact_separation,
+          .early_out_contact_separating_velocity =
+              simulate_info.early_out_contact_separating_velocity,
+          .gravitational_delta_velocity = gravitational_delta_velocity,
+          .restitution_max_separating_velocity =
+              restitution_max_separating_velocity,
+      };
+      for (auto j = std::size_t{}; j != _contact_groups.group_count(); ++j) {
+        _contact_groups.group_solve_task(j)->set_instrinsic_state(
+            &intrinsic_state);
+        simulate_info.thread_pool->push(_contact_groups.group_solve_task(j));
+      }
+      latch.wait();
     }
     call_particle_motion_callbacks(world);
     call_dynamic_rigid_body_motion_callbacks(world);
@@ -2180,7 +3257,6 @@ private:
     _particle_static_body_contact_ptrs.clear();
     _rigid_body_rigid_body_contact_ptrs.clear();
     _rigid_body_static_body_contact_ptrs.clear();
-    _contact_cache.clear_unmarked();
     _contact_groups.clear();
   }
 
@@ -2654,7 +3730,8 @@ private:
       for (auto &contact : _contact_cache.get_contacts(pair)) {
         auto const data = std::array<Rigid_body_data *, 2>{
             _rigid_bodies.data(contact.bodies[0]),
-            _rigid_bodies.data(contact.bodies[1])};
+            _rigid_bodies.data(contact.bodies[1]),
+        };
         for (auto i = 0; i != 2; ++i) {
           data[i]->rigid_body_contacts[data[i]->rigid_body_contact_count++] =
               &contact;
@@ -2670,16 +3747,7 @@ private:
     }
   }
 
-  void solve_neighbor_group(std::size_t group_index,
-                            float delta_time,
-                            int min_desired_position_iterations_per_contact,
-                            int max_desired_position_iterations_per_contact,
-                            int max_position_iterations_per_contact_group,
-                            int min_desired_velocity_iterations_per_contact,
-                            int max_desired_velocity_iterations_per_contact,
-                            int max_velocity_iterations_per_contact_group,
-                            float early_out_contact_separation,
-                            float early_out_contact_separating_velocity) {
+  void find_neighbor_group_contact_groups(std::size_t group_index) {
     auto const group_begin = _neighbor_groups.group_begin(group_index);
     auto const group_end = _neighbor_groups.group_end(group_index);
     for (auto i = group_begin; i != group_end; ++i) {
@@ -2690,26 +3758,11 @@ private:
           },
           _neighbor_groups.object(i));
     }
-    auto const gravitational_velocity_delta =
-        _gravitational_acceleration * delta_time;
-    auto const separating_velocity_epsilon =
-        -2.0f * length(gravitational_velocity_delta);
     for (auto i = group_begin; i != group_end; ++i) {
       std::visit(
           [&, this](auto &&seed_object) {
             if (!is_marked(seed_object)) {
               find_contact_group(seed_object);
-              solve_contact_group(_contact_groups.group_count() - 1,
-                                  min_desired_position_iterations_per_contact,
-                                  max_desired_position_iterations_per_contact,
-                                  max_position_iterations_per_contact_group,
-                                  min_desired_velocity_iterations_per_contact,
-                                  max_desired_velocity_iterations_per_contact,
-                                  max_velocity_iterations_per_contact_group,
-                                  early_out_contact_separation,
-                                  early_out_contact_separating_velocity,
-                                  gravitational_velocity_delta,
-                                  separating_velocity_epsilon);
             }
           },
           _neighbor_groups.object(i));
@@ -2721,7 +3774,6 @@ private:
     std::visit(
         [&](auto &&seed_object) {
           set_marked(seed_object);
-          // _contact_group.clear();
           _contact_groups.begin_group();
           _contact_group_fringe.clear();
           _contact_group_fringe.push_back(seed_object);
@@ -2786,980 +3838,117 @@ private:
     } while (!_contact_group_fringe.empty());
   }
 
-  void solve_contact_group(std::size_t group_index,
-                           int min_desired_position_iterations_per_contact,
-                           int max_desired_position_iterations_per_contact,
-                           int max_position_iterations,
-                           int min_desired_velocity_iterations_per_contact,
-                           int max_desired_velocity_iterations_per_contact,
-                           int max_velocity_iterations,
-                           float early_out_contact_separation,
-                           float early_out_contact_separating_velocity,
-                           Vec3f const &gravitational_velocity_delta,
-                           float max_separating_velocity_for_bounce) {
-    auto position_iterations = 0;
-    auto const group_begin = _contact_groups.group_begin(group_index);
-    auto const group_end = _contact_groups.group_end(group_index);
-    auto const group_size = group_end - group_begin;
-    auto const min_desired_position_iterations =
-        min_desired_position_iterations_per_contact * group_size;
-    for (auto i = std::size_t{};
-         position_iterations < max_position_iterations &&
-         i != min_desired_position_iterations;
-         ++i) {
-      if (auto const contact = _contact_groups.select_contact_position_solve(
-              group_index, 0.0f)) {
-        std::visit([this](auto &&arg) { resolve_contact_position(arg); },
-                   *contact);
-        ++position_iterations;
-      } else {
-        break;
-      }
-    }
-    auto const optional_desired_position_iterations =
-        (max_desired_position_iterations_per_contact -
-         min_desired_position_iterations_per_contact) *
-        group_size;
-    for (auto i = std::size_t{};
-         position_iterations < max_position_iterations &&
-         i != optional_desired_position_iterations;
-         ++i) {
-      if (auto const contact = _contact_groups.select_contact_position_solve(
-              group_index, early_out_contact_separation)) {
-        std::visit([this](auto &&arg) { resolve_contact_position(arg); },
-                   *contact);
-        ++position_iterations;
-      } else {
-        break;
-      }
-    }
-    auto velocity_iterations = 0;
-    auto const min_desired_velocity_iterations =
-        min_desired_velocity_iterations_per_contact * group_size;
-    for (auto i = std::size_t{};
-         velocity_iterations < max_velocity_iterations &&
-         i != min_desired_velocity_iterations;
-         ++i) {
-      if (auto const contact = _contact_groups.select_contact_velocity_solve(
-              group_index, 0.0f)) {
-        std::visit(
-            [=, this](auto &&arg) {
-              using T = std::decay_t<decltype(arg)>;
-              if constexpr (std::is_same_v<T, Particle_static_body_contact *> ||
-                            std::is_same_v<T,
-                                           Rigid_body_static_body_contact *>) {
-                resolve_contact_velocity(arg,
-                                         gravitational_velocity_delta,
-                                         max_separating_velocity_for_bounce);
-              } else {
-                resolve_contact_velocity(arg,
-                                         max_separating_velocity_for_bounce);
-              }
-            },
-            *contact);
-        ++velocity_iterations;
-      } else {
-        break;
-      }
-    }
-    auto const optional_desired_velocity_iterations =
-        (max_desired_velocity_iterations_per_contact -
-         min_desired_velocity_iterations_per_contact) *
-        group_size;
-    for (auto i = std::size_t{};
-         velocity_iterations < max_velocity_iterations &&
-         i != optional_desired_velocity_iterations;
-         ++i) {
-      if (auto const contact = _contact_groups.select_contact_velocity_solve(
-              group_index, early_out_contact_separating_velocity)) {
-        std::visit(
-            [=, this](auto &&arg) {
-              using T = std::decay_t<decltype(arg)>;
-              if constexpr (std::is_same_v<T, Particle_static_body_contact *> ||
-                            std::is_same_v<T,
-                                           Rigid_body_static_body_contact *>) {
-                resolve_contact_velocity(arg,
-                                         gravitational_velocity_delta,
-                                         max_separating_velocity_for_bounce);
-              } else {
-                resolve_contact_velocity(arg,
-                                         max_separating_velocity_for_bounce);
-              }
-            },
-            *contact);
-        ++velocity_iterations;
-      } else {
-        break;
-      }
-    }
-  }
-
-  struct Positional_constraint_problem {
-    Vec3f direction;
-    float distance;
-    std::array<Vec3f, 2> position;
-    std::array<float, 2> inverse_mass;
-    std::array<Mat3x3f, 2> inverse_inertia_tensor;
-  };
-
-  struct Positional_constraint_solution {
-    std::array<Vec3f, 2> delta_position;
-    std::array<Vec3f, 2> delta_orientation;
-    float lambda;
-  };
-
-  Positional_constraint_solution
-  solve_positional_constraint(Positional_constraint_problem const &problem) {
-    auto const angular_impulse_per_impulse =
-        std::array<Vec3f, 2>{cross(problem.position[0], problem.direction),
-                             cross(problem.position[1], problem.direction)};
-    auto const angular_displacement_per_impulse = std::array<Vec3f, 2>{
-        problem.inverse_inertia_tensor[0] * angular_impulse_per_impulse[0],
-        problem.inverse_inertia_tensor[1] * angular_impulse_per_impulse[1]};
-    auto const rotational_displacement_per_impulse = std::array<Vec3f, 2>{
-        cross(angular_displacement_per_impulse[0], problem.position[0]),
-        cross(angular_displacement_per_impulse[1], problem.position[1])};
-    auto const correcting_rotational_displacement_per_impulse =
-        std::array<float, 2>{
-            dot(rotational_displacement_per_impulse[0], problem.direction),
-            dot(rotational_displacement_per_impulse[1], problem.direction)};
-    auto const correcting_translational_displacement_per_impulse =
-        std::array<float, 2>{problem.inverse_mass[0], problem.inverse_mass[1]};
-    auto const correcting_displacement_per_impulse =
-        correcting_translational_displacement_per_impulse[0] +
-        correcting_translational_displacement_per_impulse[1] +
-        correcting_rotational_displacement_per_impulse[0] +
-        correcting_rotational_displacement_per_impulse[1];
-    auto const impulse_per_correcting_displacement =
-        1.0f / correcting_displacement_per_impulse;
-    auto const impulse = problem.distance * impulse_per_correcting_displacement;
-    auto correcting_translational_displacement = std::array<float, 2>{
-        impulse * correcting_translational_displacement_per_impulse[0],
-        impulse * -correcting_translational_displacement_per_impulse[1]};
-    auto correcting_rotational_displacement = std::array<float, 2>{
-        impulse * correcting_rotational_displacement_per_impulse[0],
-        impulse * -correcting_rotational_displacement_per_impulse[1]};
-    auto const max_rotational_displacement = std::array<float, 2>{
-        max_rotational_displacement_factor * length(problem.position[0]),
-        max_rotational_displacement_factor * length(problem.position[1])};
-    for (auto i = 0; i != 2; ++i) {
-      if (std::abs(correcting_rotational_displacement[i]) >
-          max_rotational_displacement[i]) {
-        auto const total_displacement =
-            correcting_translational_displacement[i] +
-            correcting_rotational_displacement[i];
-        correcting_rotational_displacement[i] =
-            std::signbit(correcting_rotational_displacement[i])
-                ? -max_rotational_displacement[i]
-                : max_rotational_displacement[i];
-        correcting_translational_displacement[i] =
-            total_displacement - correcting_rotational_displacement[i];
-      }
-    }
-    auto const delta_position = std::array<Vec3f, 2>{
-        problem.direction * correcting_translational_displacement[0],
-        problem.direction * correcting_translational_displacement[1],
-    };
-    auto const angular_displacement_per_correcting_rotational_displacement =
-        std::array<Vec3f, 2>{
-            angular_displacement_per_impulse[0] /
-                correcting_rotational_displacement_per_impulse[0],
-            angular_displacement_per_impulse[1] /
-                correcting_rotational_displacement_per_impulse[1]};
-    auto const delta_orientation = std::array<Vec3f, 2>{
-        angular_displacement_per_correcting_rotational_displacement[0] *
-            correcting_rotational_displacement[0],
-        angular_displacement_per_correcting_rotational_displacement[1] *
-            correcting_rotational_displacement[1]};
-    return {.delta_position = delta_position,
-            .delta_orientation = delta_orientation,
-            .lambda = impulse};
-  }
-
-  void apply_positional_correction(Particle_handle particle_handle,
-                                   Vec3f const &delta_position) noexcept {
-    auto const particle_data = _particles.data(particle_handle);
-    particle_data->position += delta_position;
-  }
-
-  void apply_positional_correction(Rigid_body_handle body_handle,
-                                   Vec3f const &delta_position,
-                                   Vec3f const &delta_orientation) noexcept {
-    auto const body_data = _rigid_bodies.data(body_handle);
-    body_data->position += delta_position;
-    body_data->orientation +=
-        0.5f * Quatf{0.0f, delta_orientation} * body_data->orientation;
-    body_data->orientation = normalize(body_data->orientation);
-  }
-
-  void resolve_contact_position(Particle_particle_contact *contact) {
-    auto const particles = contact->particles;
-    auto const particle_datas = std::array<Particle_data *, 2>{
-        _particles.data(particles[0]), _particles.data(particles[1])};
-    auto const distance_per_impulse =
-        particle_datas[0]->inverse_mass + particle_datas[1]->inverse_mass;
-    auto const impulse_per_distance = 1.0f / distance_per_impulse;
-    auto const impulse =
-        -contact->separation * impulse_per_distance * contact->normal;
-    auto const particle_position_deltas =
-        std::array<Vec3f, 2>{impulse * particle_datas[0]->inverse_mass,
-                             impulse * -particle_datas[1]->inverse_mass};
-    particle_datas[0]->position += particle_position_deltas[0];
-    particle_datas[1]->position += particle_position_deltas[1];
-    for (auto i = 0; i != 2; ++i) {
-      update_separations(particles[i], particle_position_deltas[i]);
-    }
-  }
-
-  void resolve_contact_position(Particle_rigid_body_contact *contact) {
-    auto const particle_data = _particles.data(contact->particle);
-    auto const body_data = _rigid_bodies.data(contact->body);
-    auto const rotation = Mat3x3f::rotation(body_data->orientation);
-    auto const inverse_rotation = transpose(rotation);
-    auto const inverse_inertia_tensor =
-        rotation * body_data->inverse_inertia_tensor * inverse_rotation;
-    auto const separation_solution = solve_positional_constraint({
-        .direction = contact->normal,
-        .distance = -contact->separation,
-        .position = {Vec3f::zero(), contact->relative_position},
-        .inverse_mass = {particle_data->inverse_mass, body_data->inverse_mass},
-        .inverse_inertia_tensor = {Mat3x3f::zero(), inverse_inertia_tensor},
-    });
-    auto const contact_movement =
-        (particle_data->position - particle_data->previous_position) -
-        ((body_data->position + contact->relative_position) -
-         (body_data->previous_position +
-          Mat3x3f::rotation(body_data->previous_orientation) *
-              inverse_rotation * contact->relative_position));
-    auto const tangential_contact_movement =
-        perp_unit(contact_movement, contact->normal);
-    auto delta_position = separation_solution.delta_position;
-    auto delta_orientation = separation_solution.delta_orientation[1];
-    if (tangential_contact_movement != Vec3f::zero()) {
-      auto const correction_distance = length(tangential_contact_movement);
-      auto const correction_direction =
-          tangential_contact_movement / -correction_distance;
-      auto const friction_solution = solve_positional_constraint({
-          .direction = correction_direction,
-          .distance = correction_distance,
-          .position = {Vec3f::zero(), contact->relative_position},
-          .inverse_mass = {particle_data->inverse_mass,
-                           body_data->inverse_mass},
-          .inverse_inertia_tensor = {Mat3x3f::zero(), inverse_inertia_tensor},
-      });
-      auto const static_friction_coefficient =
-          0.5f * (particle_data->material.static_friction_coefficient +
-                  body_data->material.static_friction_coefficient);
-      if (friction_solution.lambda <
-          static_friction_coefficient * separation_solution.lambda) {
-        delta_position[0] += friction_solution.delta_position[0];
-        delta_position[1] += friction_solution.delta_position[1];
-        delta_orientation += friction_solution.delta_orientation[1];
-      }
-    }
-    apply_positional_correction(contact->particle, delta_position[0]);
-    apply_positional_correction(
-        contact->body, delta_position[1], delta_orientation);
-    update_separations(contact->particle, delta_position[0]);
-    update_separations(contact->body, delta_position[1], delta_orientation);
-  }
-
-  void resolve_contact_position(Particle_static_body_contact *contact) {
-    auto const particle_data = _particles.data(contact->particle);
-    auto const body_data = _static_bodies.data(contact->body);
-    auto const separation_solution = solve_positional_constraint({
-        .direction = contact->normal,
-        .distance = -contact->separation,
-        .position = {Vec3f::zero(), Vec3f::zero()},
-        .inverse_mass = {particle_data->inverse_mass, 0.0f},
-        .inverse_inertia_tensor = {Mat3x3f::zero(), Mat3x3f::zero()},
-    });
-    auto const contact_movement =
-        particle_data->position - particle_data->previous_position;
-    auto const tangential_contact_movement =
-        perp_unit(contact_movement, contact->normal);
-    auto delta_position = separation_solution.delta_position[0];
-    if (tangential_contact_movement != Vec3f::zero()) {
-      auto const correction_distance = length(tangential_contact_movement);
-      auto const correction_direction =
-          tangential_contact_movement / -correction_distance;
-      auto const friction_solution = solve_positional_constraint({
-          .direction = correction_direction,
-          .distance = correction_distance,
-          .position = {Vec3f::zero(), Vec3f::zero()},
-          .inverse_mass = {particle_data->inverse_mass, 0.0f},
-          .inverse_inertia_tensor = {Mat3x3f::zero(), Mat3x3f::zero()},
-      });
-      auto const static_friction_coefficient =
-          0.5f * (particle_data->material.static_friction_coefficient +
-                  body_data->material.static_friction_coefficient);
-      if (friction_solution.lambda <
-          static_friction_coefficient * separation_solution.lambda) {
-        delta_position += friction_solution.delta_position[0];
-      }
-    }
-    apply_positional_correction(contact->particle, delta_position);
-    update_separations(contact->particle, delta_position);
-  }
-
-  void resolve_contact_position(Rigid_body_rigid_body_contact *contact) {
-    auto const data = std::array<Rigid_body_data *, 2>{
-        _rigid_bodies.data(contact->bodies[0]),
-        _rigid_bodies.data(contact->bodies[1])};
-    auto const rotation =
-        std::array<Mat3x3f, 2>{Mat3x3f::rotation(data[0]->orientation),
-                               Mat3x3f::rotation(data[1]->orientation)};
-    auto const inverse_rotation =
-        std::array<Mat3x3f, 2>{transpose(rotation[0]), transpose(rotation[1])};
-    auto const inverse_inertia_tensor = std::array<Mat3x3f, 2>{
-        rotation[0] * data[0]->inverse_inertia_tensor * inverse_rotation[0],
-        rotation[1] * data[1]->inverse_inertia_tensor * inverse_rotation[1]};
-    auto const separation_solution = solve_positional_constraint(
-        {.direction = contact->normal,
-         .distance = -contact->separation,
-         .position = contact->relative_positions,
-         .inverse_mass = {data[0]->inverse_mass, data[1]->inverse_mass},
-         .inverse_inertia_tensor = inverse_inertia_tensor});
-    auto const relative_contact_movement =
-        ((data[0]->position + contact->relative_positions[0]) -
-         (data[0]->previous_position +
-          Mat3x3f::rotation(data[0]->previous_orientation) *
-              inverse_rotation[0] * contact->relative_positions[0])) -
-        ((data[1]->position + contact->relative_positions[1]) -
-         (data[1]->previous_position +
-          Mat3x3f::rotation(data[1]->previous_orientation) *
-              inverse_rotation[1] * contact->relative_positions[1]));
-    auto const tangential_relative_contact_movement =
-        perp_unit(relative_contact_movement, contact->normal);
-    auto delta_position = separation_solution.delta_position;
-    auto delta_orientation = separation_solution.delta_orientation;
-    if (tangential_relative_contact_movement != Vec3f::zero()) {
-      auto const correction_distance =
-          length(tangential_relative_contact_movement);
-      auto const correction_direction =
-          tangential_relative_contact_movement / -correction_distance;
-      auto const friction_solution = solve_positional_constraint(
-          {.direction = correction_direction,
-           .distance = correction_distance,
-           .position = contact->relative_positions,
-           .inverse_mass = {data[0]->inverse_mass, data[1]->inverse_mass},
-           .inverse_inertia_tensor = inverse_inertia_tensor});
-      auto const static_friction_coefficient =
-          0.5f * (data[0]->material.static_friction_coefficient +
-                  data[1]->material.static_friction_coefficient);
-      if (friction_solution.lambda <
-          static_friction_coefficient * separation_solution.lambda) {
-        for (auto i = 0; i != 2; ++i) {
-          delta_position[i] += friction_solution.delta_position[i];
-          delta_orientation[i] += friction_solution.delta_orientation[i];
-        }
-      }
-    }
-    for (auto i = 0; i != 2; ++i) {
-      apply_positional_correction(
-          contact->bodies[i], delta_position[i], delta_orientation[i]);
-      update_separations(
-          contact->bodies[i], delta_position[i], delta_orientation[i]);
-    }
-  }
-
-  void resolve_contact_position(Rigid_body_static_body_contact *contact) {
-    auto const dynamic_body_data = _rigid_bodies.data(contact->rigid_body);
-    auto const static_body_data = _static_bodies.data(contact->static_body);
-    auto const rotation = Mat3x3f::rotation(dynamic_body_data->orientation);
-    auto const inverse_rotation = transpose(rotation);
-    auto const inverse_inertia_tensor =
-        rotation * dynamic_body_data->inverse_inertia_tensor * inverse_rotation;
-    auto const separation_solution = solve_positional_constraint(
-        {.direction = contact->normal,
-         .distance = -contact->separation,
-         .position = {contact->relative_position, Vec3f::zero()},
-         .inverse_mass = {dynamic_body_data->inverse_mass, 0.0f},
-         .inverse_inertia_tensor = {inverse_inertia_tensor, Mat3x3f::zero()}});
-    auto const contact_movement =
-        (dynamic_body_data->position + contact->relative_position) -
-        (dynamic_body_data->previous_position +
-         Mat3x3f::rotation(dynamic_body_data->previous_orientation) *
-             inverse_rotation * contact->relative_position);
-    auto const tangential_contact_movement =
-        perp_unit(contact_movement, contact->normal);
-    auto delta_position = separation_solution.delta_position[0];
-    auto delta_orientation = separation_solution.delta_orientation[0];
-    if (tangential_contact_movement != Vec3f::zero()) {
-      auto const correction_distance = length(tangential_contact_movement);
-      auto const correction_direction =
-          tangential_contact_movement / -correction_distance;
-      auto const friction_solution = solve_positional_constraint(
-          {.direction = correction_direction,
-           .distance = correction_distance,
-           .position = {contact->relative_position, Vec3f::zero()},
-           .inverse_mass = {dynamic_body_data->inverse_mass, 0.0f},
-           .inverse_inertia_tensor = {inverse_inertia_tensor,
-                                      Mat3x3f::zero()}});
-      auto const static_friction_coefficient =
-          0.5f * (dynamic_body_data->material.static_friction_coefficient +
-                  static_body_data->material.static_friction_coefficient);
-      if (friction_solution.lambda <
-          static_friction_coefficient * separation_solution.lambda) {
-        delta_position += friction_solution.delta_position[0];
-        delta_orientation += friction_solution.delta_orientation[0];
-      }
-    }
-    apply_positional_correction(
-        contact->rigid_body, delta_position, delta_orientation);
-    update_separations(contact->rigid_body, delta_position, delta_orientation);
-  }
-
-  void update_separations(Particle_handle particle,
-                          Vec3f const &position_delta) {
-    auto const data = _particles.data(particle);
-    auto const particle_contacts =
-        std::span{data->particle_contacts, data->particle_contact_count};
-    auto const dynamic_rigid_body_contacts =
-        std::span{data->rigid_body_contacts, data->rigid_body_contact_count};
-    auto const static_rigid_body_contacts =
-        std::span{data->static_body_contacts, data->static_body_contact_count};
-    for (auto const contact : particle_contacts) {
-      auto const delta = (contact->particles[0] == particle ? 1.0f : -1.0f) *
-                         dot(position_delta, contact->normal);
-      contact->separation += delta;
-    }
-    for (auto const contact : dynamic_rigid_body_contacts) {
-      auto const delta = dot(position_delta, contact->normal);
-      contact->separation += delta;
-    }
-    for (auto const contact : static_rigid_body_contacts) {
-      auto const delta = dot(position_delta, contact->normal);
-      contact->separation += delta;
-    }
-  }
-
-  void update_separations(Rigid_body_handle body,
-                          Vec3f const &position_delta,
-                          Vec3f const &orientation_delta) {
-    auto const data = _rigid_bodies.data(body);
-    auto const particle_contacts =
-        std::span{data->particle_contacts, data->particle_contact_count};
-    auto const dynamic_rigid_body_contacts =
-        std::span{data->rigid_body_contacts, data->rigid_body_contact_count};
-    auto const static_rigid_body_contacts =
-        std::span{data->static_body_contacts, data->static_body_contact_count};
-    for (auto const contact : particle_contacts) {
-      auto const delta = -dot(
-          position_delta + cross(orientation_delta, contact->relative_position),
-          contact->normal);
-      contact->separation += delta;
-    }
-    for (auto const contact : dynamic_rigid_body_contacts) {
-      if (contact->bodies[0] == body) {
-        auto const delta =
-            dot(position_delta +
-                    cross(orientation_delta, contact->relative_positions[0]),
-                contact->normal);
-        contact->separation += delta;
-      } else {
-        auto const delta =
-            -dot(position_delta +
-                     cross(orientation_delta, contact->relative_positions[1]),
-                 contact->normal);
-        contact->separation += delta;
-      }
-    }
-    for (auto const contact : static_rigid_body_contacts) {
-      auto const delta = dot(
-          position_delta + cross(orientation_delta, contact->relative_position),
-          contact->normal);
-      contact->separation += delta;
-    }
-  }
-
-  void resolve_contact_velocity(Particle_particle_contact *contact,
-                                float max_separating_velocity_for_bounce) {
-    auto const particles = contact->particles;
-    auto const particle_datas = std::array<Particle_data *, 2>{
-        _particles.data(particles[0]), _particles.data(particles[1])};
-    auto const normal = contact->normal;
-    auto const separating_velocity = contact->separating_velocity;
-    auto const velocity_per_impulse =
-        particle_datas[0]->inverse_mass + particle_datas[1]->inverse_mass;
-    auto const impulse_per_velocity = 1.0f / velocity_per_impulse;
-    auto const restitution_coefficient =
-        separating_velocity < max_separating_velocity_for_bounce
-            ? 0.5f * (particle_datas[0]->material.restitution_coefficient +
-                      particle_datas[1]->material.restitution_coefficient)
-            : 0.0f;
-    auto const delta_separating_velocity =
-        -separating_velocity * (1.0f + restitution_coefficient);
-    auto const separating_impulse_length =
-        delta_separating_velocity * impulse_per_velocity;
-    auto const separating_impulse = separating_impulse_length * normal;
-    auto const frictional_impulse = [&]() {
-      auto const relative_velocity =
-          particle_datas[0]->velocity - particle_datas[1]->velocity;
-      auto const sliding_velocity =
-          relative_velocity - separating_velocity * normal;
-      auto const sliding_speed_squared = length_squared(sliding_velocity);
-      if (sliding_speed_squared != 0.0f) {
-        auto const sliding_speed = std::sqrt(sliding_speed_squared);
-        auto const sliding_direction = sliding_velocity / sliding_speed;
-        auto const frictional_impulse_direction = -sliding_direction;
-        auto const static_friction_coefficient =
-            0.5f * (particle_datas[0]->material.static_friction_coefficient +
-                    particle_datas[1]->material.static_friction_coefficient);
-        auto const dynamic_friction_coefficient =
-            0.5f * (particle_datas[0]->material.dynamic_friction_coefficient +
-                    particle_datas[1]->material.dynamic_friction_coefficient);
-        auto const max_static_frictional_impulse_length =
-            static_friction_coefficient * separating_impulse_length;
-        auto const max_dynamic_frictional_impulse_length =
-            dynamic_friction_coefficient * separating_impulse_length;
-        auto const stopping_impulse_length =
-            impulse_per_velocity * sliding_speed;
-        if (stopping_impulse_length <= max_static_frictional_impulse_length) {
-          return stopping_impulse_length * frictional_impulse_direction;
-        } else {
-          return max_dynamic_frictional_impulse_length *
-                 frictional_impulse_direction;
-        }
-      } else {
-        return Vec3f::zero();
-      }
-    }();
-    auto const impulse = separating_impulse + frictional_impulse;
-    auto const particle_velocity_deltas =
-        std::array<Vec3f, 2>{impulse * particle_datas[0]->inverse_mass,
-                             impulse * -particle_datas[1]->inverse_mass};
-    particle_datas[0]->velocity += particle_velocity_deltas[0];
-    particle_datas[1]->velocity += particle_velocity_deltas[1];
-    for (auto i = 0; i != 2; ++i) {
-      update_separating_velocities(particles[i], particle_velocity_deltas[i]);
-    }
-  }
-
-  void resolve_contact_velocity(Particle_rigid_body_contact *contact,
-                                float max_separating_velocity_for_bounce) {
-    auto const particle = contact->particle;
-    auto const particle_data = _particles.data(particle);
-    auto const body = contact->body;
-    auto const body_data = _rigid_bodies.data(body);
-    auto const body_relative_contact_position = contact->relative_position;
-    auto const normal = contact->normal;
-    auto const separating_velocity = contact->separating_velocity;
-    auto const body_rotation = Mat3x3f::rotation(body_data->orientation);
-    auto const body_inverse_rotation = transpose(body_rotation);
-    auto const body_inverse_inertia_tensor = body_rotation *
-                                             body_data->inverse_inertia_tensor *
-                                             body_inverse_rotation;
-    auto const body_angular_impulse_per_separating_impulse =
-        cross(body_relative_contact_position, normal);
-    auto const body_angular_velocity_per_separating_impulse =
-        body_inverse_inertia_tensor *
-        body_angular_impulse_per_separating_impulse;
-    auto const separating_velocity_per_separating_impulse =
-        particle_data->inverse_mass + body_data->inverse_mass +
-        dot(cross(body_angular_velocity_per_separating_impulse,
-                  body_relative_contact_position),
-            normal);
-    auto const separating_impulse_per_separating_velocity =
-        1.0f / separating_velocity_per_separating_impulse;
-    auto const restitution_coefficient =
-        separating_velocity < max_separating_velocity_for_bounce
-            ? 0.5f * (particle_data->material.restitution_coefficient +
-                      body_data->material.restitution_coefficient)
-            : 0.0f;
-    auto const delta_separating_velocity =
-        -separating_velocity * (1.0f + restitution_coefficient);
-    auto const separating_impulse_length =
-        delta_separating_velocity * separating_impulse_per_separating_velocity;
-    auto const separating_impulse = separating_impulse_length * normal;
-    auto const relative_velocity =
-        particle_data->velocity -
-        (body_data->velocity +
-         cross(body_data->angular_velocity, body_relative_contact_position));
-    auto const sliding_velocity =
-        relative_velocity - separating_velocity * normal;
-    auto const sliding_speed_squared = length_squared(sliding_velocity);
-    auto const frictional_impulse = [&]() {
-      if (sliding_speed_squared != 0.0f) {
-        auto const sliding_speed = std::sqrt(sliding_speed_squared);
-        auto const sliding_direction = sliding_velocity / sliding_speed;
-        auto const frictional_impulse_direction = -sliding_direction;
-        auto const body_angular_impulse_per_frictional_impulse =
-            cross(body_relative_contact_position, frictional_impulse_direction);
-        auto const body_angular_velocity_per_frictional_impulse =
-            body_inverse_inertia_tensor *
-            body_angular_impulse_per_frictional_impulse;
-        auto const sliding_velocity_per_frictional_impulse =
-            particle_data->inverse_mass + body_data->inverse_mass +
-            dot(cross(body_angular_velocity_per_frictional_impulse,
-                      body_relative_contact_position),
-                frictional_impulse_direction);
-        auto const frictional_impulse_per_sliding_velocity =
-            1.0f / sliding_velocity_per_frictional_impulse;
-        auto const static_friction_coefficient =
-            0.5f * (particle_data->material.static_friction_coefficient +
-                    body_data->material.static_friction_coefficient);
-        auto const dynamic_friction_coefficient =
-            0.5f * (particle_data->material.dynamic_friction_coefficient +
-                    body_data->material.dynamic_friction_coefficient);
-        auto const max_static_friction_impulse_length =
-            static_friction_coefficient * separating_impulse_length;
-        auto const max_dynamic_friction_impulse_length =
-            dynamic_friction_coefficient * separating_impulse_length;
-        auto const stopping_impulse_length =
-            frictional_impulse_per_sliding_velocity * sliding_speed;
-        if (stopping_impulse_length <= max_static_friction_impulse_length) {
-          return stopping_impulse_length * frictional_impulse_direction;
-        } else {
-          return max_dynamic_friction_impulse_length *
-                 frictional_impulse_direction;
-        }
-      } else {
-        return Vec3f::zero();
-      }
-    }();
-    auto const impulse = separating_impulse + frictional_impulse;
-    auto const particle_velocity_delta = impulse * particle_data->inverse_mass;
-    auto const body_velocity_delta = -impulse * body_data->inverse_mass;
-    auto const body_angular_velocity_delta =
-        body_inverse_inertia_tensor *
-        cross(body_relative_contact_position, -impulse);
-    particle_data->velocity += particle_velocity_delta;
-    body_data->velocity += body_velocity_delta;
-    body_data->angular_velocity += body_angular_velocity_delta;
-    update_separating_velocities(particle, particle_velocity_delta);
-    update_separating_velocities(
-        body, body_velocity_delta, body_angular_velocity_delta);
-  }
-
-  void resolve_contact_velocity(Particle_static_body_contact *contact,
-                                Vec3f const &gravitational_velocity_delta,
-                                float max_separating_velocity_for_bounce) {
-    auto const particle = contact->particle;
-    auto const particle_data = _particles.data(particle);
-    auto const body = contact->body;
-    auto const body_data = _static_bodies.data(body);
-    auto const normal = contact->normal;
-    auto const separating_velocity = contact->separating_velocity;
-    auto const restitution_coefficient =
-        separating_velocity < max_separating_velocity_for_bounce
-            ? 0.5f * (particle_data->material.restitution_coefficient +
-                      body_data->material.restitution_coefficient)
-            : 0.0f;
-    auto const delta_separating_velocity =
-        -separating_velocity -
-        std::min(separating_velocity -
-                     dot(gravitational_velocity_delta, normal),
-                 0.0f) *
-            restitution_coefficient;
-    auto const relative_velocity = particle_data->velocity;
-    auto const sliding_velocity =
-        relative_velocity - separating_velocity * normal;
-    auto const sliding_velocity_length_squared =
-        length_squared(sliding_velocity);
-    auto const static_friction_coefficient =
-        0.5f * (particle_data->material.static_friction_coefficient +
-                body_data->material.static_friction_coefficient);
-    auto const dynamic_friction_coefficient =
-        0.5f * (particle_data->material.dynamic_friction_coefficient +
-                body_data->material.dynamic_friction_coefficient);
-    auto const max_static_friction_delta_sliding_velocity =
-        static_friction_coefficient * delta_separating_velocity;
-    auto const max_static_friction_delta_sliding_velocity_squared =
-        max_static_friction_delta_sliding_velocity *
-        max_static_friction_delta_sliding_velocity;
-    auto const max_dynamic_friction_delta_sliding_velocity =
-        dynamic_friction_coefficient * delta_separating_velocity;
-    auto const delta_sliding_velocity =
-        sliding_velocity_length_squared != 0.0f
-            ? (sliding_velocity_length_squared <=
-                       max_static_friction_delta_sliding_velocity_squared
-                   ? -sliding_velocity
-                   : -sliding_velocity *
-                         max_dynamic_friction_delta_sliding_velocity /
-                         std::sqrt(sliding_velocity_length_squared))
-            : Vec3f::zero();
-    auto const particle_velocity_delta =
-        delta_separating_velocity * normal + delta_sliding_velocity;
-    particle_data->velocity += particle_velocity_delta;
-    update_separating_velocities(particle, particle_velocity_delta);
-  }
-
-  void resolve_contact_velocity(Rigid_body_rigid_body_contact *contact,
-                                float max_separating_velocity_for_bounce) {
-    auto const bodies = contact->bodies;
-    auto const datas = std::array<Rigid_body_data *, 2>{
-        _rigid_bodies.data(bodies[0]), _rigid_bodies.data(bodies[1])};
-    auto const relative_positions = contact->relative_positions;
-    auto const normal = contact->normal;
-    auto const separating_velocity = contact->separating_velocity;
-    auto const rotations =
-        std::array<Mat3x3f, 2>{Mat3x3f::rotation(datas[0]->orientation),
-                               Mat3x3f::rotation(datas[1]->orientation)};
-    auto const inverse_rotations = std::array<Mat3x3f, 2>{
-        transpose(rotations[0]), transpose(rotations[1])};
-    auto const inverse_inertia_tensors = std::array<Mat3x3f, 2>{
-        rotations[0] * datas[0]->inverse_inertia_tensor * inverse_rotations[0],
-        rotations[1] * datas[1]->inverse_inertia_tensor * inverse_rotations[1]};
-    auto const angular_impulses_per_separating_impulse =
-        std::array<Vec3f, 2>{cross(relative_positions[0], normal),
-                             cross(relative_positions[1], normal)};
-    auto const angular_velocities_per_separating_impulse = std::array<Vec3f, 2>{
-        inverse_inertia_tensors[0] * angular_impulses_per_separating_impulse[0],
-        inverse_inertia_tensors[1] *
-            angular_impulses_per_separating_impulse[1]};
-    auto const separating_velocity_per_separating_impulse =
-        datas[0]->inverse_mass + datas[1]->inverse_mass +
-        dot(cross(angular_velocities_per_separating_impulse[0],
-                  relative_positions[0]) +
-                cross(angular_velocities_per_separating_impulse[1],
-                      relative_positions[1]),
-            normal);
-    auto const separating_impulse_per_separating_velocity =
-        1.0f / separating_velocity_per_separating_impulse;
-    auto const restitution_coefficient =
-        separating_velocity < max_separating_velocity_for_bounce
-            ? 0.5f * (datas[0]->material.restitution_coefficient +
-                      datas[1]->material.restitution_coefficient)
-            : 0.0f;
-    auto const delta_separating_velocity =
-        -separating_velocity * (1.0f + restitution_coefficient);
-    auto const separating_impulse_length =
-        delta_separating_velocity * separating_impulse_per_separating_velocity;
-    auto const separating_impulse = separating_impulse_length * normal;
-    auto const frictional_impulse = [&]() {
-      auto const relative_velocity =
-          (datas[0]->velocity +
-           cross(datas[0]->angular_velocity, relative_positions[0])) -
-          (datas[1]->velocity +
-           cross(datas[1]->angular_velocity, relative_positions[1]));
-      auto const sliding_velocity =
-          relative_velocity - separating_velocity * normal;
-      auto const sliding_speed_squared = length_squared(sliding_velocity);
-      if (sliding_speed_squared != 0.0f) {
-        auto const sliding_speed = std::sqrt(sliding_speed_squared);
-        auto const sliding_direction = sliding_velocity / sliding_speed;
-        auto const frictional_impulse_direction = -sliding_direction;
-        auto const angular_impulses_per_frictional_impulse =
-            std::array<Vec3f, 2>{
-                cross(relative_positions[0], frictional_impulse_direction),
-                cross(relative_positions[1], frictional_impulse_direction)};
-        auto const angular_velocities_per_frictional_impulse =
-            std::array<Vec3f, 2>{
-                inverse_inertia_tensors[0] *
-                    angular_impulses_per_frictional_impulse[0],
-                inverse_inertia_tensors[1] *
-                    angular_impulses_per_frictional_impulse[1]};
-        auto const sliding_velocity_per_frictional_impulse =
-            datas[0]->inverse_mass + datas[1]->inverse_mass +
-            dot(cross(angular_velocities_per_frictional_impulse[0],
-                      relative_positions[0]),
-                cross(angular_velocities_per_frictional_impulse[1],
-                      relative_positions[1]));
-        auto const frictional_impulse_per_sliding_velocity =
-            1.0f / sliding_velocity_per_frictional_impulse;
-        auto const static_friction_coefficient =
-            0.5f * (datas[0]->material.static_friction_coefficient +
-                    datas[1]->material.static_friction_coefficient);
-        auto const dynamic_friction_coefficient =
-            0.5f * (datas[0]->material.dynamic_friction_coefficient +
-                    datas[1]->material.dynamic_friction_coefficient);
-        auto const max_static_friction_impulse_length =
-            static_friction_coefficient * separating_impulse_length;
-        auto const max_dynamic_friction_impulse_length =
-            dynamic_friction_coefficient * separating_impulse_length;
-        auto const stopping_impulse_length =
-            frictional_impulse_per_sliding_velocity * sliding_speed;
-        if (stopping_impulse_length <= max_static_friction_impulse_length) {
-          return stopping_impulse_length * frictional_impulse_direction;
-        } else {
-          return max_dynamic_friction_impulse_length *
-                 frictional_impulse_direction;
-        }
-      } else {
-        return Vec3f::zero();
-      }
-    }();
-    auto const impulse = separating_impulse + frictional_impulse;
-    auto const body_velocity_deltas = std::array<Vec3f, 2>{
-        impulse * datas[0]->inverse_mass, -impulse * datas[1]->inverse_mass};
-    auto const body_angular_velocity_deltas = std::array<Vec3f, 2>{
-        inverse_inertia_tensors[0] * cross(relative_positions[0], impulse),
-        inverse_inertia_tensors[1] * cross(relative_positions[1], -impulse)};
-    for (auto i = 0; i != 2; ++i) {
-      datas[i]->velocity += body_velocity_deltas[i];
-      datas[i]->angular_velocity += body_angular_velocity_deltas[i];
-      update_separating_velocities(
-          bodies[i], body_velocity_deltas[i], body_angular_velocity_deltas[i]);
-    }
-  }
-
-  void resolve_contact_velocity(Rigid_body_static_body_contact *contact,
-                                Vec3f const &gravitational_velocity_delta,
-                                float max_separating_velocity_for_bounce) {
-    auto const dynamic_body = contact->rigid_body;
-    auto const dynamic_body_data = _rigid_bodies.data(dynamic_body);
-    auto const static_body = contact->static_body;
-    auto const static_body_data = _static_bodies.data(static_body);
-    auto const dynamic_body_relative_contact_position =
-        contact->relative_position;
-    auto const normal = contact->normal;
-    auto const separating_velocity = contact->separating_velocity;
-    auto const dynamic_body_rotation =
-        Mat3x3f::rotation(dynamic_body_data->orientation);
-    auto const dynamic_body_inverse_rotation = transpose(dynamic_body_rotation);
-    auto const dynamic_body_inverse_inertia_tensor =
-        dynamic_body_rotation * dynamic_body_data->inverse_inertia_tensor *
-        dynamic_body_inverse_rotation;
-    auto const angular_impulse_per_separating_impulse =
-        cross(dynamic_body_relative_contact_position, normal);
-    auto const angular_velocity_per_separating_impulse =
-        dynamic_body_inverse_inertia_tensor *
-        angular_impulse_per_separating_impulse;
-    auto const separating_velocity_per_separating_impulse =
-        dynamic_body_data->inverse_mass +
-        dot(cross(angular_velocity_per_separating_impulse,
-                  dynamic_body_relative_contact_position),
-            normal);
-    auto const separating_impulse_per_separating_velocity =
-        1.0f / separating_velocity_per_separating_impulse;
-    auto const restitution_coefficient =
-        separating_velocity < max_separating_velocity_for_bounce
-            ? 0.5f * (static_body_data->material.restitution_coefficient +
-                      dynamic_body_data->material.restitution_coefficient)
-            : 0.0f;
-    auto const delta_separating_velocity =
-        -separating_velocity -
-        std::min(separating_velocity -
-                     dot(gravitational_velocity_delta, normal),
-                 0.0f) *
-            restitution_coefficient;
-    auto const separating_impulse_length =
-        delta_separating_velocity * separating_impulse_per_separating_velocity;
-    auto const separating_impulse = separating_impulse_length * normal;
-    auto const frictional_impulse = [&]() {
-      auto const relative_velocity =
-          dynamic_body_data->velocity +
-          cross(dynamic_body_data->angular_velocity,
-                dynamic_body_relative_contact_position);
-      auto const sliding_velocity =
-          relative_velocity - separating_velocity * normal;
-      auto const sliding_speed_squared = length_squared(sliding_velocity);
-      if (sliding_speed_squared != 0.0f) {
-        auto const sliding_speed = std::sqrt(sliding_speed_squared);
-        auto const sliding_direction = sliding_velocity / sliding_speed;
-        auto const frictional_impulse_direction = -sliding_direction;
-        auto const angular_impulse_per_frictional_impulse =
-            cross(dynamic_body_relative_contact_position,
-                  frictional_impulse_direction);
-        auto const angular_velocity_per_frictional_impulse =
-            dynamic_body_inverse_inertia_tensor *
-            angular_impulse_per_frictional_impulse;
-        auto const sliding_velocity_per_frictional_impulse =
-            dynamic_body_data->inverse_mass +
-            dot(cross(angular_velocity_per_frictional_impulse,
-                      dynamic_body_relative_contact_position),
-                frictional_impulse_direction);
-        auto const frictional_impulse_per_sliding_velocity =
-            1.0f / sliding_velocity_per_frictional_impulse;
-        auto const static_friction_coefficient =
-            0.5f * (dynamic_body_data->material.static_friction_coefficient +
-                    static_body_data->material.static_friction_coefficient);
-        auto const dynamic_friction_coefficient =
-            0.5f * (dynamic_body_data->material.dynamic_friction_coefficient +
-                    static_body_data->material.dynamic_friction_coefficient);
-        auto const max_static_friction_impulse_length =
-            static_friction_coefficient * separating_impulse_length;
-        auto const max_dynamic_friction_impulse_length =
-            dynamic_friction_coefficient * separating_impulse_length;
-        auto const stopping_impulse_length =
-            frictional_impulse_per_sliding_velocity * sliding_speed;
-        if (stopping_impulse_length <= max_static_friction_impulse_length) {
-          return stopping_impulse_length * frictional_impulse_direction;
-        } else {
-          return max_dynamic_friction_impulse_length *
-                 frictional_impulse_direction;
-        }
-      } else {
-        return Vec3f::zero();
-      }
-    }();
-    auto const impulse = separating_impulse + frictional_impulse;
-    auto const dynamic_body_velocity_delta =
-        dynamic_body_data->inverse_mass * impulse;
-    auto const dynamic_body_angular_velocity_delta =
-        dynamic_body_inverse_inertia_tensor *
-        cross(dynamic_body_relative_contact_position, impulse);
-    dynamic_body_data->velocity += dynamic_body_velocity_delta;
-    dynamic_body_data->angular_velocity += dynamic_body_angular_velocity_delta;
-    update_separating_velocities(dynamic_body,
-                                 dynamic_body_velocity_delta,
-                                 dynamic_body_angular_velocity_delta);
-  }
-
-  void update_separating_velocities(Particle_handle particle,
-                                    Vec3f const &velocity_delta) {
-    auto const data = _particles.data(particle);
-    auto const particle_contacts =
-        std::span{data->particle_contacts, data->particle_contact_count};
-    auto const dynamic_rigid_body_contacts =
-        std::span{data->rigid_body_contacts, data->rigid_body_contact_count};
-    auto const static_rigid_body_contacts =
-        std::span{data->static_body_contacts, data->static_body_contact_count};
-    for (auto const contact : particle_contacts) {
-      auto const delta = (contact->particles[0] == particle ? 1.0f : -1.0f) *
-                         dot(velocity_delta, contact->normal);
-      contact->separating_velocity += delta;
-    }
-    for (auto const contact : dynamic_rigid_body_contacts) {
-      auto const delta = dot(velocity_delta, contact->normal);
-      contact->separating_velocity += delta;
-    }
-    for (auto const contact : static_rigid_body_contacts) {
-      auto const delta = dot(velocity_delta, contact->normal);
-      contact->separating_velocity += delta;
-    }
-  }
-
-  void update_separating_velocities(Rigid_body_handle body,
-                                    Vec3f const &velocity_delta,
-                                    Vec3f const &angular_velocity_delta) {
-    auto const data = _rigid_bodies.data(body);
-    auto const particle_contacts =
-        std::span{data->particle_contacts, data->particle_contact_count};
-    auto const rigid_body_contacts =
-        std::span{data->rigid_body_contacts, data->rigid_body_contact_count};
-    auto const static_body_contacts =
-        std::span{data->static_body_contacts, data->static_body_contact_count};
-    for (auto const contact : particle_contacts) {
-      auto const delta =
-          -dot(velocity_delta +
-                   cross(angular_velocity_delta, contact->relative_position),
-               contact->normal);
-      contact->separating_velocity += delta;
-    }
-    for (auto const contact : rigid_body_contacts) {
-      if (contact->bodies[0] == body) {
-        auto const delta =
-            dot(velocity_delta + cross(angular_velocity_delta,
-                                       contact->relative_positions[0]),
-                contact->normal);
-        contact->separating_velocity += delta;
-      } else {
-        auto const delta =
-            -dot(velocity_delta + cross(angular_velocity_delta,
-                                        contact->relative_positions[1]),
-                 contact->normal);
-        contact->separating_velocity += delta;
-      }
-    }
-    for (auto const contact : static_body_contacts) {
-      auto const delta = dot(velocity_delta + cross(angular_velocity_delta,
-                                                    contact->relative_position),
-                             contact->normal);
-      contact->separating_velocity += delta;
-    }
-  }
+  // void solve_contact_group(std::size_t group_index,
+  //                          int min_desired_position_iterations_per_contact,
+  //                          int max_desired_position_iterations_per_contact,
+  //                          int max_position_iterations,
+  //                          int min_desired_velocity_iterations_per_contact,
+  //                          int max_desired_velocity_iterations_per_contact,
+  //                          int max_velocity_iterations,
+  //                          float early_out_contact_separation,
+  //                          float early_out_contact_separating_velocity,
+  //                          Vec3f const &gravitational_velocity_delta,
+  //                          float max_separating_velocity_for_bounce) {
+  //   auto position_iterations = 0;
+  //   auto const group_begin = _contact_groups.group_begin(group_index);
+  //   auto const group_end = _contact_groups.group_end(group_index);
+  //   auto const group_size = group_end - group_begin;
+  //   auto const min_desired_position_iterations =
+  //       min_desired_position_iterations_per_contact * group_size;
+  //   for (auto i = std::size_t{};
+  //        position_iterations < max_position_iterations &&
+  //        i != min_desired_position_iterations;
+  //        ++i) {
+  //     if (auto const contact = _contact_groups.select_contact_position_solve(
+  //             group_index, 0.0f)) {
+  //       std::visit([this](auto &&arg) { resolve_contact_position(arg); },
+  //                  *contact);
+  //       ++position_iterations;
+  //     } else {
+  //       break;
+  //     }
+  //   }
+  //   auto const optional_desired_position_iterations =
+  //       (max_desired_position_iterations_per_contact -
+  //        min_desired_position_iterations_per_contact) *
+  //       group_size;
+  //   for (auto i = std::size_t{};
+  //        position_iterations < max_position_iterations &&
+  //        i != optional_desired_position_iterations;
+  //        ++i) {
+  //     if (auto const contact = _contact_groups.select_contact_position_solve(
+  //             group_index, early_out_contact_separation)) {
+  //       std::visit([this](auto &&arg) { resolve_contact_position(arg); },
+  //                  *contact);
+  //       ++position_iterations;
+  //     } else {
+  //       break;
+  //     }
+  //   }
+  //   auto velocity_iterations = 0;
+  //   auto const min_desired_velocity_iterations =
+  //       min_desired_velocity_iterations_per_contact * group_size;
+  //   for (auto i = std::size_t{};
+  //        velocity_iterations < max_velocity_iterations &&
+  //        i != min_desired_velocity_iterations;
+  //        ++i) {
+  //     if (auto const contact = _contact_groups.select_contact_velocity_solve(
+  //             group_index, 0.0f)) {
+  //       std::visit(
+  //           [=, this](auto &&arg) {
+  //             using T = std::decay_t<decltype(arg)>;
+  //             if constexpr (std::is_same_v<T, Particle_static_body_contact *>
+  //             ||
+  //                           std::is_same_v<T,
+  //                                          Rigid_body_static_body_contact *>)
+  //                                          {
+  //               resolve_contact_velocity(arg,
+  //                                        gravitational_velocity_delta,
+  //                                        max_separating_velocity_for_bounce);
+  //             } else {
+  //               resolve_contact_velocity(arg,
+  //                                        max_separating_velocity_for_bounce);
+  //             }
+  //           },
+  //           *contact);
+  //       ++velocity_iterations;
+  //     } else {
+  //       break;
+  //     }
+  //   }
+  //   auto const optional_desired_velocity_iterations =
+  //       (max_desired_velocity_iterations_per_contact -
+  //        min_desired_velocity_iterations_per_contact) *
+  //       group_size;
+  //   for (auto i = std::size_t{};
+  //        velocity_iterations < max_velocity_iterations &&
+  //        i != optional_desired_velocity_iterations;
+  //        ++i) {
+  //     if (auto const contact = _contact_groups.select_contact_velocity_solve(
+  //             group_index, early_out_contact_separating_velocity)) {
+  //       std::visit(
+  //           [=, this](auto &&arg) {
+  //             using T = std::decay_t<decltype(arg)>;
+  //             if constexpr (std::is_same_v<T, Particle_static_body_contact *>
+  //             ||
+  //                           std::is_same_v<T,
+  //                                          Rigid_body_static_body_contact *>)
+  //                                          {
+  //               resolve_contact_velocity(arg,
+  //                                        gravitational_velocity_delta,
+  //                                        max_separating_velocity_for_bounce);
+  //             } else {
+  //               resolve_contact_velocity(arg,
+  //                                        max_separating_velocity_for_bounce);
+  //             }
+  //           },
+  //           *contact);
+  //       ++velocity_iterations;
+  //     } else {
+  //       break;
+  //     }
+  //   }
+  // }
 
   void call_particle_motion_callbacks(World const &world) {
     _particles.for_each([&](Particle_handle particle, Particle_data *data) {

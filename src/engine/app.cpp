@@ -29,7 +29,7 @@ public:
   explicit Runtime(physics::World_create_info const &world_create_info,
                    Window_create_info const &window_create_info,
                    Camera_create_info const &camera_create_info)
-      : _threads{std::thread::hardware_concurrency()},
+      : _threads{8u},
         _world{world_create_info},
         _window{window_create_info},
         _camera{camera_create_info},
@@ -163,7 +163,11 @@ void App::loop() {
       auto const physics_begin_time = clock::now();
       auto world_simulate_info = _world_simulate_info;
       world_simulate_info.thread_pool = _runtime->get_threads();
+      world_simulate_info.thread_pool->set_scheduling_policy(
+          util::Scheduling_policy::spin);
       _runtime->get_world()->simulate(world_simulate_info);
+      world_simulate_info.thread_pool->set_scheduling_policy(
+          util::Scheduling_policy::block);
       auto const physics_end_time = clock::now();
       _physics_simulation_wall_time = std::chrono::duration_cast<duration>(
                                           physics_end_time - physics_begin_time)

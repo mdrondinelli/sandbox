@@ -10,6 +10,8 @@
 
 namespace marlon {
 namespace util {
+enum class Scheduling_policy { block, spin };
+
 class Task {
 public:
   virtual ~Task() {}
@@ -19,7 +21,9 @@ public:
 
 class Thread_pool {
 public:
-  explicit Thread_pool(unsigned thread_count);
+  explicit Thread_pool(
+      unsigned thread_count,
+      Scheduling_policy scheduling_policy = Scheduling_policy::block);
 
   ~Thread_pool();
 
@@ -27,10 +31,16 @@ public:
 
   void push(Task *task);
 
+  // CANNOT be called from inside the thread pool
+  void set_scheduling_policy(Scheduling_policy policy);
+
 private:
   class Thread {
   public:
-    explicit Thread(Thread *threads, unsigned thread_count, unsigned index);
+    explicit Thread(Thread *threads,
+                    unsigned thread_count,
+                    unsigned index,
+                    Scheduling_policy scheduling_policy);
 
     ~Thread();
 
@@ -38,10 +48,13 @@ private:
 
     bool try_push(Task *task);
 
+    void set_scheduling_policy(Scheduling_policy scheduling_policy);
+
   private:
-    Thread *_threads;
-    unsigned _thread_count;
-    unsigned _index;
+    Thread *const _threads;
+    unsigned const _thread_count;
+    unsigned const _index;
+    Scheduling_policy _scheduling_policy;
     Allocating_queue<Task *> _queue;
     std::mutex _mutex;
     std::condition_variable _condvar;

@@ -6,13 +6,16 @@
 
 namespace marlon {
 namespace util {
-Thread_pool::Thread_pool(unsigned thread_count) : _push_index{std::size_t{}} {
+Thread_pool::Thread_pool(unsigned thread_count,
+                         Scheduling_policy scheduling_policy)
+    : _push_index{std::size_t{}} {
   auto block = Block{};
   std::tie(block, _threads) =
       make_list<Thread>(*System_allocator::instance(), thread_count);
   try {
     for (std::size_t i = 0; i != thread_count; ++i) {
-      _threads.emplace_back(_threads.data(), thread_count, i);
+      _threads.emplace_back(
+          _threads.data(), thread_count, i, scheduling_policy);
     }
   } catch (...) {
     _threads = {};
@@ -41,12 +44,20 @@ void Thread_pool::push(Task *task) {
   _threads[base % _threads.size()].push(task);
 }
 
+void Thread_pool::set_scheduling_policy(Scheduling_policy scheduling_policy) {
+  for (auto &thread : _threads) {
+    thread.set_scheduling_policy(scheduling_policy);
+  }
+}
+
 Thread_pool::Thread::Thread(Thread *threads,
                             unsigned thread_count,
-                            unsigned index)
+                            unsigned index,
+                            Scheduling_policy scheduling_policy)
     : _threads{threads},
       _thread_count{thread_count},
       _index{index},
+      _scheduling_policy{scheduling_policy},
       _queue{System_allocator::instance()},
       _thread{[this](std::stop_token stop_token) {
         {
@@ -54,6 +65,23 @@ Thread_pool::Thread::Thread(Thread *threads,
           _queue.reserve(1024);
         }
         auto rng = std::mt19937_64{std::random_device{}()};
+        auto try_steal = [&](unsigned attempts) -> Task * {
+          auto d = std::uniform_int_distribution<std::size_t>{
+              std::size_t{1}, _thread_count - 1};
+          for (auto attempt = 0u; attempt != attempts; ++attempt) {
+            auto const offset = d(rng);
+            auto const index = (_index + offset) % _thread_count;
+            auto &thread = _threads[index];
+            if (auto lock = std::unique_lock{thread._mutex, std::try_to_lock}) {
+              if (!thread._queue.empty()) {
+                auto result = thread._queue.front();
+                thread._queue.pop_front();
+                return result;
+              }
+            }
+          }
+          return nullptr;
+        };
         for (;;) {
           // try to steal from our own queue
           auto task = (Task *)nullptr;
@@ -65,32 +93,22 @@ Thread_pool::Thread::Thread(Thread *threads,
           }
           // try to steal from other queues
           if (!task && _thread_count > 1) {
-            auto d = std::uniform_int_distribution<std::size_t>{
-                std::size_t{1}, _thread_count - 1};
-            for (auto attempt = 0u; attempt != _thread_count - 1; ++attempt) {
-              auto const offset = d(rng);
-              auto const index = (_index + offset) % _thread_count;
-              auto &thread = _threads[index];
-              if (auto lock =
-                      std::unique_lock{thread._mutex, std::try_to_lock}) {
-                if (!thread._queue.empty()) {
-                  task = thread._queue.front();
-                  thread._queue.pop_front();
-                  break;
-                }
-              }
-            }
+            task = try_steal(_thread_count - 1);
           }
           // just wait for work
           if (!task) {
             auto lock = std::unique_lock{_mutex};
             _condvar.wait(lock, [&] {
-              return !_queue.empty() || stop_token.stop_requested();
+              return _scheduling_policy == Scheduling_policy::spin ||
+                     !_queue.empty() || stop_token.stop_requested();
             });
             if (!_queue.empty()) {
               task = _queue.back();
               _queue.pop_back();
             }
+            // else if (_scheduling_policy == Scheduling_policy::spin) {
+            //   task = try_steal(_thread_count - 1);
+            // }
           }
           if (task) {
             try {
@@ -100,16 +118,9 @@ Thread_pool::Thread::Thread(Thread *threads,
             } catch (...) {
               std::cerr << "Exception in Task::run\n";
             }
-          } else {
+          } else if (stop_token.stop_requested()) {
             break;
           }
-          // if (!_queue.empty()) {
-          //   auto const task = _queue.back();
-          //   _queue.pop_back();
-          //   lock.unlock();
-          // } else {
-          //   break;
-          // }
         }
       }} {}
 
@@ -129,12 +140,25 @@ void Thread_pool::Thread::push(Task *task) {
 bool Thread_pool::Thread::try_push(Task *task) {
   if (auto lock = std::unique_lock{_mutex, std::try_to_lock}) {
     _queue.push_back(task);
-    lock.unlock();
-    _condvar.notify_one();
+    if (_scheduling_policy == Scheduling_policy::spin) {
+      lock.unlock();
+    } else {
+      lock.unlock();
+      _condvar.notify_one();
+    }
     return true;
   } else {
     return false;
   }
+}
+
+void Thread_pool::Thread::set_scheduling_policy(
+    Scheduling_policy scheduling_policy) {
+  {
+    auto const lock = std::scoped_lock{_mutex};
+    _scheduling_policy = scheduling_policy;
+  }
+  _condvar.notify_one();
 }
 } // namespace util
 } // namespace marlon

@@ -163,6 +163,17 @@ public:
     _impl.construct();
   }
 
+  Allocating_list(Allocating_list<T, Allocator> &&other) noexcept
+      : _allocator{std::move(other._allocator)} {
+    _impl.construct(std::move(*other._impl));
+  }
+
+  Allocating_list &operator=(Allocating_list<T, Allocator> &&other) noexcept {
+    auto temp{std::move(other)};
+    swap(temp);
+    return *this;
+  }
+
   ~Allocating_list() {
     if (_impl->data() != nullptr) {
       auto const block =
@@ -259,6 +270,12 @@ public:
   }
 
 private:
+  void swap(Allocating_list<T, Allocator> &other) noexcept {
+    using std::swap;
+    swap(_allocator, other._allocator);
+    swap(*_impl, *other._impl);
+  }
+
   Allocator _allocator;
   Lifetime_box<List<T>> _impl;
 };
