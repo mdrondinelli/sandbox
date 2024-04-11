@@ -21,9 +21,8 @@ struct World_create_info {
   std::size_t max_particle_static_body_neighbor_pairs{10000};
   std::size_t max_rigid_body_rigid_body_neighbor_pairs{10000};
   std::size_t max_rigid_body_static_body_neighbor_pairs{10000};
-  std::size_t max_neighbor_groups{10000};
+  std::size_t max_contact_groups{10000};
   std::size_t max_contact_group_fringe_size{1000};
-  std::size_t max_contact_group_size{10000};
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 
