@@ -549,6 +549,17 @@ private:
   List<Group> _groups;
 };
 
+template <typename Allocator>
+std::pair<Block, Neighbor_group_storage>
+make_neighbor_group_storage(Allocator &allocator,
+                            std::size_t max_object_count,
+                            std::size_t max_group_count) {
+  auto const block = allocator.alloc(Neighbor_group_storage::memory_requirement(
+      max_object_count, max_group_count));
+  return {block,
+          Neighbor_group_storage{block, max_object_count, max_group_count}};
+}
+
 class Contact_list {
 public:
   static constexpr std::size_t
@@ -750,6 +761,8 @@ public:
          decltype(_rigid_body_static_body_pairs)::memory_requirement(
              max_rigid_body_static_body_pairs)});
   }
+
+  constexpr Contact_cache() = default;
 
   explicit Contact_cache(Block block,
                          std::size_t max_rigid_body_rigid_body_pairs,
@@ -1234,6 +1247,19 @@ private:
   util::Map<std::uint64_t, Rigid_body_static_body_pair>
       _rigid_body_static_body_pairs;
 };
+
+template <typename Allocator>
+std::pair<Block, Contact_cache>
+make_contact_cache(Allocator &allocator,
+                   std::size_t max_rigid_body_rigid_body_pairs,
+                   std::size_t max_rigid_body_static_body_pairs) {
+  auto const block = allocator.alloc(Contact_cache::memory_requirement(
+      max_rigid_body_rigid_body_pairs, max_rigid_body_static_body_pairs));
+  return {block,
+          Contact_cache{block,
+                        max_rigid_body_rigid_body_pairs,
+                        max_rigid_body_static_body_pairs}};
+}
 
 class Contact_group_storage {
   using Allocator = Stack_allocator<>;
