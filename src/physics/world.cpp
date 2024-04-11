@@ -1386,6 +1386,17 @@ private:
   List<Group> _groups;
 };
 
+template <typename Allocator>
+std::pair<Block, Contact_group_storage>
+make_contact_group_storage(Allocator &allocator,
+                           std::size_t max_contact_count,
+                           std::size_t max_group_count) {
+  auto const block = allocator.alloc(Contact_group_storage::memory_requirement(
+      max_contact_count, max_group_count));
+  return {block,
+          Contact_group_storage{block, max_contact_count, max_group_count}};
+}
+
 class Contact_group_solve_task : public util::Task {
 public:
   void run(unsigned) final {}
