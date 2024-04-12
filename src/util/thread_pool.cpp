@@ -92,7 +92,7 @@ Thread_pool::Thread::Thread(Thread *threads,
             }
           }
           // try to steal from other queues
-          if (!task && _thread_count > 1) {
+          if (!task) {
             task = try_steal(_thread_count - 1);
           }
           // just wait for work
@@ -106,9 +106,6 @@ Thread_pool::Thread::Thread(Thread *threads,
               task = _queue.back();
               _queue.pop_back();
             }
-            // else if (_scheduling_policy == Scheduling_policy::spin) {
-            //   task = try_steal(_thread_count - 1);
-            // }
           }
           if (task) {
             try {

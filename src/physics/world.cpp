@@ -2976,7 +2976,7 @@ private:
   }
 
   void build_aabb_tree(float delta_time) {
-    auto const constant_safety_term = 1.0f / 16.0f;
+    auto const constant_safety_term = 0.0f;
     auto const velocity_safety_factor = 2.0f;
     auto const gravity_safety_factor = 2.0f;
     auto const gravity_safety_term = gravity_safety_factor *
@@ -3837,118 +3837,6 @@ private:
           fringe_object);
     } while (!_contact_group_fringe.empty());
   }
-
-  // void solve_contact_group(std::size_t group_index,
-  //                          int min_desired_position_iterations_per_contact,
-  //                          int max_desired_position_iterations_per_contact,
-  //                          int max_position_iterations,
-  //                          int min_desired_velocity_iterations_per_contact,
-  //                          int max_desired_velocity_iterations_per_contact,
-  //                          int max_velocity_iterations,
-  //                          float early_out_contact_separation,
-  //                          float early_out_contact_separating_velocity,
-  //                          Vec3f const &gravitational_velocity_delta,
-  //                          float max_separating_velocity_for_bounce) {
-  //   auto position_iterations = 0;
-  //   auto const group_begin = _contact_groups.group_begin(group_index);
-  //   auto const group_end = _contact_groups.group_end(group_index);
-  //   auto const group_size = group_end - group_begin;
-  //   auto const min_desired_position_iterations =
-  //       min_desired_position_iterations_per_contact * group_size;
-  //   for (auto i = std::size_t{};
-  //        position_iterations < max_position_iterations &&
-  //        i != min_desired_position_iterations;
-  //        ++i) {
-  //     if (auto const contact = _contact_groups.select_contact_position_solve(
-  //             group_index, 0.0f)) {
-  //       std::visit([this](auto &&arg) { resolve_contact_position(arg); },
-  //                  *contact);
-  //       ++position_iterations;
-  //     } else {
-  //       break;
-  //     }
-  //   }
-  //   auto const optional_desired_position_iterations =
-  //       (max_desired_position_iterations_per_contact -
-  //        min_desired_position_iterations_per_contact) *
-  //       group_size;
-  //   for (auto i = std::size_t{};
-  //        position_iterations < max_position_iterations &&
-  //        i != optional_desired_position_iterations;
-  //        ++i) {
-  //     if (auto const contact = _contact_groups.select_contact_position_solve(
-  //             group_index, early_out_contact_separation)) {
-  //       std::visit([this](auto &&arg) { resolve_contact_position(arg); },
-  //                  *contact);
-  //       ++position_iterations;
-  //     } else {
-  //       break;
-  //     }
-  //   }
-  //   auto velocity_iterations = 0;
-  //   auto const min_desired_velocity_iterations =
-  //       min_desired_velocity_iterations_per_contact * group_size;
-  //   for (auto i = std::size_t{};
-  //        velocity_iterations < max_velocity_iterations &&
-  //        i != min_desired_velocity_iterations;
-  //        ++i) {
-  //     if (auto const contact = _contact_groups.select_contact_velocity_solve(
-  //             group_index, 0.0f)) {
-  //       std::visit(
-  //           [=, this](auto &&arg) {
-  //             using T = std::decay_t<decltype(arg)>;
-  //             if constexpr (std::is_same_v<T, Particle_static_body_contact *>
-  //             ||
-  //                           std::is_same_v<T,
-  //                                          Rigid_body_static_body_contact *>)
-  //                                          {
-  //               resolve_contact_velocity(arg,
-  //                                        gravitational_velocity_delta,
-  //                                        max_separating_velocity_for_bounce);
-  //             } else {
-  //               resolve_contact_velocity(arg,
-  //                                        max_separating_velocity_for_bounce);
-  //             }
-  //           },
-  //           *contact);
-  //       ++velocity_iterations;
-  //     } else {
-  //       break;
-  //     }
-  //   }
-  //   auto const optional_desired_velocity_iterations =
-  //       (max_desired_velocity_iterations_per_contact -
-  //        min_desired_velocity_iterations_per_contact) *
-  //       group_size;
-  //   for (auto i = std::size_t{};
-  //        velocity_iterations < max_velocity_iterations &&
-  //        i != optional_desired_velocity_iterations;
-  //        ++i) {
-  //     if (auto const contact = _contact_groups.select_contact_velocity_solve(
-  //             group_index, early_out_contact_separating_velocity)) {
-  //       std::visit(
-  //           [=, this](auto &&arg) {
-  //             using T = std::decay_t<decltype(arg)>;
-  //             if constexpr (std::is_same_v<T, Particle_static_body_contact *>
-  //             ||
-  //                           std::is_same_v<T,
-  //                                          Rigid_body_static_body_contact *>)
-  //                                          {
-  //               resolve_contact_velocity(arg,
-  //                                        gravitational_velocity_delta,
-  //                                        max_separating_velocity_for_bounce);
-  //             } else {
-  //               resolve_contact_velocity(arg,
-  //                                        max_separating_velocity_for_bounce);
-  //             }
-  //           },
-  //           *contact);
-  //       ++velocity_iterations;
-  //     } else {
-  //       break;
-  //     }
-  //   }
-  // }
 
   void call_particle_motion_callbacks(World const &world) {
     _particles.for_each([&](Particle_handle particle, Particle_data *data) {

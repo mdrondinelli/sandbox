@@ -29,7 +29,7 @@ public:
   explicit Runtime(physics::World_create_info const &world_create_info,
                    Window_create_info const &window_create_info,
                    Camera_create_info const &camera_create_info)
-      : _threads{8u},
+      : _threads{std::max(std::thread::hardware_concurrency() / 2 - 1, 1u)},
         _world{world_create_info},
         _window{window_create_info},
         _camera{camera_create_info},
