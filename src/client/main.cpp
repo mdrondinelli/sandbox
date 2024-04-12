@@ -354,7 +354,7 @@ private:
   float _box_spawn_angle;
 };
 
-constexpr auto pyramid_layers = 10;
+constexpr auto pyramid_layers = 7;
 
 class Pyramid_phase : public Phase {
 public:
