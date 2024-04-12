@@ -309,7 +309,9 @@ public:
   Ring_phase() = default;
 
   explicit Ring_phase(client::Dynamic_prop_manager *box_manager)
-      : _box_manager{box_manager}, _boxes{util::System_allocator::instance()} {}
+      : _box_manager{box_manager}, _boxes{util::System_allocator::instance()} {
+    _boxes.reserve(768);
+  }
 
   void on_start() final {
     _box_spawn_timer = 0.0f;
@@ -350,6 +352,66 @@ private:
   util::Allocating_list<client::Dynamic_prop_handle> _boxes;
   float _box_spawn_timer;
   float _box_spawn_angle;
+};
+
+constexpr auto pyramid_layers = 10;
+
+class Pyramid_phase : public Phase {
+public:
+  Pyramid_phase() = default;
+
+  explicit Pyramid_phase(client::Dynamic_prop_manager *box_manager)
+      : _box_manager{box_manager}, _boxes{util::System_allocator::instance()} {}
+
+  void on_start() final {
+    _box_spawn_timer = 0.0f;
+    _box_spawn_layer = 0;
+    _box_spawn_row = 0;
+    _box_spawn_col = 0;
+    std::cout << "Pyramid phase:\n";
+  }
+
+  void post_physics() final {
+    _box_spawn_timer += physics_delta_time;
+    if (_box_spawn_timer > 0.0f) {
+      _box_spawn_timer -= 0.1f;
+      auto const size = pyramid_layers - _box_spawn_layer;
+      auto const new_box = _box_manager->create({
+          .position = math::Vec3f{0.6f * _box_spawn_row - 0.5f * 0.6f * size,
+                                  0.6f * _box_spawn_layer + 0.4f,
+                                  0.6f * _box_spawn_col - 0.5f * 0.6f * size},
+          .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                                 math::deg_to_rad(90.0f)),
+          .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+      });
+      _boxes.emplace_back(new_box);
+      if (++_box_spawn_col == size) {
+        _box_spawn_col = 0;
+        if (++_box_spawn_row == size) {
+          _box_spawn_row = 0;
+          if (++_box_spawn_layer == pyramid_layers) {
+            stop();
+          }
+        }
+      }
+    }
+  }
+
+  void on_stop() final {
+    for (auto const box : _boxes) {
+      _box_manager->destroy(box);
+    }
+    _boxes.clear();
+  }
+
+private:
+  client::Dynamic_prop_manager *_box_manager;
+  util::Allocating_list<client::Dynamic_prop_handle> _boxes;
+  float _box_spawn_timer;
+  int _box_spawn_layer;
+  int _box_spawn_row;
+  int _box_spawn_col;
 };
 
 class Client : public engine::App {
@@ -410,8 +472,8 @@ public:
                     .restitution_coefficient = 0.2f,
                 },
         });
-    _red_ball_manager->create({.position = {-1.5f, 0.5f, -1.5f}});
-    _red_ball_manager->create({.position = {1.5f, 0.5f, 1.5f}});
+    // _red_ball_manager->create({.position = {-1.5f, 0.5f, -1.5f}});
+    // _red_ball_manager->create({.position = {1.5f, 0.5f, 1.5f}});
     world->create_static_body({
         .shape = physics::Box{{100.0f, 0.5f, 100.0f}},
         .material =
@@ -436,7 +498,8 @@ public:
     // srand(25);
     _column_phase = Column_phase{_box_manager.get(), &_selection};
     _ring_phase = Ring_phase{_box_manager.get()};
-    _phases = {&_column_phase, &_ring_phase};
+    _pyramid_phase = Pyramid_phase{_box_manager.get()};
+    _phases = {&_pyramid_phase, &_column_phase, &_ring_phase};
     _phases[_phase_index]->start();
   }
 
@@ -551,7 +614,8 @@ private:
   float _camera_pitch{0.0f};
   Column_phase _column_phase;
   Ring_phase _ring_phase;
-  std::array<Phase *, 2> _phases;
+  Pyramid_phase _pyramid_phase;
+  std::array<Phase *, 3> _phases;
   std::size_t _phase_index{};
 
   // int _phase{0};
