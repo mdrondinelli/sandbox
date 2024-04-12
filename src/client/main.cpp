@@ -210,6 +210,148 @@ create_wireframe_cube_mesh(graphics::Graphics *graphics) {
 
 constexpr float physics_delta_time = 1.0f / 128.0f;
 
+class Phase {
+public:
+  virtual void on_start() = 0;
+
+  virtual void post_physics() = 0;
+
+  virtual void on_stop() = 0;
+
+  void start() {
+    if (!_running) {
+      _running = true;
+      on_start();
+    }
+  }
+
+  void stop() {
+    if (_running) {
+      on_stop();
+      _running = false;
+    }
+  }
+
+  bool is_running() const noexcept { return _running; }
+
+private:
+  bool _running{false};
+};
+
+class Column_phase : public Phase {
+public:
+  Column_phase() = default;
+
+  explicit Column_phase(client::Dynamic_prop_manager *box_manager,
+                        std::optional<client::Dynamic_prop_handle> *selection)
+      : _box_manager{box_manager},
+        _selection{selection},
+        _boxes{util::System_allocator::instance()} {
+    _boxes.reserve(768);
+  }
+
+  void on_start() final {
+    _box_spawn_timer = 0.0f;
+    _box_spawn_x = 0.0f;
+    _box_spawn_y = 0.5f;
+    _box_spawn_z = 0.0f;
+    srand(25);
+    std::cout << "Column phase:\n";
+  }
+
+  void post_physics() final {
+    _box_spawn_timer += physics_delta_time;
+    if (_box_spawn_timer > 0.0f) {
+      _box_spawn_timer -= 0.01f;
+      if (_box_spawn_y > 8.0f) {
+        _box_spawn_y = 2.0f;
+        _box_spawn_x = 40 * (rand() / (float)RAND_MAX) - 20;
+        _box_spawn_z = 40 * (rand() / (float)RAND_MAX) - 20;
+      } else {
+        _box_spawn_y += 0.6f;
+      }
+      auto const box = _box_manager->create({
+          .position = math::Vec3f{_box_spawn_x, _box_spawn_y, _box_spawn_z},
+          .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                                 math::deg_to_rad(90.0f)),
+          .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+      });
+      _boxes.emplace_back(box);
+      if (_boxes.size() == 565) {
+        *_selection = box;
+      } else if (_boxes.size() == 768) {
+        stop();
+      }
+    }
+  }
+
+  void on_stop() final {
+    for (auto const box : _boxes) {
+      _box_manager->destroy(box);
+    }
+    _boxes.clear();
+    *_selection = std::nullopt;
+  }
+
+private:
+  client::Dynamic_prop_manager *_box_manager;
+  std::optional<client::Dynamic_prop_handle> *_selection;
+  util::Allocating_list<client::Dynamic_prop_handle> _boxes;
+  float _box_spawn_timer;
+  float _box_spawn_x;
+  float _box_spawn_y;
+  float _box_spawn_z;
+};
+
+class Ring_phase : public Phase {
+public:
+  Ring_phase() = default;
+
+  explicit Ring_phase(client::Dynamic_prop_manager *box_manager)
+      : _box_manager{box_manager}, _boxes{util::System_allocator::instance()} {}
+
+  void on_start() final {
+    _box_spawn_timer = 0.0f;
+    _box_spawn_angle = 0.0f;
+    std::cout << "Ring phase:\n";
+  }
+
+  void post_physics() final {
+    _box_spawn_timer += physics_delta_time;
+    _box_spawn_angle += physics_delta_time;
+    if (_box_spawn_timer > 0.0f) {
+      _box_spawn_timer -= 0.1f;
+      auto const new_box = _box_manager->create({
+          .position = math::Vec3f{std::cos(_box_spawn_angle) * 15.0f,
+                                  5.0f,
+                                  std::sin(_box_spawn_angle) * 15.0f},
+          .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                                 math::deg_to_rad(90.0f)),
+          .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+      });
+      _boxes.emplace_back(new_box);
+      if (_boxes.size() == 768) {
+        stop();
+      }
+    }
+  }
+
+  void on_stop() final {
+    for (auto const box : _boxes) {
+      _box_manager->destroy(box);
+    }
+    _boxes.clear();
+  }
+
+private:
+  client::Dynamic_prop_manager *_box_manager;
+  util::Allocating_list<client::Dynamic_prop_handle> _boxes;
+  float _box_spawn_timer;
+  float _box_spawn_angle;
+};
+
 class Client : public engine::App {
 public:
   Client()
@@ -246,22 +388,21 @@ public:
                     .restitution_coefficient = 0.3f,
                 },
         });
-    auto const cotton_box_shape = physics::Box{{0.3f, 0.3f, 0.3f}};
-    _cotton_box_manager = std::make_unique<client::Dynamic_prop_manager>(
+    auto const box_shape = physics::Box{{0.3f, 0.3f, 0.3f}};
+    _box_manager = std::make_unique<client::Dynamic_prop_manager>(
         client::Dynamic_prop_manager_create_info{
             .scene = scene,
             .surface_mesh = _resources.cube_mesh.get(),
             .surface_material = _resources.striped_cotton_material.get(),
             .surface_pretransform =
-                math::Mat3x4f{
-                    {cotton_box_shape.half_extents[0], 0.0f, 0.0f, 0.0f},
-                    {0.0f, cotton_box_shape.half_extents[1], 0.0f, 0.0f},
-                    {0.0f, 0.0f, cotton_box_shape.half_extents[2], 0.0f}},
+                math::Mat3x4f{{box_shape.half_extents[0], 0.0f, 0.0f, 0.0f},
+                              {0.0f, box_shape.half_extents[1], 0.0f, 0.0f},
+                              {0.0f, 0.0f, box_shape.half_extents[2], 0.0f}},
             .space = world,
             .body_mass = 80.0f,
             .body_inertia_tensor =
-                80.0f * physics::solid_inertia_tensor(cotton_box_shape),
-            .body_shape = cotton_box_shape,
+                80.0f * physics::solid_inertia_tensor(box_shape),
+            .body_shape = box_shape,
             .body_material =
                 {
                     .static_friction_coefficient = 0.3f,
@@ -290,9 +431,13 @@ public:
     });
     camera->set_position({-10.0f, 3.5f, 10.0f});
     camera->set_zoom(math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f);
-    _boxes = util::Allocating_list<client::Dynamic_prop_handle>{
-        util::System_allocator::instance()};
-    srand(25);
+    // _boxes = util::Allocating_list<client::Dynamic_prop_handle>{
+    //     util::System_allocator::instance()};
+    // srand(25);
+    _column_phase = Column_phase{_box_manager.get(), &_selection};
+    _ring_phase = Ring_phase{_box_manager.get()};
+    _phases = {&_column_phase, &_ring_phase};
+    _phases[_phase_index]->start();
   }
 
   void post_input() final {
@@ -349,78 +494,23 @@ public:
     _max_physics_wall_time =
         std::max(_max_physics_wall_time, get_physics_simulation_wall_time());
     _total_physics_wall_time += get_physics_simulation_wall_time();
-    _total_physics_simulated_time += 1.0 / 128.0;
-    if (_phase == 0) {
-      _phase = 1;
-      std::cout << "PHASE 1:\n";
-    } else if (_phase == 1) {
-      _box_spawn_timer += physics_delta_time;
-      if (_box_spawn_timer > 0.0f) {
-        _box_spawn_timer -= 0.01f;
-        if (_box_spawn_height > 8.0f) {
-          _box_spawn_height = 2.0f;
-          _box_spawn_offset_x = 40 * (rand() / (float)RAND_MAX) - 20;
-          _box_spawn_offset_z = 40 * (rand() / (float)RAND_MAX) - 20;
-        } else {
-          _box_spawn_height += 0.6f;
-        }
-        auto const new_box = _cotton_box_manager->create({
-            .position = math::Vec3f{_box_spawn_offset_x,
-                                    _box_spawn_height,
-                                    _box_spawn_offset_z},
-            .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-            .orientation = math::Quatf::axis_angle(
-                math::Vec3f{0.0f, 1.0f, 0.0f}, math::deg_to_rad(90.0f)),
-            .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-        });
-        _boxes.emplace_back(new_box);
-        if (_boxes.size() == 565) {
-          _selection = new_box;
-        }
-        if (_boxes.size() == 768) {
-          for (auto const box : _boxes) {
-            _cotton_box_manager->destroy(box);
-          }
-          _boxes.clear();
-          std::cout << "max physics wall time: " << _max_physics_wall_time
-                    << "\n";
-          std::cout << "total physics wall time: " << _total_physics_wall_time
-                    << "\n";
-          std::cout << "total physics simulated time: "
-                    << _total_physics_simulated_time << "\n";
-          _phase = 2;
-          _selection = std::nullopt;
-          std::cout << "PHASE 2:\n";
-        }
+    _total_physics_simulated_time += physics_delta_time;
+    if (_phases[_phase_index]->is_running()) {
+      _phases[_phase_index]->post_physics();
+      if (!_phases[_phase_index]->is_running()) {
+        std::cout << "max physics wall time: " << _max_physics_wall_time
+                  << "\n";
+        std::cout << "total physics wall time: " << _total_physics_wall_time
+                  << "\n";
+        std::cout << "total physics simulated time: "
+                  << _total_physics_simulated_time << "\n";
       }
-    } else if (_phase == 2) {
-      _box_spawn_timer += physics_delta_time;
-      _box_spawn_angle += physics_delta_time;
-      if (_box_spawn_timer > 0.0f) {
-        _box_spawn_timer -= 0.1f;
-        _box_spawn_height = 5.0f;
-        _box_spawn_offset_x = std::cos(_box_spawn_angle) * 15.0f;
-        _box_spawn_offset_z = std::sin(_box_spawn_angle) * 15.0f;
-        auto const new_box = _cotton_box_manager->create({
-            .position = math::Vec3f{_box_spawn_offset_x,
-                                    _box_spawn_height,
-                                    _box_spawn_offset_z},
-            .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-            .orientation = math::Quatf::axis_angle(
-                math::Vec3f{0.0f, 1.0f, 0.0f}, math::deg_to_rad(90.0f)),
-            .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-        });
-        _boxes.emplace_back(new_box);
-        if (_boxes.size() == 768) {
-          std::cout << "max physics wall time: " << _max_physics_wall_time
-                    << "\n";
-          std::cout << "total physics wall time: " << _total_physics_wall_time
-                    << "\n";
-          std::cout << "total physics simulated time: "
-                    << _total_physics_simulated_time << "\n";
-          _phase = 3;
-        }
-      }
+    } else {
+      _max_physics_wall_time = 0.0;
+      _total_physics_wall_time = 0.0;
+      _total_physics_simulated_time = 0.0;
+      _phase_index = (_phase_index + 1) % _phases.size();
+      _phases[_phase_index]->start();
     }
     if (_selection) {
       if (!_selection_wireframe) {
@@ -429,7 +519,7 @@ public:
             .color = {1.0f, 0.5f, 0.0f},
         });
       }
-      auto const rigid_body = _cotton_box_manager->get_rigid_body(*_selection);
+      auto const rigid_body = _box_manager->get_rigid_body(*_selection);
       auto const transform =
           math::Mat3x4f::trs(get_world()->get_position(rigid_body),
                              get_world()->get_orientation(rigid_body),
@@ -438,14 +528,10 @@ public:
     } else if (_selection_wireframe) {
       _selection_wireframe = nullptr;
     }
-    if (_phase == 2) {
-      if (get_physics_simulation_wall_time() > 1.0f / 128.0f) {
-        std::cout << "SLOWER THAN REAL TIME: "
-                  << get_physics_simulation_wall_time() * 1000.0 << " ms\n";
-      }
+    if (get_physics_simulation_wall_time() > physics_delta_time) {
+      std::cout << "SLOWER THAN REAL TIME: "
+                << get_physics_simulation_wall_time() * 1000.0 << " ms\n";
     }
-    // std::cout << "physics: " << get_physics_simulation_wall_time() * 1000.0
-    //           << " ms\n";
   }
 
   void post_loop() {
@@ -456,19 +542,24 @@ public:
 private:
   Resources _resources;
   std::unique_ptr<client::Static_prop_manager> _red_ball_manager;
-  std::unique_ptr<client::Dynamic_prop_manager> _cotton_box_manager;
+  std::unique_ptr<client::Dynamic_prop_manager> _box_manager;
   graphics::Unique_surface_ptr _ground_surface;
   graphics::Unique_wireframe_ptr _selection_wireframe;
-  util::Allocating_list<client::Dynamic_prop_handle> _boxes;
   std::optional<client::Dynamic_prop_handle> _selection;
+  // util::Allocating_list<client::Dynamic_prop_handle> _boxes;
   float _camera_yaw{math::deg_to_rad(-45.0f)};
   float _camera_pitch{0.0f};
-  int _phase{0};
-  double _box_spawn_timer{0.0};
-  float _box_spawn_height{0.5f};
-  float _box_spawn_offset_x{0.0f};
-  float _box_spawn_offset_z{0.0f};
-  float _box_spawn_angle{0.0f};
+  Column_phase _column_phase;
+  Ring_phase _ring_phase;
+  std::array<Phase *, 2> _phases;
+  std::size_t _phase_index{};
+
+  // int _phase{0};
+  // double _box_spawn_timer{0.0};
+  // float _box_spawn_height{0.5f};
+  // float _box_spawn_offset_x{0.0f};
+  // float _box_spawn_offset_z{0.0f};
+  // float _box_spawn_angle{0.0f};
   double _max_physics_wall_time{0.0};
   double _total_physics_wall_time{0.0};
   double _total_physics_simulated_time{0.0};
