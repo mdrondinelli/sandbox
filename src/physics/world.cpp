@@ -4183,7 +4183,9 @@ private:
     auto const separating_velocity =
         dot(particle_datas[0]->velocity - particle_datas[1]->velocity,
             contact->normal);
-    // auto const separating_velocity = contact->separating_velocity;
+    if (separating_velocity >= 0.0f) {
+      return;
+    }
     auto const velocity_per_impulse =
         particle_datas[0]->inverse_mass + particle_datas[1]->inverse_mass;
     auto const impulse_per_velocity = 1.0f / velocity_per_impulse;
@@ -4248,13 +4250,15 @@ private:
     auto const body = contact->body;
     auto const body_data = _rigid_bodies.data(body);
     auto const body_relative_contact_position = contact->relative_position;
+    auto const relative_velocity =
+        particle_data->velocity -
+        (body_data->velocity +
+         cross(body_data->angular_velocity, body_relative_contact_position));
     auto const normal = contact->normal;
-    auto const separating_velocity =
-        dot(particle_data->velocity -
-                (body_data->velocity + cross(body_data->angular_velocity,
-                                             contact->relative_position)),
-            contact->normal);
-    // auto const separating_velocity = contact->separating_velocity;
+    auto const separating_velocity = dot(relative_velocity, contact->normal);
+    if (separating_velocity >= 0.0f) {
+      return;
+    }
     auto const body_rotation = Mat3x3f::rotation(body_data->orientation);
     auto const body_inverse_rotation = transpose(body_rotation);
     auto const body_inverse_inertia_tensor = body_rotation *
@@ -4282,10 +4286,6 @@ private:
     auto const separating_impulse_length =
         delta_separating_velocity * separating_impulse_per_separating_velocity;
     auto const separating_impulse = separating_impulse_length * normal;
-    auto const relative_velocity =
-        particle_data->velocity -
-        (body_data->velocity +
-         cross(body_data->angular_velocity, body_relative_contact_position));
     auto const sliding_velocity =
         relative_velocity - separating_velocity * normal;
     auto const sliding_speed_squared = length_squared(sliding_velocity);
@@ -4352,7 +4352,9 @@ private:
     auto const normal = contact->normal;
     auto const separating_velocity =
         dot(particle_data->velocity, contact->normal);
-    // auto const separating_velocity = contact->separating_velocity;
+    if (separating_velocity >= 0.0f) {
+      return;
+    }
     auto const restitution_coefficient =
         separating_velocity < max_separating_velocity_for_bounce
             ? 0.5f * (particle_data->material.restitution_coefficient +
@@ -4394,7 +4396,6 @@ private:
     auto const particle_velocity_delta =
         delta_separating_velocity * normal + delta_sliding_velocity;
     particle_data->velocity += particle_velocity_delta;
-    // update_separating_velocities(particle, particle_velocity_delta);
   }
 
   void resolve_contact_velocity(Rigid_body_rigid_body_contact *contact,
@@ -4404,15 +4405,17 @@ private:
         _rigid_bodies.data(bodies[0]),
         _rigid_bodies.data(bodies[1]),
     };
-    auto const normal = contact->normal;
     auto const relative_positions = contact->relative_positions;
     auto const relative_velocity =
         (datas[0]->velocity +
          cross(datas[0]->angular_velocity, relative_positions[0])) -
         (datas[1]->velocity +
          cross(datas[1]->angular_velocity, relative_positions[1]));
+    auto const normal = contact->normal;
     auto const separating_velocity = dot(relative_velocity, normal);
-    // auto const separating_velocity = contact->separating_velocity;
+    if (separating_velocity >= 0.0f) {
+      return;
+    }
     auto const rotations = std::array<Mat3x3f, 2>{
         Mat3x3f::rotation(datas[0]->orientation),
         Mat3x3f::rotation(datas[1]->orientation),
@@ -4527,14 +4530,17 @@ private:
     auto const dynamic_body_data = _rigid_bodies.data(dynamic_body);
     auto const static_body = contact->static_body;
     auto const static_body_data = _static_bodies.data(static_body);
-    auto const normal = contact->normal;
     auto const dynamic_body_relative_contact_position =
         contact->relative_position;
     auto const relative_velocity =
         dynamic_body_data->velocity +
         cross(dynamic_body_data->angular_velocity,
               dynamic_body_relative_contact_position);
+    auto const normal = contact->normal;
     auto const separating_velocity = dot(relative_velocity, normal);
+    if (separating_velocity >= 0.0f) {
+      return;
+    }
     auto const dynamic_body_rotation =
         Mat3x3f::rotation(dynamic_body_data->orientation);
     auto const dynamic_body_inverse_rotation = transpose(dynamic_body_rotation);
