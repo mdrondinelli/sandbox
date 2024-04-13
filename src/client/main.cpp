@@ -617,13 +617,6 @@ private:
   Pyramid_phase _pyramid_phase;
   std::array<Phase *, 3> _phases;
   std::size_t _phase_index{};
-
-  // int _phase{0};
-  // double _box_spawn_timer{0.0};
-  // float _box_spawn_height{0.5f};
-  // float _box_spawn_offset_x{0.0f};
-  // float _box_spawn_offset_z{0.0f};
-  // float _box_spawn_angle{0.0f};
   double _max_physics_wall_time{0.0};
   double _total_physics_wall_time{0.0};
   double _total_physics_simulated_time{0.0};

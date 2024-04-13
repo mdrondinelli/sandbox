@@ -94,7 +94,7 @@ App::~App() {}
 int App::run() {
   assert(_runtime == nullptr);
   auto result = 0;
-  try {
+  // try {
     _runtime = std::make_unique<Runtime>(_world_create_info,
                                          Window_create_info{
                                              .extents = _window_extents,
@@ -104,13 +104,13 @@ int App::run() {
     pre_loop();
     loop();
     post_loop();
-  } catch (std::exception &e) {
-    std::cerr << "Caught exception: " << e.what() << "\n";
-    result = 1;
-  } catch (...) {
-    std::cerr << "Caught unknown exception\n";
-    result = 2;
-  }
+  // } catch (std::exception &e) {
+  //   std::cerr << "Caught exception: " << e.what() << "\n";
+  //   result = 1;
+  // } catch (...) {
+  //   std::cerr << "Caught unknown exception\n";
+  //   result = 2;
+  // }
   _runtime = nullptr;
   return result;
 }
