@@ -134,9 +134,7 @@ struct Rigid_body_static_body_contact : Contact {
 
 struct Particle_data {
   Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node{};
-  Particle_handle *particle_neighbors{};
-  Rigid_body_handle *rigid_body_neighbors{};
-  Static_body_handle *static_body_neighbors{};
+  Neighbor_pair **neighbor_pairs{};
   Particle_particle_contact **particle_contacts{};
   Particle_rigid_body_contact **rigid_body_contacts{};
   Particle_static_body_contact **static_body_contacts{};
@@ -148,9 +146,7 @@ struct Particle_data {
   Vec3f position{};
   Vec3f velocity{};
   float waking_motion{};
-  std::uint16_t particle_neighbor_count{};
-  std::uint16_t rigid_body_neighbor_count{};
-  std::uint16_t static_body_neighbor_count{};
+  std::uint16_t neighbor_count{};
   std::uint16_t particle_contact_count{};
   std::uint16_t rigid_body_contact_count{};
   std::uint16_t static_body_contact_count{};
@@ -161,9 +157,7 @@ struct Particle_data {
 
 struct Rigid_body_data {
   Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node{};
-  Particle_handle *particle_neighbors{};
-  Rigid_body_handle *rigid_body_neighbors{};
-  Static_body_handle *static_body_neighbors{};
+  Neighbor_pair **neighbor_pairs{};
   Particle_rigid_body_contact **particle_contacts{};
   Rigid_body_static_body_contact **static_body_contacts{};
   Rigid_body_rigid_body_contact **rigid_body_contacts{};
@@ -179,9 +173,7 @@ struct Rigid_body_data {
   Quatf orientation{};
   Vec3f angular_velocity{};
   float waking_motion;
-  std::uint16_t particle_neighbor_count{};
-  std::uint16_t rigid_body_neighbor_count{};
-  std::uint16_t static_body_neighbor_count{};
+  std::uint16_t neighbor_count{};
   std::uint16_t particle_contact_count{};
   std::uint16_t rigid_body_contact_count{};
   std::uint16_t static_body_contact_count{};
@@ -649,35 +641,19 @@ public:
 
   static constexpr std::size_t
   memory_requirement(World_create_info const &create_info) {
+    auto const max_neighbor_pairs =
+        create_info.max_particle_particle_neighbor_pairs +
+        create_info.max_particle_rigid_body_neighbor_pairs +
+        create_info.max_particle_static_body_neighbor_pairs +
+        create_info.max_rigid_body_rigid_body_neighbor_pairs +
+        create_info.max_rigid_body_static_body_neighbor_pairs;
     return Stack_allocator<>::memory_requirement({
         decltype(_aabb_tree)::memory_requirement(
             create_info.max_aabb_tree_leaf_nodes,
             create_info.max_aabb_tree_internal_nodes),
-        decltype(_neighbor_pairs)::memory_requirement(
-            create_info.max_particle_particle_neighbor_pairs +
-            create_info.max_particle_rigid_body_neighbor_pairs +
-            create_info.max_particle_static_body_neighbor_pairs +
-            create_info.max_rigid_body_rigid_body_neighbor_pairs +
-            create_info.max_rigid_body_static_body_neighbor_pairs),
-        // decltype(_particle_particle_neighbor_pairs)::memory_requirement(
-        //     create_info.max_particle_particle_neighbor_pairs),
-        // decltype(_particle_rigid_body_neighbor_pairs)::memory_requirement(
-        //     create_info.max_particle_rigid_body_neighbor_pairs),
-        // decltype(_particle_static_body_neighbor_pairs)::memory_requirement(
-        //     create_info.max_particle_static_body_neighbor_pairs),
-        // decltype(_rigid_body_rigid_body_neighbor_pairs)::memory_requirement(
-        //     create_info.max_rigid_body_rigid_body_neighbor_pairs),
-        // decltype(_rigid_body_static_body_neighbor_pairs)::memory_requirement(
-        //     create_info.max_rigid_body_static_body_neighbor_pairs),
-        decltype(_particle_neighbors)::memory_requirement(
-            2 * create_info.max_particle_particle_neighbor_pairs +
-            create_info.max_particle_rigid_body_neighbor_pairs),
-        decltype(_rigid_body_neighbors)::memory_requirement(
-            create_info.max_particle_rigid_body_neighbor_pairs +
-            2 * create_info.max_rigid_body_rigid_body_neighbor_pairs),
-        decltype(_static_body_neighbors)::memory_requirement(
-            create_info.max_particle_static_body_neighbor_pairs +
-            create_info.max_rigid_body_static_body_neighbor_pairs),
+        decltype(_neighbor_pairs)::memory_requirement(max_neighbor_pairs),
+        decltype(_neighbor_pair_ptrs)::memory_requirement(2 *
+                                                          max_neighbor_pairs),
         decltype(_neighbor_groups)::memory_requirement(
             create_info.max_particles + create_info.max_rigid_bodies,
             create_info.max_contact_groups),
@@ -719,32 +695,16 @@ public:
                      create_info.max_aabb_tree_leaf_nodes,
                      create_info.max_aabb_tree_internal_nodes)
                      .second;
+    auto const max_neighbor_pairs =
+        create_info.max_particle_particle_neighbor_pairs +
+        create_info.max_particle_rigid_body_neighbor_pairs +
+        create_info.max_particle_static_body_neighbor_pairs +
+        create_info.max_rigid_body_rigid_body_neighbor_pairs +
+        create_info.max_rigid_body_static_body_neighbor_pairs;
     _neighbor_pairs =
-        util::make_list<Neighbor_pair>(
-            allocator,
-            create_info.max_particle_particle_neighbor_pairs +
-                create_info.max_particle_rigid_body_neighbor_pairs +
-                create_info.max_particle_static_body_neighbor_pairs +
-                create_info.max_rigid_body_rigid_body_neighbor_pairs +
-                create_info.max_rigid_body_static_body_neighbor_pairs)
-            .second;
-    _particle_neighbors =
-        util::make_list<Particle_handle>(
-            allocator,
-            2 * create_info.max_particle_particle_neighbor_pairs +
-                create_info.max_particle_rigid_body_neighbor_pairs)
-            .second;
-    _rigid_body_neighbors =
-        util::make_list<Rigid_body_handle>(
-            allocator,
-            create_info.max_particle_rigid_body_neighbor_pairs +
-                2 * create_info.max_rigid_body_rigid_body_neighbor_pairs)
-            .second;
-    _static_body_neighbors =
-        util::make_list<Static_body_handle>(
-            allocator,
-            create_info.max_particle_static_body_neighbor_pairs +
-                create_info.max_rigid_body_static_body_neighbor_pairs)
+        util::make_list<Neighbor_pair>(allocator, max_neighbor_pairs).second;
+    _neighbor_pair_ptrs =
+        util::make_list<Neighbor_pair *>(allocator, 2 * max_neighbor_pairs)
             .second;
     _neighbor_groups =
         make_neighbor_group_storage(allocator,
@@ -809,9 +769,10 @@ public:
     _particle_rigid_body_contacts = {};
     _particle_particle_contacts = {};
     _neighbor_groups = {};
-    _static_body_neighbors = {};
-    _rigid_body_neighbors = {};
-    _particle_neighbors = {};
+    // _static_body_neighbors = {};
+    // _rigid_body_neighbors = {};
+    // _particle_neighbors = {};
+    _neighbor_pair_ptrs = {};
     _neighbor_pairs = {};
     // _rigid_body_static_body_neighbor_pairs = {};
     // _rigid_body_rigid_body_neighbor_pairs = {};
@@ -972,83 +933,64 @@ public:
   }
 
 private:
-  bool is_marked(Particle_handle particle) const {
+  bool is_marked(Particle_handle particle) const noexcept {
     return _particles.data(particle)->marked;
   }
 
-  bool is_marked(Rigid_body_handle rigid_body) const {
+  bool is_marked(Rigid_body_handle rigid_body) const noexcept {
     return _rigid_bodies.data(rigid_body)->marked;
   }
 
-  void set_marked(Particle_handle particle, bool marked = true) {
+  void set_marked(Particle_handle particle, bool marked = true) noexcept {
     _particles.data(particle)->marked = marked;
   }
 
-  void set_marked(Rigid_body_handle rigid_body, bool marked = true) {
+  void set_marked(Rigid_body_handle rigid_body, bool marked = true) noexcept {
     _rigid_bodies.data(rigid_body)->marked = marked;
   }
 
-  void set_unmarked(Particle_handle particle) { set_marked(particle, false); }
+  void set_unmarked(Particle_handle particle) noexcept {
+    set_marked(particle, false);
+  }
 
-  void set_unmarked(Rigid_body_handle rigid_body) {
+  void set_unmarked(Rigid_body_handle rigid_body) noexcept {
     set_marked(rigid_body, false);
   }
 
-  bool is_visited(Particle_handle particle) const {
+  bool is_visited(Particle_handle particle) const noexcept {
     return _particles.data(particle)->visited;
   }
 
-  bool is_visited(Rigid_body_handle rigid_body) const {
+  bool is_visited(Rigid_body_handle rigid_body) const noexcept {
     return _rigid_bodies.data(rigid_body)->visited;
   }
 
-  void set_visited(Particle_handle particle, bool visited = true) {
+  void set_visited(Particle_handle particle, bool visited = true) noexcept {
     _particles.data(particle)->visited = visited;
   }
 
-  void set_visited(Rigid_body_handle rigid_body, bool visited = true) {
+  void set_visited(Rigid_body_handle rigid_body, bool visited = true) noexcept {
     _rigid_bodies.data(rigid_body)->visited = visited;
   }
 
-  void set_unvisited(Particle_handle particle) { set_visited(particle, false); }
+  void set_unvisited(Particle_handle particle) noexcept {
+    set_visited(particle, false);
+  }
 
-  void set_unvisited(Rigid_body_handle rigid_body) {
+  void set_unvisited(Rigid_body_handle rigid_body) noexcept {
     set_visited(rigid_body, false);
   }
 
-  std::span<Particle_handle> get_particle_neighbors(Particle_handle particle) {
+  std::span<Neighbor_pair *const>
+  get_neighbor_pairs(Particle_handle particle) const noexcept {
     auto const data = _particles.data(particle);
-    return {data->particle_neighbors, data->particle_neighbor_count};
+    return {data->neighbor_pairs, data->neighbor_count};
   }
 
-  std::span<Particle_handle>
-  get_particle_neighbors(Rigid_body_handle rigid_body) {
+  std::span<Neighbor_pair *const>
+  get_neighbor_pairs(Rigid_body_handle rigid_body) const noexcept {
     auto const data = _rigid_bodies.data(rigid_body);
-    return {data->particle_neighbors, data->particle_neighbor_count};
-  }
-
-  std::span<Rigid_body_handle>
-  get_rigid_body_neighbors(Particle_handle particle) {
-    auto const data = _particles.data(particle);
-    return {data->rigid_body_neighbors, data->rigid_body_neighbor_count};
-  }
-
-  std::span<Rigid_body_handle>
-  get_rigid_body_neighbors(Rigid_body_handle rigid_body) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    return {data->rigid_body_neighbors, data->rigid_body_neighbor_count};
-  }
-
-  std::span<Static_body_handle>
-  get_static_body_neighbors(Particle_handle particle) {
-    auto const data = _particles.data(particle);
-    return {data->static_body_neighbors, data->static_body_neighbor_count};
-  }
-
-  std::span<Static_body_handle>
-  get_static_body_neighbors(Rigid_body_handle rigid_body) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    return {data->static_body_neighbors, data->static_body_neighbor_count};
+    return {data->neighbor_pairs, data->neighbor_count};
   }
 
   std::span<Particle_particle_contact *>
@@ -1115,28 +1057,16 @@ private:
 
   void clear_neighbors() {
     reset_neighbor_counts();
-    // _particle_particle_neighbor_pairs.clear();
-    // _particle_rigid_body_neighbor_pairs.clear();
-    // _particle_static_body_neighbor_pairs.clear();
-    // _rigid_body_rigid_body_neighbor_pairs.clear();
-    // _rigid_body_static_body_neighbor_pairs.clear();
+    _neighbor_pair_ptrs.clear();
     _neighbor_pairs.clear();
-    _particle_neighbors.clear();
-    _rigid_body_neighbors.clear();
-    _static_body_neighbors.clear();
     _neighbor_groups.clear();
   }
 
   void reset_neighbor_counts() {
-    _particles.for_each([](Particle_handle, Particle_data *data) {
-      data->particle_neighbor_count = 0;
-      data->rigid_body_neighbor_count = 0;
-      data->static_body_neighbor_count = 0;
-    });
+    _particles.for_each(
+        [](Particle_handle, Particle_data *data) { data->neighbor_count = 0; });
     _rigid_bodies.for_each([](Rigid_body_handle, Rigid_body_data *data) {
-      data->particle_neighbor_count = 0;
-      data->rigid_body_neighbor_count = 0;
-      data->static_body_neighbor_count = 0;
+      data->neighbor_count = 0;
     });
   }
 
@@ -1153,35 +1083,26 @@ private:
                   [this, first_handle](auto &&second_handle) {
                     using U = std::decay_t<decltype(second_handle)>;
                     if constexpr (std::is_same_v<U, Particle_handle>) {
-                      // _particle_particle_neighbor_pairs.push_back(
-                      //     {first_handle, second_handle});
                       _neighbor_pairs.push_back({
                           .objects = {first_handle.value, second_handle.value},
                           .type = Object_pair_type::particle_particle,
                       });
-                      ++_particles.data(first_handle)->particle_neighbor_count;
-                      ++_particles.data(second_handle)->particle_neighbor_count;
+                      ++_particles.data(first_handle)->neighbor_count;
+                      ++_particles.data(second_handle)->neighbor_count;
                     } else if constexpr (std::is_same_v<U, Rigid_body_handle>) {
-                      // _particle_rigid_body_neighbor_pairs.push_back(
-                      //     {first_handle, second_handle});
                       _neighbor_pairs.push_back({
                           .objects = {first_handle.value, second_handle.value},
                           .type = Object_pair_type::particle_rigid_body,
                       });
-                      ++_particles.data(first_handle)
-                            ->rigid_body_neighbor_count;
-                      ++_rigid_bodies.data(second_handle)
-                            ->particle_neighbor_count;
+                      ++_particles.data(first_handle)->neighbor_count;
+                      ++_rigid_bodies.data(second_handle)->neighbor_count;
                     } else {
                       static_assert(std::is_same_v<U, Static_body_handle>);
-                      // _particle_static_body_neighbor_pairs.push_back(
-                      //     {first_handle, second_handle});
                       _neighbor_pairs.push_back({
                           .objects = {first_handle.value, second_handle.value},
                           .type = Object_pair_type::particle_static_body,
                       });
-                      ++_particles.data(first_handle)
-                            ->static_body_neighbor_count;
+                      ++_particles.data(first_handle)->neighbor_count;
                     }
                   },
                   second_payload);
@@ -1190,39 +1111,25 @@ private:
                   [this, first_handle](auto &&second_handle) {
                     using U = std::decay_t<decltype(second_handle)>;
                     if constexpr (std::is_same_v<U, Particle_handle>) {
-                      // _particle_rigid_body_neighbor_pairs.push_back(
-                      //     {second_handle, first_handle});
                       _neighbor_pairs.push_back(
                           {.objects = {second_handle.value, first_handle.value},
                            .type = Object_pair_type::particle_rigid_body});
-                      ++_particles.data(second_handle)
-                            ->rigid_body_neighbor_count;
-                      ++_rigid_bodies.data(first_handle)
-                            ->particle_neighbor_count;
+                      ++_particles.data(second_handle)->neighbor_count;
+                      ++_rigid_bodies.data(first_handle)->neighbor_count;
                     } else if constexpr (std::is_same_v<U, Rigid_body_handle>) {
-                      // auto handles = std::pair{first_handle, second_handle};
-                      // if (handles.first.value > handles.second.value) {
-                      //   std::swap(handles.first, handles.second);
-                      // }
-                      // _rigid_body_rigid_body_neighbor_pairs.push_back(handles);
                       _neighbor_pairs.push_back({
                           .objects = {first_handle.value, second_handle.value},
                           .type = Object_pair_type::rigid_body_rigid_body,
                       });
-                      ++_rigid_bodies.data(first_handle)
-                            ->rigid_body_neighbor_count;
-                      ++_rigid_bodies.data(second_handle)
-                            ->rigid_body_neighbor_count;
+                      ++_rigid_bodies.data(first_handle)->neighbor_count;
+                      ++_rigid_bodies.data(second_handle)->neighbor_count;
                     } else {
                       static_assert(std::is_same_v<U, Static_body_handle>);
-                      // auto handles = std::pair{first_handle, second_handle};
-                      // _rigid_body_static_body_neighbor_pairs.push_back(handles);
                       _neighbor_pairs.push_back({
                           .objects = {first_handle.value, second_handle.value},
                           .type = Object_pair_type::rigid_body_static_body,
                       });
-                      ++_rigid_bodies.data(first_handle)
-                            ->static_body_neighbor_count;
+                      ++_rigid_bodies.data(first_handle)->neighbor_count;
                     }
                   },
                   second_payload);
@@ -1232,23 +1139,17 @@ private:
                   [this, first_handle](auto &&second_handle) {
                     using U = std::decay_t<decltype(second_handle)>;
                     if constexpr (std::is_same_v<U, Particle_handle>) {
-                      // _particle_static_body_neighbor_pairs.push_back(
-                      //     {second_handle, first_handle});
                       _neighbor_pairs.push_back({
                           .objects = {second_handle.value, first_handle.value},
                           .type = Object_pair_type::particle_static_body,
                       });
-                      ++_particles.data(second_handle)
-                            ->static_body_neighbor_count;
+                      ++_particles.data(second_handle)->neighbor_count;
                     } else if constexpr (std::is_same_v<U, Rigid_body_handle>) {
-                      // auto handles = std::pair{second_handle, first_handle};
-                      // _rigid_body_static_body_neighbor_pairs.push_back(handles);
                       _neighbor_pairs.push_back({
                           .objects = {second_handle.value, first_handle.value},
                           .type = Object_pair_type::rigid_body_static_body,
                       });
-                      ++_rigid_bodies.data(second_handle)
-                            ->static_body_neighbor_count;
+                      ++_rigid_bodies.data(second_handle)->neighbor_count;
                     }
                   },
                   second_payload);
@@ -1260,53 +1161,39 @@ private:
 
   void allocate_neighbors() {
     auto const f = [this](auto const, auto const data) {
-      data->particle_neighbors = _particle_neighbors.end();
-      _particle_neighbors.resize(_particle_neighbors.size() +
-                                 data->particle_neighbor_count);
-      data->rigid_body_neighbors = _rigid_body_neighbors.end();
-      _rigid_body_neighbors.resize(_rigid_body_neighbors.size() +
-                                   data->rigid_body_neighbor_count);
-      data->static_body_neighbors = _static_body_neighbors.end();
-      _static_body_neighbors.resize(_static_body_neighbors.size() +
-                                    data->static_body_neighbor_count);
+      data->neighbor_pairs = _neighbor_pair_ptrs.end();
+      _neighbor_pair_ptrs.resize(_neighbor_pair_ptrs.size() +
+                                 data->neighbor_count);
     };
     _particles.for_each(f);
     _rigid_bodies.for_each(f);
   }
 
   void assign_neighbors() {
-    for (auto const &pair : _neighbor_pairs) {
+    for (auto &pair : _neighbor_pairs) {
       switch (pair.type) {
       case Object_pair_type::particle_particle: {
         auto const handle_1 = Particle_handle{pair.objects[0]};
         auto const handle_2 = Particle_handle{pair.objects[1]};
         auto const data_1 = _particles.data(handle_1);
         auto const data_2 = _particles.data(handle_2);
-        data_1->particle_neighbors[data_1->particle_neighbor_count++] =
-            handle_2;
-        data_2->particle_neighbors[data_2->particle_neighbor_count++] =
-            handle_1;
+        data_1->neighbor_pairs[data_1->neighbor_count++] = &pair;
+        data_2->neighbor_pairs[data_2->neighbor_count++] = &pair;
         continue;
       }
       case Object_pair_type::particle_rigid_body: {
         auto const particle_handle = Particle_handle{pair.objects[0]};
-        auto const rigid_body_handle = Rigid_body_handle{pair.objects[1]};
+        auto const body_handle = Rigid_body_handle{pair.objects[1]};
         auto const particle_data = _particles.data(particle_handle);
-        auto const rigid_body_data = _rigid_bodies.data(rigid_body_handle);
-        particle_data
-            ->rigid_body_neighbors[particle_data->rigid_body_neighbor_count++] =
-            rigid_body_handle;
-        rigid_body_data
-            ->particle_neighbors[rigid_body_data->particle_neighbor_count++] =
-            particle_handle;
+        auto const body_data = _rigid_bodies.data(body_handle);
+        particle_data->neighbor_pairs[particle_data->neighbor_count++] = &pair;
+        body_data->neighbor_pairs[body_data->neighbor_count++] = &pair;
         continue;
       }
       case Object_pair_type::particle_static_body: {
-        auto const particle_handle = Particle_handle{pair.objects[0]};
-        auto const static_body_handle = Static_body_handle{pair.objects[1]};
-        auto const particle_data = _particles.data(particle_handle);
-        particle_data->static_body_neighbors
-            [particle_data->static_body_neighbor_count++] = static_body_handle;
+        auto const handle = Particle_handle{pair.objects[0]};
+        auto const data = _particles.data(handle);
+        data->neighbor_pairs[data->neighbor_count++] = &pair;
         continue;
       }
       case Object_pair_type::rigid_body_rigid_body: {
@@ -1314,19 +1201,14 @@ private:
         auto const handle_2 = Rigid_body_handle{pair.objects[1]};
         auto const data_1 = _rigid_bodies.data(handle_1);
         auto const data_2 = _rigid_bodies.data(handle_2);
-        data_1->rigid_body_neighbors[data_1->rigid_body_neighbor_count++] =
-            handle_2;
-        data_2->rigid_body_neighbors[data_2->rigid_body_neighbor_count++] =
-            handle_1;
+        data_1->neighbor_pairs[data_1->neighbor_count++] = &pair;
+        data_2->neighbor_pairs[data_2->neighbor_count++] = &pair;
         continue;
       }
       case Object_pair_type::rigid_body_static_body: {
-        auto const rigid_body_handle = Rigid_body_handle{pair.objects[0]};
-        auto const static_body_handle = Static_body_handle{pair.objects[1]};
-        auto const rigid_body_data = _rigid_bodies.data(rigid_body_handle);
-        rigid_body_data->static_body_neighbors
-            [rigid_body_data->static_body_neighbor_count++] =
-            static_body_handle;
+        auto const handle = Rigid_body_handle{pair.objects[0]};
+        auto const data = _rigid_bodies.data(handle);
+        data->neighbor_pairs[data->neighbor_count++] = &pair;
         continue;
       }
       }
@@ -1341,41 +1223,55 @@ private:
     auto fringe_index = std::size_t{};
     auto visitor = [this](auto &&handle) {
       using T = std::decay_t<decltype(handle)>;
-      if constexpr (std::is_same_v<T, Particle_handle>) {
-        auto const data = _particles.data(handle);
-        for (auto const neighbor_handle : std::span{
-                 data->particle_neighbors, data->particle_neighbor_count}) {
-          auto const neighbor_data = _particles.data(neighbor_handle);
-          if (!neighbor_data->marked) {
-            neighbor_data->marked = true;
-            _neighbor_groups.add_to_group(neighbor_handle);
+      for (auto const pair : get_neighbor_pairs(handle)) {
+        if constexpr (std::is_same_v<T, Particle_handle>) {
+          switch (pair->type) {
+          case Object_pair_type::particle_particle: {
+            auto const neighbor_handle = Particle_handle{
+                pair->objects[pair->objects[0] == handle.value]};
+            auto const neighbor_data = _particles.data(neighbor_handle);
+            if (!neighbor_data->marked) {
+              neighbor_data->marked = true;
+              _neighbor_groups.add_to_group(neighbor_handle);
+            }
+            continue;
           }
-        }
-        for (auto const neighbor_handle : std::span{
-                 data->rigid_body_neighbors, data->rigid_body_neighbor_count}) {
-          auto const neighbor_data = _rigid_bodies.data(neighbor_handle);
-          if (!neighbor_data->marked) {
-            neighbor_data->marked = true;
-            _neighbor_groups.add_to_group(neighbor_handle);
+          case Object_pair_type::particle_rigid_body: {
+            auto const neighbor_handle = Rigid_body_handle{pair->objects[1]};
+            auto const neighbor_data = _rigid_bodies.data(neighbor_handle);
+            if (!neighbor_data->marked) {
+              neighbor_data->marked = true;
+              _neighbor_groups.add_to_group(neighbor_handle);
+            }
+            continue;
           }
-        }
-      } else {
-        static_assert(std::is_same_v<T, Rigid_body_handle>);
-        auto const data = _rigid_bodies.data(handle);
-        for (auto const neighbor_handle : std::span{
-                 data->particle_neighbors, data->particle_neighbor_count}) {
-          auto const neighbor_data = _particles.data(neighbor_handle);
-          if (!neighbor_data->marked) {
-            neighbor_data->marked = true;
-            _neighbor_groups.add_to_group(neighbor_handle);
+          default:
+            continue;
           }
-        }
-        for (auto const neighbor_handle : std::span{
-                 data->rigid_body_neighbors, data->rigid_body_neighbor_count}) {
-          auto const neighbor_data = _rigid_bodies.data(neighbor_handle);
-          if (!neighbor_data->marked) {
-            neighbor_data->marked = true;
-            _neighbor_groups.add_to_group(neighbor_handle);
+        } else {
+          static_assert(std::is_same_v<T, Rigid_body_handle>);
+          switch (pair->type) {
+          case Object_pair_type::particle_rigid_body: {
+            auto const neighbor_handle = Particle_handle{pair->objects[0]};
+            auto const neighbor_data = _particles.data(neighbor_handle);
+            if (!neighbor_data->marked) {
+              neighbor_data->marked = true;
+              _neighbor_groups.add_to_group(neighbor_handle);
+            }
+            continue;
+          }
+          case Object_pair_type::rigid_body_rigid_body: {
+            auto const neighbor_handle = Rigid_body_handle{
+                pair->objects[pair->objects[0] == handle.value]};
+            auto const neighbor_data = _rigid_bodies.data(neighbor_handle);
+            if (!neighbor_data->marked) {
+              neighbor_data->marked = true;
+              _neighbor_groups.add_to_group(neighbor_handle);
+            }
+            continue;
+          }
+          default:
+            continue;
           }
         }
       }
@@ -1583,23 +1479,75 @@ private:
       std::visit(
           [&](auto &&object) {
             set_marked(object);
-            for (auto const particle : get_particle_neighbors(object)) {
-              if (!is_marked(particle)) {
-                if (auto const contact = find_contact({object, particle})) {
-                  resolve_contact_position(contact);
+            using T = std::decay_t<decltype(object)>;
+            for (auto const pair : get_neighbor_pairs(object)) {
+              if constexpr (std::is_same_v<T, Particle_handle>) {
+                switch (pair->type) {
+                case Object_pair_type::particle_particle: {
+                  auto const particle = Particle_handle{
+                      pair->objects[pair->objects[0] == object.value]};
+                  if (!is_marked(particle)) {
+                    if (auto const contact = find_contact({object, particle})) {
+                      resolve_contact_position(contact);
+                    }
+                  }
+                  continue;
                 }
-              }
-            }
-            for (auto const rigid_body : get_rigid_body_neighbors(object)) {
-              if (!is_marked(rigid_body)) {
-                if (auto const contact = find_contact({object, rigid_body})) {
-                  resolve_contact_position(contact);
+                case Object_pair_type::particle_rigid_body: {
+                  auto const rigid_body = Rigid_body_handle{pair->objects[1]};
+                  if (!is_marked(rigid_body)) {
+                    if (auto const contact =
+                            find_contact({object, rigid_body})) {
+                      resolve_contact_position(contact);
+                    }
+                  }
+                  continue;
                 }
-              }
-            }
-            for (auto const static_body : get_static_body_neighbors(object)) {
-              if (auto const contact = find_contact({object, static_body})) {
-                resolve_contact_position(contact);
+                case Object_pair_type::particle_static_body: {
+                  auto const static_body = Static_body_handle{pair->objects[1]};
+                  if (auto const contact =
+                          find_contact({object, static_body})) {
+                    resolve_contact_position(contact);
+                  }
+                  continue;
+                }
+                default:
+                  continue;
+                }
+              } else {
+                static_assert(std::is_same_v<T, Rigid_body_handle>);
+                switch (pair->type) {
+                case Object_pair_type::particle_rigid_body: {
+                  auto const particle = Particle_handle{pair->objects[0]};
+                  if (!is_marked(particle)) {
+                    if (auto const contact = find_contact({object, particle})) {
+                      resolve_contact_position(contact);
+                    }
+                  }
+                  continue;
+                }
+                case Object_pair_type::rigid_body_rigid_body: {
+                  auto const rigid_body = Rigid_body_handle{
+                      pair->objects[pair->objects[0] == object.value]};
+                  if (!is_marked(rigid_body)) {
+                    if (auto const contact =
+                            find_contact({object, rigid_body})) {
+                      resolve_contact_position(contact);
+                    }
+                  }
+                  continue;
+                }
+                case Object_pair_type::rigid_body_static_body: {
+                  auto const static_body = Static_body_handle{pair->objects[1]};
+                  if (auto const contact =
+                          find_contact({object, static_body})) {
+                    resolve_contact_position(contact);
+                  }
+                  continue;
+                }
+                default:
+                  continue;
+                }
               }
             }
             alloc_contact_ptrs(object);
@@ -2603,9 +2551,7 @@ private:
   Static_body_storage _static_bodies;
   Rigid_body_storage _rigid_bodies;
   List<Neighbor_pair> _neighbor_pairs;
-  List<Particle_handle> _particle_neighbors;
-  List<Rigid_body_handle> _rigid_body_neighbors;
-  List<Static_body_handle> _static_body_neighbors;
+  List<Neighbor_pair *> _neighbor_pair_ptrs;
   Neighbor_group_storage _neighbor_groups;
   List<std::size_t> _awake_neighbor_groups;
   List<Particle_particle_contact> _particle_particle_contacts;
