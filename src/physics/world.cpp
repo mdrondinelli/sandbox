@@ -1204,12 +1204,12 @@ private:
   }
 
   void find_neighbor_groups() {
-    _particles.for_each(
-        [](Particle_handle, Particle_data *data) { data->marked = false; });
-    _rigid_bodies.for_each(
-        [](Rigid_body_handle, Rigid_body_data *data) { data->marked = false; });
-    auto fringe_index = std::size_t{};
-    auto visitor = [this](auto &&handle) {
+    auto const unmark = [](auto const, auto const data) {
+      data->marked = false;
+    };
+    _particles.for_each(unmark);
+    _rigid_bodies.for_each(unmark);
+    auto const visitor = [this](auto &&handle) {
       using T = std::decay_t<decltype(handle)>;
       for (auto const pair : get_neighbor_pairs(handle)) {
         if constexpr (std::is_same_v<T, Particle_handle>) {
@@ -1264,27 +1264,20 @@ private:
         }
       }
     };
-    _particles.for_each([&, this](Particle_handle handle, Particle_data *data) {
-      if (!data->marked) {
-        data->marked = true;
+    auto fringe_index = std::size_t{};
+    auto const find_neighbor_group = [&, this](auto const seed_handle,
+                                               auto const seed_data) {
+      if (!seed_data->marked) {
+        seed_data->marked = true;
         _neighbor_groups.begin_group();
-        _neighbor_groups.add_to_group(handle);
+        _neighbor_groups.add_to_group(seed_handle);
         do {
           std::visit(visitor, _neighbor_groups.object(fringe_index));
         } while (++fringe_index != _neighbor_groups.object_count());
       }
-    });
-    _rigid_bodies.for_each(
-        [&, this](Rigid_body_handle handle, Rigid_body_data *data) {
-          if (!data->marked) {
-            data->marked = true;
-            _neighbor_groups.begin_group();
-            _neighbor_groups.add_to_group(handle);
-            do {
-              std::visit(visitor, _neighbor_groups.object(fringe_index));
-            } while (++fringe_index != _neighbor_groups.object_count());
-          }
-        });
+    };
+    _particles.for_each(find_neighbor_group);
+    _rigid_bodies.for_each(find_neighbor_group);
   }
 
   void clear_contacts() {
