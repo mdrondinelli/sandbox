@@ -893,11 +893,9 @@ public:
 
   void simulate(World const &world, World_simulate_info const &simulate_info) {
     build_aabb_tree(simulate_info.delta_time);
-    clear_neighbors();
+    clear_neighbor_pairs();
     find_neighbor_pairs();
-    allocate_neighbors();
-    reset_neighbor_counts();
-    assign_neighbors();
+    assign_neighbor_pairs();
     find_neighbor_groups();
     auto const h = simulate_info.delta_time / simulate_info.substep_count;
     auto const time_compensated_velocity_damping_factor =
@@ -993,6 +991,18 @@ private:
     return {data->neighbor_pairs, data->neighbor_count};
   }
 
+  void assign_neighbor_pair(Particle_handle particle,
+                            Neighbor_pair *neighbor_pair) noexcept {
+    auto const data = _particles.data(particle);
+    data->neighbor_pairs[data->neighbor_count++] = neighbor_pair;
+  }
+
+  void assign_neighbor_pair(Rigid_body_handle rigid_body,
+                            Neighbor_pair *neighbor_pair) noexcept {
+    auto const data = _rigid_bodies.data(rigid_body);
+    data->neighbor_pairs[data->neighbor_count++] = neighbor_pair;
+  }
+
   std::span<Particle_particle_contact *>
   get_particle_contacts(Particle_handle particle) {
     auto const data = _particles.data(particle);
@@ -1055,19 +1065,15 @@ private:
     _aabb_tree.build();
   }
 
-  void clear_neighbors() {
-    reset_neighbor_counts();
+  void clear_neighbor_pairs() {
+    auto const reset_neighbor_count = [](auto const, auto const data) {
+      data->neighbor_count = 0;
+    };
+    _particles.for_each(reset_neighbor_count);
+    _rigid_bodies.for_each(reset_neighbor_count);
     _neighbor_pair_ptrs.clear();
     _neighbor_pairs.clear();
     _neighbor_groups.clear();
-  }
-
-  void reset_neighbor_counts() {
-    _particles.for_each(
-        [](Particle_handle, Particle_data *data) { data->neighbor_count = 0; });
-    _rigid_bodies.for_each([](Rigid_body_handle, Rigid_body_data *data) {
-      data->neighbor_count = 0;
-    });
   }
 
   void find_neighbor_pairs() {
@@ -1159,56 +1165,38 @@ private:
     });
   }
 
-  void allocate_neighbors() {
-    auto const f = [this](auto const, auto const data) {
+  void assign_neighbor_pairs() {
+    auto const alloc_neighbor_pairs = [this](auto const, auto const data) {
       data->neighbor_pairs = _neighbor_pair_ptrs.end();
       _neighbor_pair_ptrs.resize(_neighbor_pair_ptrs.size() +
                                  data->neighbor_count);
+      data->neighbor_count = 0;
     };
-    _particles.for_each(f);
-    _rigid_bodies.for_each(f);
-  }
-
-  void assign_neighbors() {
+    _particles.for_each(alloc_neighbor_pairs);
+    _rigid_bodies.for_each(alloc_neighbor_pairs);
     for (auto &pair : _neighbor_pairs) {
       switch (pair.type) {
       case Object_pair_type::particle_particle: {
-        auto const handle_1 = Particle_handle{pair.objects[0]};
-        auto const handle_2 = Particle_handle{pair.objects[1]};
-        auto const data_1 = _particles.data(handle_1);
-        auto const data_2 = _particles.data(handle_2);
-        data_1->neighbor_pairs[data_1->neighbor_count++] = &pair;
-        data_2->neighbor_pairs[data_2->neighbor_count++] = &pair;
+        assign_neighbor_pair(Particle_handle{pair.objects[0]}, &pair);
+        assign_neighbor_pair(Particle_handle{pair.objects[1]}, &pair);
         continue;
       }
       case Object_pair_type::particle_rigid_body: {
-        auto const particle_handle = Particle_handle{pair.objects[0]};
-        auto const body_handle = Rigid_body_handle{pair.objects[1]};
-        auto const particle_data = _particles.data(particle_handle);
-        auto const body_data = _rigid_bodies.data(body_handle);
-        particle_data->neighbor_pairs[particle_data->neighbor_count++] = &pair;
-        body_data->neighbor_pairs[body_data->neighbor_count++] = &pair;
+        assign_neighbor_pair(Particle_handle{pair.objects[0]}, &pair);
+        assign_neighbor_pair(Rigid_body_handle{pair.objects[1]}, &pair);
         continue;
       }
       case Object_pair_type::particle_static_body: {
-        auto const handle = Particle_handle{pair.objects[0]};
-        auto const data = _particles.data(handle);
-        data->neighbor_pairs[data->neighbor_count++] = &pair;
+        assign_neighbor_pair(Particle_handle{pair.objects[0]}, &pair);
         continue;
       }
       case Object_pair_type::rigid_body_rigid_body: {
-        auto const handle_1 = Rigid_body_handle{pair.objects[0]};
-        auto const handle_2 = Rigid_body_handle{pair.objects[1]};
-        auto const data_1 = _rigid_bodies.data(handle_1);
-        auto const data_2 = _rigid_bodies.data(handle_2);
-        data_1->neighbor_pairs[data_1->neighbor_count++] = &pair;
-        data_2->neighbor_pairs[data_2->neighbor_count++] = &pair;
+        assign_neighbor_pair(Rigid_body_handle{pair.objects[0]}, &pair);
+        assign_neighbor_pair(Rigid_body_handle{pair.objects[1]}, &pair);
         continue;
       }
       case Object_pair_type::rigid_body_static_body: {
-        auto const handle = Rigid_body_handle{pair.objects[0]};
-        auto const data = _rigid_bodies.data(handle);
-        data->neighbor_pairs[data->neighbor_count++] = &pair;
+        assign_neighbor_pair(Rigid_body_handle{pair.objects[0]}, &pair);
         continue;
       }
       }
