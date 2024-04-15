@@ -1700,7 +1700,6 @@ private:
       ++rigid_body_data->static_body_contact_count;
       return &_rigid_body_static_body_contacts.back();
     } else {
-      // _contact_cache.clear(objects);
       return nullptr;
     }
   }
