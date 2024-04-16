@@ -5,6 +5,7 @@
 #include <iostream>
 #include <latch>
 
+#include "../util/bit_list.h"
 #include "../util/list.h"
 #include "../util/map.h"
 #include "aabb_tree.h"
@@ -16,6 +17,7 @@ using marlon::math::Vec3f;
 
 namespace marlon {
 namespace physics {
+using util::Bit_list;
 using util::Block;
 using util::List;
 using util::Map;
@@ -40,7 +42,7 @@ enum class Object_pair_type : std::uint8_t {
 struct Neighbor_pair {
   std::array<std::uint32_t, 2> objects;
   Object_pair_type type;
-  std::uint16_t color;
+  std::uint16_t color{};
 };
 
 struct Contact {
@@ -544,13 +546,6 @@ make_neighbor_group_storage(Allocator &allocator,
           Neighbor_group_storage{block, max_object_count, max_group_count}};
 }
 
-// integration constants
-auto constexpr velocity_damping_factor = 0.99f;
-auto constexpr waking_motion_epsilon = 1.0f / 32.0f;
-auto constexpr waking_motion_initializer = 2.0f * waking_motion_epsilon;
-auto constexpr waking_motion_limit = 8.0f * waking_motion_epsilon;
-auto constexpr waking_motion_smoothing_factor = 7.0f / 8.0f;
-
 struct Positional_constraint_problem {
   Vec3f direction;
   float distance;
@@ -565,10 +560,9 @@ struct Positional_constraint_solution {
   float lambda;
 };
 
-auto constexpr max_rotational_displacement_factor = 0.2f;
-
 Positional_constraint_solution
 solve_positional_constraint(Positional_constraint_problem const &problem) {
+  auto constexpr max_rotational_displacement_factor = 0.2f;
   auto const angular_impulse_per_impulse =
       std::array<Vec3f, 2>{cross(problem.position[0], problem.direction),
                            cross(problem.position[1], problem.direction)};
@@ -633,6 +627,15 @@ solve_positional_constraint(Positional_constraint_problem const &problem) {
           .delta_orientation = delta_orientation,
           .lambda = impulse};
 }
+
+auto constexpr max_colors =
+    std::size_t{std::numeric_limits<std::uint16_t>::max()};
+// integration constants
+auto constexpr velocity_damping_factor = 0.99f;
+auto constexpr waking_motion_epsilon = 1.0f / 32.0f;
+auto constexpr waking_motion_initializer = 2.0f * waking_motion_epsilon;
+auto constexpr waking_motion_limit = 8.0f * waking_motion_epsilon;
+auto constexpr waking_motion_smoothing_factor = 7.0f / 8.0f;
 } // namespace
 
 class World::Impl {
@@ -657,8 +660,11 @@ public:
         decltype(_neighbor_groups)::memory_requirement(
             create_info.max_particles + create_info.max_rigid_bodies,
             create_info.max_contact_groups),
-        decltype(_awake_neighbor_groups)::memory_requirement(
+        decltype(_neighbor_group_awake_indices)::memory_requirement(
             create_info.max_contact_groups),
+        decltype(_neighbor_group_coloring_fringe)::memory_requirement(
+            max_neighbor_pairs),
+        decltype(_neighbor_group_coloring_bits)::memory_requirement(max_colors),
         decltype(_particle_particle_contacts)::memory_requirement(
             create_info.max_particle_particle_neighbor_pairs),
         decltype(_particle_rigid_body_contacts)::memory_requirement(
@@ -712,9 +718,13 @@ public:
                                         create_info.max_rigid_bodies,
                                     create_info.max_contact_groups)
             .second;
-    _awake_neighbor_groups =
+    _neighbor_group_awake_indices =
         util::make_list<std::size_t>(allocator, create_info.max_contact_groups)
             .second;
+    _neighbor_group_coloring_fringe =
+        util::make_list<Neighbor_pair *>(allocator, max_neighbor_pairs).second;
+    _neighbor_group_coloring_bits =
+        util::make_bit_list(allocator, max_colors).second;
     _particle_particle_contacts =
         util::make_list<Particle_particle_contact>(
             allocator, create_info.max_particle_particle_neighbor_pairs)
@@ -769,16 +779,8 @@ public:
     _particle_rigid_body_contacts = {};
     _particle_particle_contacts = {};
     _neighbor_groups = {};
-    // _static_body_neighbors = {};
-    // _rigid_body_neighbors = {};
-    // _particle_neighbors = {};
     _neighbor_pair_ptrs = {};
     _neighbor_pairs = {};
-    // _rigid_body_static_body_neighbor_pairs = {};
-    // _rigid_body_rigid_body_neighbor_pairs = {};
-    // _particle_static_body_neighbor_pairs = {};
-    // _particle_rigid_body_neighbor_pairs = {};
-    // _particle_particle_neighbor_pairs = {};
     util::System_allocator::instance()->free(_block);
   }
 
@@ -906,11 +908,12 @@ public:
     auto const restitution_max_separating_velocity =
         -2.0f * length(gravitational_delta_velocity);
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
-      _awake_neighbor_groups.clear();
+      _neighbor_group_awake_indices.clear();
       clear_contacts();
       for (auto j = std::size_t{}; j != _neighbor_groups.group_count(); ++j) {
         if (update_neighbor_group_awake_states(j)) {
-          _awake_neighbor_groups.emplace_back(j);
+          _neighbor_group_awake_indices.emplace_back(j);
+          // color_neighbor_group(j);
           integrate_neighbor_group(
               j,
               h,
@@ -920,7 +923,7 @@ public:
         }
       }
       assign_contact_ptrs();
-      for (auto const j : _awake_neighbor_groups) {
+      for (auto const j : _neighbor_group_awake_indices) {
         solve_neighbor_group_velocities(j,
                                         gravitational_delta_velocity,
                                         restitution_max_separating_velocity);
@@ -1388,6 +1391,30 @@ private:
       return false;
     }
   }
+
+  // void color_neighbor_group(std::size_t group_index) {
+  //   auto const seed_object =
+  //       _neighbor_groups.object(_neighbor_groups.group_begin(group_index));
+  //   auto const seed_pair = std::visit(
+  //       [this](auto &&seed_object) {
+  //         using T = std::decay_t<decltype(seed_object)>;
+  //         if constexpr (std::is_same_v<T, Particle_handle>) {
+  //           auto const data = _particles.data(seed_object);
+  //           return data->neighbor_pairs[0];
+  //         } else {
+  //           static_assert(std::is_same_v<T, Rigid_body_handle>);
+  //           auto const data = _rigid_bodies.data(seed_object);
+  //           return data->neighbor_pairs[0];
+  //         }
+  //       },
+  //       seed_object);
+  //   _neighbor_group_coloring_fringe.emplace_back(seed_pair);
+  //   do {
+  //     auto const pair = _neighbor_group_coloring_fringe.back();
+  //     _neighbor_group_coloring_fringe.pop_back();
+
+  //   } while (!_neighbor_group_coloring_fringe.empty());
+  // }
 
   void integrate_neighbor_group(std::size_t group_index,
                                 float delta_time,
@@ -2533,7 +2560,9 @@ private:
   List<Neighbor_pair> _neighbor_pairs;
   List<Neighbor_pair *> _neighbor_pair_ptrs;
   Neighbor_group_storage _neighbor_groups;
-  List<std::size_t> _awake_neighbor_groups;
+  List<std::size_t> _neighbor_group_awake_indices;
+  List<Neighbor_pair *> _neighbor_group_coloring_fringe;
+  Bit_list _neighbor_group_coloring_bits;
   List<Particle_particle_contact> _particle_particle_contacts;
   List<Particle_rigid_body_contact> _particle_rigid_body_contacts;
   List<Particle_static_body_contact> _particle_static_body_contacts;
