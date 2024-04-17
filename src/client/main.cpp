@@ -41,9 +41,9 @@ create_wireframe_cube_mesh(graphics::Graphics *graphics);
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
   retval.brick_base_color_texture = create_texture(
-      graphics, "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
+      graphics, "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
   retval.striped_cotton_base_color_texture = create_texture(
-      graphics, "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
+      graphics, "C:/Users/marlo/rendering-engine/res/StripedCotton01_2K_BaseColor.ktx");
   retval.brick_material = graphics->create_surface_material_unique(
       {.base_color_texture = retval.brick_base_color_texture.get()});
   retval.striped_cotton_material = graphics->create_surface_material_unique(
