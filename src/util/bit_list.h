@@ -32,9 +32,15 @@ public:
 
   Bit_list &operator=(Bit_list const &other) = delete;
 
-  constexpr Bit_list(Bit_list &&other) noexcept = default;
+  constexpr Bit_list(Bit_list &&other) noexcept
+      : _data{std::exchange(other._data, std::span<std::uint64_t>{})},
+        _size{std::exchange(other._size, std::size_t{})} {}
 
-  constexpr Bit_list &operator=(Bit_list &&other) noexcept = default;
+  constexpr Bit_list &operator=(Bit_list &&other) noexcept {
+    auto temp{std::move(other)};
+    swap(temp);
+    return *this;
+  }
 
   constexpr bool get(std::size_t index) const noexcept {
     auto const n = index >> 6;
@@ -97,19 +103,17 @@ public:
     if (max_size() < count) {
       throw Capacity_error{};
     }
-    if (size() < count) {
-      if (size() >> 6 == count >> 6) {
+    if (_size < count) {
+      if (_size >> 6 == count >> 6) {
         do {
           push_back(false);
-        } while (size() < count);
+        } while (_size < count);
       } else {
-        if (size() & 63 != 0) {
-          _size += 64 - (size() & 63);
+        if ((_size & 63) != 0) {
+          _data[_size >> 6] &= (std::uint64_t{1} << (_size & 63)) - 1;
+          _size += 64 - (_size & 63);
         }
-        while (size() & 63 != 0) {
-          push_back(false);
-        }
-        while (size() >> 6 < count >> 6) {
+        while (_size >> 6 < count >> 6) {
           new (&_data[_size >> 6]) std::uint64_t{};
           _size += 64;
         }
@@ -123,6 +127,11 @@ public:
   }
 
 private:
+  void swap(Bit_list &other) noexcept {
+    std::swap(_data, other._data);
+    std::swap(_size, other._size);
+  }
+
   std::span<std::uint64_t> _data;
   std::size_t _size{};
 };

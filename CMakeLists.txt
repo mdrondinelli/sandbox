@@ -24,6 +24,7 @@ add_executable(
   util_tests
   "src/util/hash_tests.cpp"
   "src/util/memory_tests.cpp"
+  "src/util/bit_list_tests.cpp"
   "src/util/list_tests.cpp"
   "src/util/queue_tests.cpp"
   "src/util/set_tests.cpp"
