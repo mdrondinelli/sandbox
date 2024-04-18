@@ -209,6 +209,7 @@ create_wireframe_cube_mesh(graphics::Graphics *graphics) {
 }
 
 constexpr float physics_delta_time = 1.0f / 128.0f;
+constexpr unsigned physics_substeps = 12;
 
 class Phase {
 public:
@@ -423,7 +424,7 @@ public:
                     .gravitational_acceleration = {0.0f, -9.8f, 0.0f},
                 },
             .world_simulate_info = {.delta_time = physics_delta_time,
-                                    .substep_count = 12},
+                                    .substep_count = physics_substeps},
             .window_extents = {1920, 1080},
         }} {}
 

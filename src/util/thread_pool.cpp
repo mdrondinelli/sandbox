@@ -13,7 +13,7 @@ Thread_pool::Thread_pool(unsigned thread_count,
   std::tie(block, _threads) =
       make_list<Thread>(*System_allocator::instance(), thread_count);
   try {
-    for (std::size_t i = 0; i != thread_count; ++i) {
+    for (unsigned i = 0; i != thread_count; ++i) {
       _threads.emplace_back(
           _threads.data(), thread_count, i, scheduling_policy);
     }
@@ -64,7 +64,7 @@ Thread_pool::Thread::Thread(Thread *threads,
           auto const lock = std::scoped_lock{_mutex};
           _queue.reserve(1024);
         }
-        auto rng = std::mt19937_64{std::random_device{}()};
+        auto rng = std::minstd_rand{std::random_device{}()};
         auto try_steal = [&](unsigned attempts) -> Task * {
           auto d = std::uniform_int_distribution<std::size_t>{
               std::size_t{1}, _thread_count - 1};
@@ -127,19 +127,18 @@ Thread_pool::Thread::~Thread() {
 }
 
 void Thread_pool::Thread::push(Task *task) {
-  {
-    auto const lock = std::scoped_lock{_mutex};
-    _queue.push_back(task);
+  auto lock = std::unique_lock{_mutex};
+  _queue.push_back(task);
+  if (_scheduling_policy == Scheduling_policy::block) {
+    lock.unlock();
+    _condvar.notify_one();
   }
-  _condvar.notify_one();
 }
 
 bool Thread_pool::Thread::try_push(Task *task) {
   if (auto lock = std::unique_lock{_mutex, std::try_to_lock}) {
     _queue.push_back(task);
-    if (_scheduling_policy == Scheduling_policy::spin) {
-      lock.unlock();
-    } else {
+    if (_scheduling_policy == Scheduling_policy::block) {
       lock.unlock();
       _condvar.notify_one();
     }

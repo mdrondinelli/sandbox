@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <limits>
 #include <span>
 
 #include "capacity_error.h"
@@ -52,7 +53,7 @@ public:
     if (value) {
       set(index);
     } else {
-      unset(index);
+      reset(index);
     }
   }
 
@@ -62,10 +63,22 @@ public:
     _data[n] |= std::uint64_t{1} << m;
   }
 
-  constexpr void unset(std::size_t index) noexcept {
+  constexpr void set() noexcept {
+    for (auto &word : _data) {
+      word = std::numeric_limits<std::uint64_t>::max();
+    }
+  }
+
+  constexpr void reset(std::size_t index) noexcept {
     auto const n = index >> 6;
     auto const m = index & 63;
     _data[n] &= ~(std::uint64_t{1} << m);
+  }
+
+  constexpr void reset() noexcept {
+    for (auto &word : _data) {
+      word = std::uint64_t{};
+    }
   }
 
   constexpr void flip(std::size_t index) noexcept {
@@ -127,7 +140,7 @@ public:
   }
 
 private:
-  void swap(Bit_list &other) noexcept {
+  constexpr void swap(Bit_list &other) noexcept {
     std::swap(_data, other._data);
     std::swap(_size, other._size);
   }
