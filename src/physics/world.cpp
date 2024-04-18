@@ -51,94 +51,9 @@ struct Neighbor_pair {
   std::uint16_t color{color_unmarked};
 };
 
-// struct Contact {
-//   Vec3f normal;
-
-//   Contact() = default;
-
-//   constexpr Contact(Vec3f const &normal) noexcept : normal{normal} {}
-// };
-
-// struct Particle_particle_contact : Contact {
-//   std::array<Particle_handle, 2> particles;
-
-//   Particle_particle_contact() = default;
-
-//   constexpr Particle_particle_contact(
-//       Vec3f const &normal,
-//       std::array<Particle_handle, 2> const &particles) noexcept
-//       : Contact{normal}, particles{particles} {}
-// };
-
-// struct Particle_rigid_body_contact : Contact {
-//   Particle_handle particle;
-//   Rigid_body_handle body;
-//   Vec3f relative_position;
-
-//   Particle_rigid_body_contact() = default;
-
-//   constexpr Particle_rigid_body_contact(
-//       Vec3f const &normal,
-//       Particle_handle particle,
-//       Rigid_body_handle body,
-//       Vec3f const &body_relative_position) noexcept
-//       : Contact{normal},
-//         particle{particle},
-//         body{body},
-//         relative_position{body_relative_position} {}
-// };
-
-// struct Particle_static_body_contact : Contact {
-//   Particle_handle particle;
-//   Static_body_handle body;
-
-//   Particle_static_body_contact() = default;
-
-//   constexpr Particle_static_body_contact(Vec3f const &normal,
-//                                          Particle_handle particle,
-//                                          Static_body_handle body)
-//       : Contact{normal}, particle{particle}, body{body} {}
-// };
-
-// struct Rigid_body_rigid_body_contact : Contact {
-//   std::array<Rigid_body_handle, 2> bodies;
-//   std::array<Vec3f, 2> relative_positions;
-
-//   Rigid_body_rigid_body_contact() = default;
-
-//   constexpr Rigid_body_rigid_body_contact(
-//       Vec3f const &normal,
-//       std::array<Rigid_body_handle, 2> const &bodies,
-//       std::array<Vec3f, 2> const &relative_positions) noexcept
-//       : Contact{normal},
-//         bodies{bodies},
-//         relative_positions{relative_positions} {}
-// };
-
-// struct Rigid_body_static_body_contact : Contact {
-//   Rigid_body_handle rigid_body;
-//   Static_body_handle static_body;
-//   Vec3f relative_position;
-
-//   Rigid_body_static_body_contact() = default;
-
-//   constexpr Rigid_body_static_body_contact(
-//       Vec3f const &normal,
-//       Rigid_body_handle dynamic_body,
-//       Static_body_handle static_body,
-//       Vec3f const &relative_position) noexcept
-//       : Contact{normal},
-//         rigid_body{dynamic_body},
-//         static_body{static_body},
-//         relative_position{relative_position} {}
-// };
-
 struct Particle_data {
   Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node{};
   Neighbor_pair **neighbor_pairs{};
-  // Particle_particle_contact **particle_contacts{};
-  // Particle_rigid_body_contact **rigid_body_contacts{};
-  // Particle_static_body_contact **static_body_contacts{};
   Particle_motion_callback *motion_callback{};
   float radius{};
   float inverse_mass{};
@@ -148,20 +63,13 @@ struct Particle_data {
   Vec3f velocity{};
   float waking_motion{};
   std::uint16_t neighbor_count{};
-  // std::uint16_t particle_contact_count{};
-  // std::uint16_t rigid_body_contact_count{};
-  // std::uint16_t static_body_contact_count{};
   bool marked{};
-  bool visited{};
   bool awake{};
 };
 
 struct Rigid_body_data {
   Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node{};
   Neighbor_pair **neighbor_pairs{};
-  // Particle_rigid_body_contact **particle_contacts{};
-  // Rigid_body_static_body_contact **static_body_contacts{};
-  // Rigid_body_rigid_body_contact **rigid_body_contacts{};
   Rigid_body_motion_callback *motion_callback{};
   Shape shape;
   float inverse_mass{};
@@ -175,11 +83,7 @@ struct Rigid_body_data {
   Vec3f angular_velocity{};
   float waking_motion;
   std::uint16_t neighbor_count{};
-  // std::uint16_t particle_contact_count{};
-  // std::uint16_t rigid_body_contact_count{};
-  // std::uint16_t static_body_contact_count{};
   bool marked{};
-  bool visited{};
   bool awake{};
 };
 
@@ -618,12 +522,6 @@ public:
     _groups.resize(max_colors);
   }
 
-  // void reserve(std::size_t count) {
-  //   auto const index = static_cast<std::uint32_t>(_neighbor_pairs.size());
-  //   _neighbor_pairs.resize(_neighbor_pairs.size() + count);
-  //   _groups.push_back({index, index});
-  // }
-
   void count(std::uint16_t color) noexcept {
     ++_groups[color].neighbor_pairs_end;
   }
@@ -774,7 +672,6 @@ public:
       : _state{state}, _chunk{chunk} {}
 
   void run(unsigned) final {
-    // std::cout << "inside run" << std::endl;
     for (auto i = std::size_t{}; i != _chunk->size; ++i) {
       auto const pair = _chunk->pairs[i];
       switch (pair->type) {
@@ -860,11 +757,7 @@ public:
         continue;
       }
     }
-    // std::cout << "got to end of run before count_down()\n";
-    // std::cout << _state->latch << "\n";
-    // std::cout << "end of run 1" << std::endl;
     _state->latch->count_down();
-    // std::cout << "end of run 2" << std::endl;
   }
 
 private:
@@ -1854,7 +1747,6 @@ public:
         .velocity = create_info.velocity,
         .waking_motion = waking_motion_initializer,
         .marked = false,
-        .visited = false,
         .awake = true,
     });
     _particles.data(particle)->aabb_tree_node->payload = particle;
@@ -1898,7 +1790,6 @@ public:
         .angular_velocity = create_info.angular_velocity,
         .waking_motion = waking_motion_initializer,
         .marked = false,
-        .visited = false,
         .awake = true,
     });
     _rigid_bodies.data(rigid_body)->aabb_tree_node->payload = rigid_body;
@@ -1960,22 +1851,10 @@ public:
       if (update_neighbor_group_awake_states(j)) {
         _neighbor_group_awake_indices.emplace_back(j);
         color_neighbor_group(j);
-        // count_neighbor_group_colors(j);
       }
     }
     _color_groups.reserve();
     assign_color_groups();
-    // std::cout << "color counts:\n";
-    // for (auto i = std::size_t{}; i != max_colors; ++i) {
-    //   auto const color = static_cast<std::uint16_t>(i);
-    //   auto const group = _color_groups.group(color);
-    //   if (!group.empty()) {
-    //     std::cout << group.size() << "\n";
-    //   } else {
-    //     std::cout << "\n";
-    //     break;
-    //   }
-    // }
     auto const h = simulate_info.delta_time / simulate_info.substep_count;
     auto const gravitational_delta_velocity = _gravitational_acceleration * h;
     auto const restitution_separating_velocity_threshold =
@@ -2004,7 +1883,6 @@ public:
               {.pairs = group.data() + j,
                .contacts = _solve_contacts.data() + _solve_contacts.size(),
                .size = chunk_size});
-          // std::cout << &_solve_chunks.back() << std::endl;
           _solve_contacts.resize(_solve_contacts.size() + chunk_size);
           _position_solve_tasks.emplace_back(&solve_state,
                                              &_solve_chunks.back());
@@ -2020,7 +1898,6 @@ public:
     auto const time_compensating_waking_motion_smoothing_factor =
         1.0f - std::pow(1.0f - waking_motion_smoothing_factor, h);
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
-      // integrate
       for (auto const j : _neighbor_group_awake_indices) {
         integrate_neighbor_group(
             j,
@@ -2058,30 +1935,6 @@ private:
 
   void set_unmarked(Rigid_body_handle rigid_body) noexcept {
     set_marked(rigid_body, false);
-  }
-
-  bool is_visited(Particle_handle particle) const noexcept {
-    return _particles.data(particle)->visited;
-  }
-
-  bool is_visited(Rigid_body_handle rigid_body) const noexcept {
-    return _rigid_bodies.data(rigid_body)->visited;
-  }
-
-  void set_visited(Particle_handle particle, bool visited = true) noexcept {
-    _particles.data(particle)->visited = visited;
-  }
-
-  void set_visited(Rigid_body_handle rigid_body, bool visited = true) noexcept {
-    _rigid_bodies.data(rigid_body)->visited = visited;
-  }
-
-  void set_unvisited(Particle_handle particle) noexcept {
-    set_visited(particle, false);
-  }
-
-  void set_unvisited(Rigid_body_handle rigid_body) noexcept {
-    set_visited(rigid_body, false);
   }
 
   std::span<Neighbor_pair *const>
@@ -2507,8 +2360,6 @@ private:
         break;
       }
       _coloring_bits.reset();
-      // _coloring_bits.clear();
-      // _coloring_bits.resize(max_colors);
       for (auto i{0}; i != 2; ++i) {
         for (auto const neighbor : neighbors[i]) {
           if (neighbor->color == color_unmarked) {
@@ -2639,7 +2490,6 @@ private:
         for (auto k = std::size_t{}; k != solve_chunk_count; ++k) {
           thread_pool.push(&_velocity_solve_tasks[solve_chunk_index + k]);
         }
-        // simulate_info.thread_pool->notify();
         for (;;) {
           if (latch.try_wait()) {
             break;
