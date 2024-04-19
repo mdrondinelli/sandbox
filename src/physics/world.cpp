@@ -2,7 +2,6 @@
 
 #include <cstdint>
 
-#include <iostream>
 #include <latch>
 
 #include "../util/bit_list.h"
