@@ -576,70 +576,30 @@ struct Positional_constraint_solution {
 
 Positional_constraint_solution
 solve_positional_constraint(Positional_constraint_problem const &problem) {
-  auto constexpr max_rotational_displacement_factor = 0.2f;
-  auto const angular_impulse_per_impulse =
-      std::array<Vec3f, 2>{cross(problem.position[0], problem.direction),
-                           cross(problem.position[1], problem.direction)};
-  auto const angular_displacement_per_impulse = std::array<Vec3f, 2>{
-      problem.inverse_inertia_tensor[0] * angular_impulse_per_impulse[0],
-      problem.inverse_inertia_tensor[1] * angular_impulse_per_impulse[1]};
-  auto const rotational_displacement_per_impulse = std::array<Vec3f, 2>{
-      cross(angular_displacement_per_impulse[0], problem.position[0]),
-      cross(angular_displacement_per_impulse[1], problem.position[1])};
-  auto const correcting_rotational_displacement_per_impulse =
-      std::array<float, 2>{
-          dot(rotational_displacement_per_impulse[0], problem.direction),
-          dot(rotational_displacement_per_impulse[1], problem.direction)};
-  auto const correcting_translational_displacement_per_impulse =
-      std::array<float, 2>{problem.inverse_mass[0], problem.inverse_mass[1]};
-  auto const correcting_displacement_per_impulse =
-      correcting_translational_displacement_per_impulse[0] +
-      correcting_translational_displacement_per_impulse[1] +
-      correcting_rotational_displacement_per_impulse[0] +
-      correcting_rotational_displacement_per_impulse[1];
-  auto const impulse_per_correcting_displacement =
-      1.0f / correcting_displacement_per_impulse;
-  auto const impulse = problem.distance * impulse_per_correcting_displacement;
-  auto correcting_translational_displacement = std::array<float, 2>{
-      impulse * correcting_translational_displacement_per_impulse[0],
-      impulse * -correcting_translational_displacement_per_impulse[1]};
-  auto correcting_rotational_displacement = std::array<float, 2>{
-      impulse * correcting_rotational_displacement_per_impulse[0],
-      impulse * -correcting_rotational_displacement_per_impulse[1]};
-  auto const max_rotational_displacement = std::array<float, 2>{
-      max_rotational_displacement_factor * length(problem.position[0]),
-      max_rotational_displacement_factor * length(problem.position[1])};
-  for (auto i = 0; i != 2; ++i) {
-    if (std::abs(correcting_rotational_displacement[i]) >
-        max_rotational_displacement[i]) {
-      auto const total_displacement = correcting_translational_displacement[i] +
-                                      correcting_rotational_displacement[i];
-      correcting_rotational_displacement[i] =
-          std::signbit(correcting_rotational_displacement[i])
-              ? -max_rotational_displacement[i]
-              : max_rotational_displacement[i];
-      correcting_translational_displacement[i] =
-          total_displacement - correcting_rotational_displacement[i];
-    }
-  }
-  auto const delta_position = std::array<Vec3f, 2>{
-      problem.direction * correcting_translational_displacement[0],
-      problem.direction * correcting_translational_displacement[1],
+  auto const r_1_cross_n = cross(problem.position[0], problem.direction);
+  auto const r_2_cross_n = cross(problem.position[1], problem.direction);
+  auto const w_1 =
+      problem.inverse_mass[0] +
+      dot(r_1_cross_n, problem.inverse_inertia_tensor[0] * r_1_cross_n);
+  auto const w_2 =
+      problem.inverse_mass[1] +
+      dot(r_2_cross_n, problem.inverse_inertia_tensor[1] * r_2_cross_n);
+  auto const delta_lambda = problem.distance / (w_1 + w_2);
+  auto const p = delta_lambda * problem.direction;
+  return {
+      .delta_position =
+          {
+              p * problem.inverse_mass[0],
+              -p * problem.inverse_mass[1],
+          },
+      .delta_orientation =
+          {
+              problem.inverse_inertia_tensor[0] * cross(problem.position[0], p),
+              problem.inverse_inertia_tensor[1] *
+                  cross(problem.position[1], -p),
+          },
+      .lambda = delta_lambda,
   };
-  auto const angular_displacement_per_correcting_rotational_displacement =
-      std::array<Vec3f, 2>{
-          angular_displacement_per_impulse[0] /
-              correcting_rotational_displacement_per_impulse[0],
-          angular_displacement_per_impulse[1] /
-              correcting_rotational_displacement_per_impulse[1]};
-  auto const delta_orientation = std::array<Vec3f, 2>{
-      angular_displacement_per_correcting_rotational_displacement[0] *
-          correcting_rotational_displacement[0],
-      angular_displacement_per_correcting_rotational_displacement[1] *
-          correcting_rotational_displacement[1]};
-  return {.delta_position = delta_position,
-          .delta_orientation = delta_orientation,
-          .lambda = impulse};
 }
 
 struct Solve_state {
