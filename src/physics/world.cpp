@@ -1526,7 +1526,7 @@ public:
     util::System_allocator::instance()->free(_block);
   }
 
-  Particle_handle create(Particle_create_info const &create_info) {
+  Particle_handle create_particle(Particle_create_info const &create_info) {
     auto const bounds =
         Aabb{create_info.position - Vec3f::all(create_info.radius),
              create_info.position + Vec3f::all(create_info.radius)};
@@ -1547,7 +1547,7 @@ public:
     return particle;
   }
 
-  void destroy(Particle_handle particle) {
+  void destroy_particle(Particle_handle particle) {
     _aabb_tree.destroy_leaf(_particles.data(particle)->aabb_tree_node);
     _particles.destroy(particle);
   }
@@ -1564,7 +1564,8 @@ public:
     return _particles.data(particle)->position;
   }
 
-  Rigid_body_handle create(Rigid_body_create_info const &create_info) {
+  Rigid_body_handle
+  create_rigid_body(Rigid_body_create_info const &create_info) {
     auto const transform =
         Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const bounds = physics::bounds(create_info.shape, transform);
@@ -1589,7 +1590,7 @@ public:
     return rigid_body;
   }
 
-  void destroy(Rigid_body_handle rigid_body) {
+  void destroy_rigid_body(Rigid_body_handle rigid_body) {
     _aabb_tree.destroy_leaf(_rigid_bodies.data(rigid_body)->aabb_tree_node);
     _rigid_bodies.destroy(rigid_body);
   }
@@ -1610,7 +1611,8 @@ public:
     return _rigid_bodies.data(rigid_body)->orientation;
   }
 
-  Static_body_handle create(Static_body_create_info const &create_info) {
+  Static_body_handle
+  create_static_body(Static_body_create_info const &create_info) {
     auto const transform =
         Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const transform_inverse = rigid_inverse(transform);
@@ -1626,7 +1628,7 @@ public:
     return static_body;
   }
 
-  void destroy(Static_body_handle handle) {
+  void destroy_static_body(Static_body_handle handle) {
     _aabb_tree.destroy_leaf(_static_bodies.data(handle)->aabb_tree_node);
     _static_bodies.destroy(handle);
   }
@@ -2372,12 +2374,13 @@ World::World(World_create_info const &create_info)
 
 World::~World() {}
 
-Particle_handle World::create(Particle_create_info const &create_info) {
-  return _impl->create(create_info);
+Particle_handle
+World::create_particle(Particle_create_info const &create_info) {
+  return _impl->create_particle(create_info);
 }
 
-void World::destroy(Particle_handle particle) {
-  _impl->destroy(particle);
+void World::destroy_particle(Particle_handle particle) {
+  _impl->destroy_particle(particle);
 }
 
 bool World::is_awake(Particle_handle particle) const noexcept {
@@ -2392,12 +2395,13 @@ math::Vec3f World::get_position(Particle_handle particle) const noexcept {
   return _impl->get_position(particle);
 }
 
-Rigid_body_handle World::create(Rigid_body_create_info const &create_info) {
-  return _impl->create(create_info);
+Rigid_body_handle
+World::create_rigid_body(Rigid_body_create_info const &create_info) {
+  return _impl->create_rigid_body(create_info);
 }
 
-void World::destroy(Rigid_body_handle handle) {
-  _impl->destroy(handle);
+void World::destroy_rigid_body(Rigid_body_handle handle) {
+  _impl->destroy_rigid_body(handle);
 }
 
 bool World::is_awake(Rigid_body_handle rigid_body) const noexcept {
@@ -2417,12 +2421,13 @@ World::get_orientation(Rigid_body_handle rigid_body) const noexcept {
   return _impl->get_orientation(rigid_body);
 }
 
-Static_body_handle World::create(Static_body_create_info const &create_info) {
-  return _impl->create(create_info);
+Static_body_handle
+World::create_static_body(Static_body_create_info const &create_info) {
+  return _impl->create_static_body(create_info);
 }
 
-void World::destroy(Static_body_handle static_rigid_body) {
-  _impl->destroy(static_rigid_body);
+void World::destroy_rigid_body(Static_body_handle static_rigid_body) {
+  _impl->destroy_static_body(static_rigid_body);
 }
 
 void World::simulate(World_simulate_info const &simulate_info) {

@@ -61,7 +61,6 @@ add_executable(
   client
   "src/client/dynamic_prop.cpp"
   "src/client/static_prop.cpp"
-  "src/client/test_entity.cpp"
   "src/client/main.cpp"
 )
 set_target_properties(math_tests util util_tests graphics physics engine client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")

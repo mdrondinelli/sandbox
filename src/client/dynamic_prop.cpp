@@ -28,38 +28,30 @@ Dynamic_prop_manager::create(Dynamic_prop_create_info const &create_info) {
   auto const surface_transform_3x4 = math::Mat3x4f{surface_transform_4x4[0],
                                                    surface_transform_4x4[1],
                                                    surface_transform_4x4[2]};
-  value.surface = _scene->create_surface({.mesh = _surface_mesh,
-                                          .material = _surface_material,
-                                          .transform = surface_transform_3x4});
-  try {
-    value.body = _space->create(
-        {.motion_callback = &value,
-         .shape = _body_shape,
-         .mass = _body_mass,
-         .inertia_tensor = _body_inertia_tensor,
-         .material = _body_material,
-         .position = create_info.position,
-         .velocity = create_info.velocity,
-         .orientation = create_info.orientation,
-         .angular_velocity = create_info.angular_velocity});
-  } catch (...) {
-    _scene->destroy_surface(value.surface);
-    throw;
-  }
-  // try {
-  //   _scene->add_surface(value.surface);
-  // } catch (...) {
-  //   _space->destroy_rigid_body(value.body);
-  //   _graphics->destroy_surface(value.surface);
-  //   throw;
-  // }
+  auto surface = _scene->create_surface_unique({
+      .mesh = _surface_mesh,
+      .material = _surface_material,
+      .transform = surface_transform_3x4,
+  });
+  value.body = _space->create_rigid_body({
+      .motion_callback = &value,
+      .shape = _body_shape,
+      .mass = _body_mass,
+      .inertia_tensor = _body_inertia_tensor,
+      .material = _body_material,
+      .position = create_info.position,
+      .velocity = create_info.velocity,
+      .orientation = create_info.orientation,
+      .angular_velocity = create_info.angular_velocity,
+  });
+  value.surface = surface.release();
   return {_next_entity_handle_value++};
 }
 
 void Dynamic_prop_manager::destroy(Dynamic_prop_handle handle) {
   auto const it = _entities.find(handle.value);
   auto &value = it->second;
-  _space->destroy(value.body);
+  _space->destroy_rigid_body(value.body);
   _scene->destroy_surface(value.surface);
   _entities.erase(it);
 }
