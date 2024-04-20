@@ -29,7 +29,8 @@ public:
   explicit Runtime(physics::World_create_info const &world_create_info,
                    Window_create_info const &window_create_info,
                    Camera_create_info const &camera_create_info)
-      : _threads{std::max(std::thread::hardware_concurrency() / 2 - 1, 1u)},
+      : _threads{std::max(
+            std::max(std::thread::hardware_concurrency() / 2, 1u) - 1, 1u)},
         _world{world_create_info},
         _window{window_create_info},
         _camera{camera_create_info},
@@ -95,15 +96,15 @@ int App::run() {
   assert(_runtime == nullptr);
   auto result = 0;
   // try {
-    _runtime = std::make_unique<Runtime>(_world_create_info,
-                                         Window_create_info{
-                                             .extents = _window_extents,
-                                             .title = _window_title.c_str(),
-                                         },
-                                         _camera_create_info);
-    pre_loop();
-    loop();
-    post_loop();
+  _runtime = std::make_unique<Runtime>(_world_create_info,
+                                       Window_create_info{
+                                           .extents = _window_extents,
+                                           .title = _window_title.c_str(),
+                                       },
+                                       _camera_create_info);
+  pre_loop();
+  loop();
+  post_loop();
   // } catch (std::exception &e) {
   //   std::cerr << "Caught exception: " << e.what() << "\n";
   //   result = 1;
