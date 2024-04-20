@@ -480,7 +480,7 @@ public:
         });
     // _red_ball_manager->create({.position = {-1.5f, 0.5f, -1.5f}});
     // _red_ball_manager->create({.position = {1.5f, 0.5f, 1.5f}});
-    world->create({
+    world->create(physics::Static_body_create_info{
         .shape = physics::Box{{100.0f, 0.5f, 100.0f}},
         .material =
             {

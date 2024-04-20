@@ -106,7 +106,7 @@ public:
       }
       set(_size++, value);
     } else {
-      throw Capacity_error{};
+      throw Capacity_error{"Capacity_error in Bit_list::push_back"};
     }
   }
 
@@ -114,7 +114,7 @@ public:
 
   void resize(std::size_t count) {
     if (max_size() < count) {
-      throw Capacity_error{};
+      throw Capacity_error{"Capacity_error in Bit_list::resize"};
     }
     if (_size < count) {
       if (_size >> 6 == count >> 6) {

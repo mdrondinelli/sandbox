@@ -225,7 +225,7 @@ public:
       ++_size;
       _tail = (_tail + 1) & (_slots.size() - 1);
     } else {
-      throw Capacity_error{};
+      throw Capacity_error{"Capacity_error in Queue::push_back"};
     }
   }
 
@@ -236,7 +236,7 @@ public:
       _tail = (_tail + 1) & (_slots.size() - 1);
       return result;
     } else {
-      throw Capacity_error{};
+      throw Capacity_error{"Capacity_error in Queue::emplace_back"};
     }
   }
 

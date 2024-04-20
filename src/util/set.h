@@ -365,7 +365,7 @@ public:
       try {
         return _nodes.alloc(sizeof(Node));
       } catch (...) {
-        throw Capacity_error{};
+        throw Capacity_error{"Capacity_error in Set::emplace"};
       }
     }();
     auto const node = new (block.begin) Node;
@@ -381,7 +381,7 @@ public:
     try {
       if (bucket.node == nullptr) {
         if (size() == max_size()) {
-          throw Capacity_error{};
+          throw Capacity_error{"Capacity_error in Set::emplace"};
         }
         node->prev(nullptr);
         node->next(_head);
@@ -406,7 +406,7 @@ public:
               return std::pair{Iterator{it}, false};
             } else if (it->next() == nullptr) {
               if (size() == max_size()) {
-                throw Capacity_error();
+                throw Capacity_error{"Capacity_error in Set::emplace"};
               }
               node->prev(it);
               node->next(nullptr);
@@ -423,7 +423,7 @@ public:
           } else if (hash_index(it->hash) == index) {
             if (it->next() == nullptr) {
               if (size() == max_size()) {
-                throw Capacity_error();
+                throw Capacity_error("Capacity_error in Set::emplace");
               }
               node->prev(it);
               node->next(nullptr);
@@ -439,7 +439,7 @@ public:
             }
           } else {
             if (size() == max_size()) {
-              throw Capacity_error();
+              throw Capacity_error("Capacity_error in Set::emplace");
             }
             node->prev(it->prev());
             node->next(it);

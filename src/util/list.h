@@ -93,7 +93,7 @@ public:
       new (_stack_end) T(object);
       ++_stack_end;
     } else {
-      throw Capacity_error{};
+      throw Capacity_error{"Capacity_error in List::push_back"};
     }
   }
 
@@ -103,7 +103,7 @@ public:
       ++_stack_end;
       return result;
     } else {
-      throw Capacity_error{};
+      throw Capacity_error{"Capacity_error in List::emplace_back"};
     }
   }
 
@@ -113,7 +113,7 @@ public:
     auto const stack_end = _stack_end;
     auto const new_stack_end = _begin + count;
     if (new_stack_end > _buffer_end) {
-      throw Capacity_error{};
+      throw Capacity_error{"Capacity_error in List::resize"};
     }
     if (new_stack_end < stack_end) {
       auto it = new_stack_end;
