@@ -27,11 +27,12 @@ Static_prop_manager::create(Static_prop_create_info const &create_info) {
   value.surface = _scene->create_surface({.mesh = _surface_mesh,
                                           .material = _surface_material,
                                           .transform = surface_transform_3x4});
-  value.body =
-      _space->create({.shape = _body_shape,
-                                  .material = _body_material,
-                                  .position = create_info.position,
-                                  .orientation = create_info.orientation});
+  value.body = _space->create(physics::Static_body_create_info{
+      .shape = _body_shape,
+      .material = _body_material,
+      .position = create_info.position,
+      .orientation = create_info.orientation,
+  });
   return {_next_entity_handle_value++};
 }
 
