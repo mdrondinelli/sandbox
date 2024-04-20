@@ -32,7 +32,7 @@ Dynamic_prop_manager::create(Dynamic_prop_create_info const &create_info) {
                                           .material = _surface_material,
                                           .transform = surface_transform_3x4});
   try {
-    value.body = _space->create_rigid_body(
+    value.body = _space->create(
         {.motion_callback = &value,
          .shape = _body_shape,
          .mass = _body_mass,
@@ -59,7 +59,7 @@ Dynamic_prop_manager::create(Dynamic_prop_create_info const &create_info) {
 void Dynamic_prop_manager::destroy(Dynamic_prop_handle handle) {
   auto const it = _entities.find(handle.value);
   auto &value = it->second;
-  _space->destroy_rigid_body(value.body);
+  _space->destroy(value.body);
   _scene->destroy_surface(value.surface);
   _entities.erase(it);
 }

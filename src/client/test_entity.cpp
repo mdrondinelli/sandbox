@@ -72,7 +72,7 @@ Test_entity_manager::create_entity(Test_entity_create_info const &) {
        .transform = math::Mat3x4f{{scale, 0.0f, 0.0f, position.x},
                                   {0.0f, scale, 0.0f, position.y},
                                   {0.0f, 0.0f, scale, position.z}}});
-  value.particle = _space->create_particle(
+  value.particle = _space->create(
       {.motion_callback = &value,
        .radius = scale,
        .mass = density * 4.0f / 3.0f * 3.14f * scale * scale * scale,
@@ -87,7 +87,7 @@ Test_entity_manager::create_entity(Test_entity_create_info const &) {
 void Test_entity_manager::destroy_entity(Test_entity_handle handle) {
   auto const it = _entities.find(handle.value);
   auto &value = it->second;
-  _space->destroy_particle(value.particle);
+  _space->destroy(value.particle);
   _scene->destroy_surface(value.surface);
   _entities.erase(it);
 }

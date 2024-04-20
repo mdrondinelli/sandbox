@@ -33,9 +33,9 @@ public:
 
   ~World();
 
-  Particle_handle create_particle(Particle_create_info const &create_info);
+  Particle_handle create(Particle_create_info const &create_info);
 
-  void destroy_particle(Particle_handle particle);
+  void destroy(Particle_handle particle);
 
   bool is_awake(Particle_handle particle) const noexcept;
 
@@ -43,11 +43,10 @@ public:
 
   math::Vec3f get_position(Particle_handle particle) const noexcept;
 
-  Rigid_body_handle
-  create_rigid_body(Rigid_body_create_info const &create_info);
+  Rigid_body_handle create(Rigid_body_create_info const &create_info);
 
-  void destroy_rigid_body(Rigid_body_handle rigid_body);
-  
+  void destroy(Rigid_body_handle rigid_body);
+
   bool is_awake(Rigid_body_handle rigid_body) const noexcept;
 
   float get_waking_motion(Rigid_body_handle rigid_body) const noexcept;
@@ -56,10 +55,9 @@ public:
 
   math::Quatf get_orientation(Rigid_body_handle rigid_body) const noexcept;
 
-  Static_body_handle
-  create_static_body(Static_body_create_info const &create_info);
+  Static_body_handle create(Static_body_create_info const &create_info);
 
-  void destroy_static_body(Static_body_handle handle);
+  void destroy(Static_body_handle handle);
 
   void simulate(World_simulate_info const &simulate_info);
 
