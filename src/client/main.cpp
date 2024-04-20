@@ -41,9 +41,11 @@ create_wireframe_cube_mesh(graphics::Graphics *graphics);
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
   retval.brick_base_color_texture = create_texture(
-      graphics, "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
+      graphics,
+      "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
   retval.striped_cotton_base_color_texture = create_texture(
-      graphics, "C:/Users/marlo/rendering-engine/res/StripedCotton01_2K_BaseColor.ktx");
+      graphics,
+      "C:/Users/marlo/rendering-engine/res/StripedCotton01_2K_BaseColor.ktx");
   retval.brick_material = graphics->create_surface_material_unique(
       {.base_color_texture = retval.brick_base_color_texture.get()});
   retval.striped_cotton_material = graphics->create_surface_material_unique(
@@ -209,6 +211,7 @@ create_wireframe_cube_mesh(graphics::Graphics *graphics) {
 }
 
 constexpr float physics_delta_time = 1.0f / 128.0f;
+constexpr unsigned physics_substeps = 8;
 
 class Phase {
 public:
@@ -372,14 +375,16 @@ public:
   }
 
   void post_physics() final {
+    auto constexpr spacing = 0.61f;
     _box_spawn_timer += physics_delta_time;
     if (_box_spawn_timer > 0.0f) {
       _box_spawn_timer -= 0.1f;
       auto const size = pyramid_layers - _box_spawn_layer;
       auto const new_box = _box_manager->create({
-          .position = math::Vec3f{0.6f * _box_spawn_row - 0.5f * 0.6f * size,
-                                  0.6f * _box_spawn_layer + 0.4f,
-                                  0.6f * _box_spawn_col - 0.5f * 0.6f * size},
+          .position =
+              math::Vec3f{spacing * _box_spawn_row - 0.5f * spacing * size,
+                          spacing * _box_spawn_layer + 0.4f,
+                          spacing * _box_spawn_col - 0.5f * spacing * size},
           .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
           .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
                                                  math::deg_to_rad(90.0f)),
@@ -423,8 +428,8 @@ public:
                     .gravitational_acceleration = {0.0f, -9.8f, 0.0f},
                 },
             .world_simulate_info = {.delta_time = physics_delta_time,
-                                    .substep_count = 12},
-            .window_extents = {1920, 1080},
+                                    .substep_count = physics_substeps},
+            .window_extents = {1280, 720},
         }} {}
 
   void pre_loop() final {
@@ -450,6 +455,7 @@ public:
                     .restitution_coefficient = 0.3f,
                 },
         });
+    auto const box_mass = 80.0f;
     auto const box_shape = physics::Box{{0.3f, 0.3f, 0.3f}};
     _box_manager = std::make_unique<client::Dynamic_prop_manager>(
         client::Dynamic_prop_manager_create_info{
@@ -461,15 +467,15 @@ public:
                               {0.0f, box_shape.half_extents[1], 0.0f, 0.0f},
                               {0.0f, 0.0f, box_shape.half_extents[2], 0.0f}},
             .space = world,
-            .body_mass = 80.0f,
+            .body_mass = box_mass,
             .body_inertia_tensor =
-                80.0f * physics::solid_inertia_tensor(box_shape),
+                box_mass * physics::solid_inertia_tensor(box_shape),
             .body_shape = box_shape,
             .body_material =
                 {
                     .static_friction_coefficient = 0.3f,
                     .dynamic_friction_coefficient = 0.2f,
-                    .restitution_coefficient = 0.2f,
+                    .restitution_coefficient = 0.08f,
                 },
         });
     // _red_ball_manager->create({.position = {-1.5f, 0.5f, -1.5f}});
@@ -617,13 +623,6 @@ private:
   Pyramid_phase _pyramid_phase;
   std::array<Phase *, 3> _phases;
   std::size_t _phase_index{};
-
-  // int _phase{0};
-  // double _box_spawn_timer{0.0};
-  // float _box_spawn_height{0.5f};
-  // float _box_spawn_offset_x{0.0f};
-  // float _box_spawn_offset_z{0.0f};
-  // float _box_spawn_angle{0.0f};
   double _max_physics_wall_time{0.0};
   double _total_physics_wall_time{0.0};
   double _total_physics_simulated_time{0.0};
