@@ -1428,32 +1428,33 @@ public:
 
   static constexpr std::size_t
   memory_requirement(World_create_info const &create_info) {
-    auto const max_neighbor_pairs =
-        create_info.max_particle_particle_neighbor_pairs +
-        create_info.max_particle_rigid_body_neighbor_pairs +
-        create_info.max_particle_static_body_neighbor_pairs +
-        create_info.max_rigid_body_rigid_body_neighbor_pairs +
-        create_info.max_rigid_body_static_body_neighbor_pairs;
     return Stack_allocator<>::memory_requirement({
         decltype(_aabb_tree)::memory_requirement(
             create_info.max_aabb_tree_leaf_nodes,
             create_info.max_aabb_tree_internal_nodes),
-        decltype(_neighbor_pairs)::memory_requirement(max_neighbor_pairs),
-        decltype(_neighbor_pair_ptrs)::memory_requirement(2 *
-                                                          max_neighbor_pairs),
+        decltype(_neighbor_pairs)::memory_requirement(
+            create_info.max_neighbor_pairs),
+        decltype(_neighbor_pair_ptrs)::memory_requirement(
+            2 * create_info.max_neighbor_pairs),
         decltype(_neighbor_groups)::memory_requirement(
             create_info.max_particles + create_info.max_rigid_bodies,
-            max_neighbor_pairs,
-            create_info.max_contact_groups),
+            create_info.max_neighbor_pairs,
+            create_info.max_neighbor_groups),
         decltype(_neighbor_group_awake_indices)::memory_requirement(
-            create_info.max_contact_groups),
+            create_info.max_neighbor_groups),
         decltype(_coloring_bits)::memory_requirement(max_colors),
-        decltype(_coloring_fringe)::memory_requirement(max_neighbor_pairs),
-        decltype(_color_groups)::memory_requirement(max_neighbor_pairs),
-        decltype(_solve_contacts)::memory_requirement(max_neighbor_pairs),
-        decltype(_solve_chunks)::memory_requirement(max_neighbor_pairs),
-        decltype(_position_solve_tasks)::memory_requirement(max_neighbor_pairs),
-        decltype(_velocity_solve_tasks)::memory_requirement(max_neighbor_pairs),
+        decltype(_coloring_fringe)::memory_requirement(
+            create_info.max_neighbor_pairs),
+        decltype(_color_groups)::memory_requirement(
+            create_info.max_neighbor_pairs),
+        decltype(_solve_contacts)::memory_requirement(
+            create_info.max_neighbor_pairs),
+        decltype(_solve_chunks)::memory_requirement(
+            create_info.max_neighbor_pairs),
+        decltype(_position_solve_tasks)::memory_requirement(
+            create_info.max_neighbor_pairs),
+        decltype(_velocity_solve_tasks)::memory_requirement(
+            create_info.max_neighbor_pairs),
     });
   }
 
@@ -1470,44 +1471,43 @@ public:
                      create_info.max_aabb_tree_leaf_nodes,
                      create_info.max_aabb_tree_internal_nodes)
                      .second;
-    auto const max_neighbor_pairs =
-        create_info.max_particle_particle_neighbor_pairs +
-        create_info.max_particle_rigid_body_neighbor_pairs +
-        create_info.max_particle_static_body_neighbor_pairs +
-        create_info.max_rigid_body_rigid_body_neighbor_pairs +
-        create_info.max_rigid_body_static_body_neighbor_pairs;
-    _neighbor_pairs =
-        util::make_list<Neighbor_pair>(allocator, max_neighbor_pairs).second;
-    _neighbor_pair_ptrs =
-        util::make_list<Neighbor_pair *>(allocator, 2 * max_neighbor_pairs)
-            .second;
+    _neighbor_pairs = util::make_list<Neighbor_pair>(
+                          allocator, create_info.max_neighbor_pairs)
+                          .second;
+    _neighbor_pair_ptrs = util::make_list<Neighbor_pair *>(
+                              allocator, 2 * create_info.max_neighbor_pairs)
+                              .second;
     _neighbor_groups =
         make_neighbor_group_storage(allocator,
                                     create_info.max_particles +
                                         create_info.max_rigid_bodies,
-                                    max_neighbor_pairs,
-                                    create_info.max_contact_groups)
+                                    create_info.max_neighbor_pairs,
+                                    create_info.max_neighbor_groups)
             .second;
     _neighbor_group_awake_indices =
         util::make_list<std::uint32_t>(allocator,
-                                       create_info.max_contact_groups)
+                                       create_info.max_neighbor_groups)
             .second;
     _coloring_bits = util::make_bit_list(allocator, max_colors).second;
     _coloring_bits.resize(max_colors);
-    _coloring_fringe =
-        util::make_queue<Neighbor_pair *>(allocator, max_neighbor_pairs).second;
+    _coloring_fringe = util::make_queue<Neighbor_pair *>(
+                           allocator, create_info.max_neighbor_pairs)
+                           .second;
     _color_groups =
-        make_color_group_storage(allocator, max_neighbor_pairs).second;
+        make_color_group_storage(allocator, create_info.max_neighbor_pairs)
+            .second;
     _solve_contacts =
-        util::make_list<Contact>(allocator, max_neighbor_pairs).second;
+        util::make_list<Contact>(allocator, create_info.max_neighbor_pairs)
+            .second;
     _solve_chunks =
-        util::make_list<Solve_chunk>(allocator, max_neighbor_pairs).second;
-    _position_solve_tasks =
-        util::make_list<Position_solve_task>(allocator, max_neighbor_pairs)
+        util::make_list<Solve_chunk>(allocator, create_info.max_neighbor_pairs)
             .second;
-    _velocity_solve_tasks =
-        util::make_list<Velocity_solve_task>(allocator, max_neighbor_pairs)
-            .second;
+    _position_solve_tasks = util::make_list<Position_solve_task>(
+                                allocator, create_info.max_neighbor_pairs)
+                                .second;
+    _velocity_solve_tasks = util::make_list<Velocity_solve_task>(
+                                allocator, create_info.max_neighbor_pairs)
+                                .second;
   }
 
   ~Impl() {
@@ -1522,6 +1522,7 @@ public:
     _neighbor_groups = {};
     _neighbor_pair_ptrs = {};
     _neighbor_pairs = {};
+    _aabb_tree = {};
     util::System_allocator::instance()->free(_block);
   }
 
