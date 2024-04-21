@@ -14,33 +14,36 @@
 #include "texture.h"
 
 namespace marlon {
+using util::Pool;
+using util::Set;
+using util::Stack_allocator;
+using util::System_allocator;
+
 namespace graphics {
 namespace {
 constexpr std::size_t memory_requirement(std::size_t max_surfaces,
                                          std::size_t max_wireframes) noexcept {
-  return util::Stack_allocator<>::memory_requirement({
-      util::Pool<Gl_surface>::memory_requirement(max_surfaces),
-      util::Pool<Gl_wireframe>::memory_requirement(max_wireframes),
-      util::Set<Gl_surface *>::memory_requirement(max_surfaces),
-      util::Set<Gl_wireframe *>::memory_requirement(max_wireframes),
+  return Stack_allocator<>::memory_requirement({
+      Pool<Gl_surface>::memory_requirement(max_surfaces),
+      Pool<Gl_wireframe>::memory_requirement(max_wireframes),
+      Set<Gl_surface *>::memory_requirement(max_surfaces),
+      Set<Gl_wireframe *>::memory_requirement(max_wireframes),
   });
 }
 } // namespace
 
 Gl_scene::Gl_scene(Scene_create_info const &create_info) noexcept
-    : _memory{util::System_allocator::instance()->alloc(memory_requirement(
+    : _memory{System_allocator::instance()->alloc(memory_requirement(
           create_info.max_surfaces, create_info.max_wireframes))} {
-  auto allocator = util::Stack_allocator<>{_memory};
+  auto allocator = Stack_allocator<>{_memory};
   _surface_pool =
-      util::make_pool<Gl_surface>(allocator, create_info.max_surfaces).second;
+      Pool<Gl_surface>::make(allocator, create_info.max_surfaces).second;
   _wireframe_pool =
-      util::make_pool<Gl_wireframe>(allocator, create_info.max_wireframes)
-          .second;
+      Pool<Gl_wireframe>::make(allocator, create_info.max_wireframes).second;
   _surfaces =
-      util::make_set<Gl_surface *>(allocator, create_info.max_surfaces).second;
+      Set<Gl_surface *>::make(allocator, create_info.max_surfaces).second;
   _wireframes =
-      util::make_set<Gl_wireframe *>(allocator, create_info.max_wireframes)
-          .second;
+      Set<Gl_wireframe *>::make(allocator, create_info.max_wireframes).second;
 }
 
 Gl_scene::~Gl_scene() {
@@ -48,7 +51,7 @@ Gl_scene::~Gl_scene() {
   _surfaces = {};
   _wireframe_pool = {};
   _surface_pool = {};
-  util::System_allocator::instance()->free(_memory);
+  System_allocator::instance()->free(_memory);
 }
 
 Surface *Gl_scene::create_surface(Surface_create_info const &create_info) {

@@ -30,7 +30,7 @@ public:
     return util::Stack_allocator<alignof(Node)>::memory_requirement({
         decltype(_leaf_node_pool)::memory_requirement(leaf_node_capacity),
         decltype(_leaf_node_set)::memory_requirement(leaf_node_capacity),
-        decltype(_leaf_node_array)::memory_requirement(leaf_node_capacity),
+        decltype(_leaf_node_list)::memory_requirement(leaf_node_capacity),
         decltype(_internal_nodes)::memory_requirement(internal_node_capacity),
     });
   }
@@ -53,11 +53,11 @@ public:
                              leaf_node_capacity)),
                          leaf_node_capacity};
     _leaf_node_set =
-        util::make_set<Node *>(allocator, leaf_node_capacity).second;
-    _leaf_node_array =
-        util::make_list<Node *>(allocator, leaf_node_capacity).second;
+        util::Set<Node *>::make(allocator, leaf_node_capacity).second;
+    _leaf_node_list =
+        util::List<Node *>::make(allocator, leaf_node_capacity).second;
     _internal_nodes =
-        util::make_list<Node>(allocator, internal_node_capacity).second;
+        util::List<Node>::make(allocator, internal_node_capacity).second;
   }
 
   Node *create_leaf(Aabb const &bounds, Payload const &payload) {
@@ -90,11 +90,11 @@ public:
       _root_node = nullptr;
     }
     if (_leaf_node_set.size() > 1) {
-      _leaf_node_array.clear();
+      _leaf_node_list.clear();
       for (auto const element : _leaf_node_set) {
-        _leaf_node_array.emplace_back(element);
+        _leaf_node_list.emplace_back(element);
       }
-      _root_node = build_internal_node(_leaf_node_array);
+      _root_node = build_internal_node(_leaf_node_list);
     } else if (_leaf_node_set.size() == 1) {
       for (auto const element : _leaf_node_set) {
         _root_node = element;
@@ -260,7 +260,7 @@ private:
 
   util::Pool<Node> _leaf_node_pool;
   util::Set<Node *> _leaf_node_set;
-  util::List<Node *> _leaf_node_array;
+  util::List<Node *> _leaf_node_list;
   util::List<Node> _internal_nodes;
   Node *_root_node{};
 };

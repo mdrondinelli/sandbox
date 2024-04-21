@@ -109,6 +109,13 @@ public:
     std::size_t _offset;
   };
 
+  template <typename Allocator>
+  static std::pair<Block, Queue> make(Allocator &allocator,
+                                      std::size_t max_size) {
+    auto const block = allocator.alloc(memory_requirement(max_size));
+    return {block, Queue{block, max_size}};
+  }
+
   static constexpr std::size_t
   memory_requirement(std::size_t max_size) noexcept {
     if (max_size != 0) {
@@ -261,13 +268,6 @@ private:
   std::size_t _tail{};
 };
 
-template <typename T, typename Allocator>
-std::pair<Block, Queue<T>> make_queue(Allocator &allocator,
-                                      std::size_t max_size) {
-  auto const block = allocator.alloc(Queue<T>::memory_requirement(max_size));
-  return {block, Queue<T>{block, max_size}};
-}
-
 template <typename T, class Allocator = Polymorphic_allocator>
 class Allocating_queue {
 public:
@@ -326,7 +326,7 @@ public:
 
   void reserve(std::size_t capacity) {
     if (capacity > _impl->capacity()) {
-      auto temp = make_queue<T>(_allocator, capacity).second;
+      auto temp = Queue<T>::make(_allocator, capacity).second;
       for (auto &object : *_impl) {
         temp.emplace_back(std::move(object));
       }

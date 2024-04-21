@@ -75,6 +75,7 @@ TEST_CASE("marlon::util::Map") {
     }
     REQUIRE(marlon_map.size() == 0);
   }
+  marlon_map = {};
 }
 } // namespace util
 } // namespace marlon

@@ -6,6 +6,7 @@
 
 #include "../math/scalar.h"
 #include "../util/bit_list.h"
+#include "../util/lifetime_box.h"
 #include "../util/list.h"
 #include "../util/map.h"
 #include "aabb_tree.h"
@@ -23,6 +24,8 @@ using math::pow;
 
 using util::Bit_list;
 using util::Block;
+using util::Capacity_error;
+using util::Lifetime_box;
 using util::List;
 using util::Map;
 using util::Queue;
@@ -101,48 +104,76 @@ struct Static_body_data {
 };
 
 class Particle_storage {
+  using Allocator = Stack_allocator<>;
+
 public:
-  explicit Particle_storage(std::size_t size) noexcept
-      : _data{std::make_unique<std::byte[]>(size * sizeof(Particle_data))},
-        _free_indices(size),
-        _occupancy_bits(size) {
-    for (auto i = std::size_t{}; i != size; ++i) {
-      _free_indices[i] = static_cast<std::uint32_t>(size - i - 1);
+  template <typename Allocator>
+  static std::pair<Block, Particle_storage> make(Allocator &allocator,
+                                                 std::size_t max_particles) {
+    auto const block = allocator.alloc(memory_requirement(max_particles));
+    return {block, Particle_storage{block, max_particles}};
+  }
+
+  static constexpr std::size_t
+  memory_requirement(std::size_t max_particles) noexcept {
+    return Allocator::memory_requirement({
+        decltype(_data)::memory_requirement(max_particles),
+        decltype(_available_handles)::memory_requirement(max_particles),
+        decltype(_occupancy_bits)::memory_requirement(max_particles),
+    });
+  }
+
+  constexpr Particle_storage() noexcept = default;
+
+  explicit Particle_storage(Block block, std::size_t max_particles) noexcept
+      : Particle_storage{block.begin, max_particles} {}
+
+  explicit Particle_storage(void *block, std::size_t max_particles) noexcept {
+    auto allocator =
+        Allocator{make_block(block, memory_requirement(max_particles))};
+    _data = decltype(_data)::make(allocator, max_particles).second;
+    _data.resize(max_particles);
+    _available_handles =
+        decltype(_available_handles)::make(allocator, max_particles).second;
+    _available_handles.resize(max_particles);
+    for (auto i = std::size_t{}; i != max_particles; ++i) {
+      _available_handles[i] = {
+          static_cast<std::uint32_t>(max_particles - i - 1)};
     }
+    _occupancy_bits = Bit_list::make(allocator, max_particles).second;
+    _occupancy_bits.resize(max_particles);
   }
 
   Particle_handle create(Particle_data const &data) {
-    if (_free_indices.empty()) {
-      throw std::runtime_error{"Out of space for particles"};
+    if (_available_handles.empty()) {
+      throw Capacity_error{"Capacity_error in Particle_storage::create"};
     }
-    auto const index = _free_indices.back();
-    new (_data.get() + sizeof(Particle_data) * index) Particle_data{data};
-    _free_indices.pop_back();
-    _occupancy_bits[index] = true;
-    return Particle_handle{index};
+    auto const result = _available_handles.back();
+    _available_handles.pop_back();
+    _data[result.value].construct(data);
+    _occupancy_bits.set(result.value);
+    return result;
   }
 
   void destroy(Particle_handle particle) {
-    _free_indices.emplace_back(particle.value);
-    _occupancy_bits[particle.value] = false;
+    _available_handles.emplace_back(particle);
+    _occupancy_bits.reset(particle.value);
   }
 
-  Particle_data const *data(Particle_handle handle) const noexcept {
-    return std::launder(reinterpret_cast<Particle_data const *>(
-        _data.get() + sizeof(Particle_data) * handle.value));
+  Particle_data const *data(Particle_handle particle) const noexcept {
+    return _data[particle.value].get();
   }
 
-  Particle_data *data(Particle_handle handle) noexcept {
-    return std::launder(reinterpret_cast<Particle_data *>(
-        _data.get() + sizeof(Particle_data) * handle.value));
+  Particle_data *data(Particle_handle particle) noexcept {
+    return _data[particle.value].get();
   }
 
   template <typename F> void for_each(F &&f) {
-    auto const n = _occupancy_bits.size();
-    auto const m = _occupancy_bits.size() - _free_indices.size();
+    auto const n = _data.size();
+    auto const m = _data.size() - _available_handles.size();
     auto k = std::size_t{};
     for (auto i = std::size_t{}; i != n && k != m; ++i) {
-      if (_occupancy_bits[i]) {
+      if (_occupancy_bits.get(i)) {
         auto const handle = Particle_handle{static_cast<std::uint32_t>(i)};
         f(handle, data(handle));
         ++k;
@@ -151,54 +182,84 @@ public:
   }
 
 private:
-  std::unique_ptr<std::byte[]> _data;
-  std::vector<std::uint32_t> _free_indices;
-  std::vector<bool> _occupancy_bits;
+  List<Lifetime_box<Particle_data>> _data;
+  List<Particle_handle> _available_handles;
+  Bit_list _occupancy_bits;
 };
 
 class Rigid_body_storage {
+  using Allocator = Stack_allocator<>;
+
 public:
-  explicit Rigid_body_storage(std::size_t size)
-      : _data{std::make_unique<std::byte[]>(size * sizeof(Rigid_body_data))},
-        _free_indices(size),
-        _occupancy_bits(size) {
-    for (auto i = std::size_t{}; i != size; ++i) {
-      _free_indices[i] = static_cast<std::uint32_t>(size - i - 1);
+  template <typename Allocator>
+  static std::pair<Block, Rigid_body_storage>
+  make(Allocator &allocator, std::size_t max_rigid_bodies) {
+    auto const block = allocator.alloc(memory_requirement(max_rigid_bodies));
+    return {block, Rigid_body_storage{block, max_rigid_bodies}};
+  }
+
+  static constexpr std::size_t
+  memory_requirement(std::size_t max_rigid_bodies) noexcept {
+    return Allocator::memory_requirement({
+        decltype(_data)::memory_requirement(max_rigid_bodies),
+        decltype(_available_handles)::memory_requirement(max_rigid_bodies),
+        decltype(_occupancy_bits)::memory_requirement(max_rigid_bodies),
+    });
+  }
+
+  constexpr Rigid_body_storage() = default;
+
+  explicit Rigid_body_storage(Block block,
+                              std::size_t max_rigid_bodies) noexcept
+      : Rigid_body_storage{block.begin, max_rigid_bodies} {}
+
+  explicit Rigid_body_storage(void *block,
+                              std::size_t max_rigid_bodies) noexcept {
+    auto allocator =
+        Allocator{make_block(block, memory_requirement(max_rigid_bodies))};
+    _data = decltype(_data)::make(allocator, max_rigid_bodies).second;
+    _data.resize(max_rigid_bodies);
+    _available_handles =
+        decltype(_available_handles)::make(allocator, max_rigid_bodies).second;
+    _available_handles.resize(max_rigid_bodies);
+    for (auto i = std::size_t{}; i != max_rigid_bodies; ++i) {
+      _available_handles[i] = {
+          static_cast<std::uint32_t>(max_rigid_bodies - i - 1)};
     }
+    _occupancy_bits = Bit_list::make(allocator, max_rigid_bodies).second;
+    _occupancy_bits.resize(max_rigid_bodies);
   }
 
   Rigid_body_handle create(Rigid_body_data const &data) {
-    if (_free_indices.empty()) {
-      throw std::runtime_error{"Out of space for static rigid bodies"};
+    if (_available_handles.empty()) {
+      throw Capacity_error{"Capacity_error in Rigid_body_storage::create"};
     }
-    auto const index = _free_indices.back();
-    new (_data.get() + sizeof(Rigid_body_data) * index) Rigid_body_data{data};
-    _free_indices.pop_back();
-    _occupancy_bits[index] = true;
-    return Rigid_body_handle{index};
+    auto const result = _available_handles.back();
+    _available_handles.pop_back();
+    _data[result.value].construct(data);
+    _occupancy_bits.set(result.value);
+    return result;
   }
 
   void destroy(Rigid_body_handle rigid_body) {
-    _free_indices.emplace_back(rigid_body.value);
-    _occupancy_bits[rigid_body.value] = false;
+    _available_handles.emplace_back(rigid_body);
+    _occupancy_bits.reset(rigid_body.value);
   }
 
-  Rigid_body_data const *data(Rigid_body_handle handle) const noexcept {
-    return std::launder(reinterpret_cast<Rigid_body_data const *>(
-        _data.get() + sizeof(Rigid_body_data) * handle.value));
+  Rigid_body_data const *data(Rigid_body_handle rigid_body) const noexcept {
+    return _data[rigid_body.value].get();
   }
 
-  Rigid_body_data *data(Rigid_body_handle handle) noexcept {
-    return std::launder(reinterpret_cast<Rigid_body_data *>(
-        _data.get() + sizeof(Rigid_body_data) * handle.value));
+  Rigid_body_data *data(Rigid_body_handle rigid_body) noexcept {
+    return _data[rigid_body.value].get();
   }
 
   template <typename F> void for_each(F &&f) {
-    auto const n = _occupancy_bits.size();
-    auto const m = _occupancy_bits.size() - _free_indices.size();
+    auto const n = _data.size();
+    auto const m = _data.size() - _available_handles.size();
     auto k = std::size_t{};
     for (auto i = std::size_t{}; i != n && k != m; ++i) {
-      if (_occupancy_bits[i]) {
+      if (_occupancy_bits.get(i)) {
         auto const handle = Rigid_body_handle{static_cast<std::uint32_t>(i)};
         f(handle, data(handle));
         ++k;
@@ -207,46 +268,77 @@ public:
   }
 
 private:
-  std::unique_ptr<std::byte[]> _data;
-  std::vector<std::uint32_t> _free_indices;
-  std::vector<bool> _occupancy_bits;
+  List<Lifetime_box<Rigid_body_data>> _data;
+  List<Rigid_body_handle> _available_handles;
+  Bit_list _occupancy_bits;
 };
 
 class Static_body_storage {
+  using Allocator = Stack_allocator<>;
+
 public:
-  explicit Static_body_storage(std::size_t size) noexcept
-      : _data{std::make_unique<std::byte[]>(size * sizeof(Static_body_data))},
-        _free_indices(size),
-        _occupancy_bits(size) {
-    for (auto i = std::size_t{}; i != size; ++i) {
-      _free_indices[i] = static_cast<std::uint32_t>(size - i - 1);
+  template <typename Allocator>
+  static std::pair<Block, Static_body_storage>
+  make(Allocator &allocator, std::size_t max_static_bodies) {
+    auto const block = allocator.alloc(memory_requirement(max_static_bodies));
+    return {block, Static_body_storage{block, max_static_bodies}};
+  }
+
+  static constexpr std::size_t
+  memory_requirement(std::size_t max_static_bodies) noexcept {
+    return Allocator::memory_requirement({
+        decltype(_data)::memory_requirement(max_static_bodies),
+        decltype(_available_handles)::memory_requirement(max_static_bodies),
+        decltype(_occupancy_bits)::memory_requirement(max_static_bodies),
+    });
+  }
+
+  constexpr Static_body_storage() = default;
+
+  explicit Static_body_storage(Block block,
+                               std::size_t max_static_bodies) noexcept
+      : Static_body_storage{block.begin, max_static_bodies} {}
+
+  explicit Static_body_storage(void *block,
+                               std::size_t max_static_bodies) noexcept {
+    auto allocator =
+        Allocator{make_block(block, memory_requirement(max_static_bodies))};
+    _data = decltype(_data)::make(allocator, max_static_bodies).second;
+    _data.resize(max_static_bodies);
+    _available_handles =
+        decltype(_available_handles)::make(allocator, max_static_bodies).second;
+    _available_handles.resize(max_static_bodies);
+    for (auto i = std::size_t{}; i != max_static_bodies; ++i) {
+      _available_handles[i] = {
+          static_cast<std::uint32_t>(max_static_bodies - i - 1)};
     }
+    _occupancy_bits =
+        decltype(_occupancy_bits)::make(allocator, max_static_bodies).second;
+    _occupancy_bits.resize(max_static_bodies);
   }
 
   Static_body_handle create(Static_body_data const &data) {
-    if (_free_indices.empty()) {
-      throw std::runtime_error{"Out of space for static rigid bodies"};
+    if (_available_handles.empty()) {
+      throw Capacity_error{"Out of space for static rigid bodies"};
     }
-    auto const index = _free_indices.back();
-    new (_data.get() + sizeof(Static_body_data) * index) Static_body_data{data};
-    _free_indices.pop_back();
-    _occupancy_bits[index] = true;
-    return Static_body_handle{index};
+    auto const result = _available_handles.back();
+    _available_handles.pop_back();
+    _data[result.value].construct(data);
+    _occupancy_bits.set(result.value);
+    return result;
   }
 
   void destroy(Static_body_handle static_body) {
-    _free_indices.emplace_back(static_body.value);
-    _occupancy_bits[static_body.value] = false;
+    _available_handles.emplace_back(static_body);
+    _occupancy_bits.reset(static_body.value);
   }
 
-  Static_body_data const *data(Static_body_handle handle) const noexcept {
-    return std::launder(reinterpret_cast<Static_body_data const *>(
-        _data.get() + sizeof(Static_body_data) * handle.value));
+  Static_body_data const *data(Static_body_handle static_body) const noexcept {
+    return _data[static_body.value].get();
   }
 
-  Static_body_data *data(Static_body_handle handle) noexcept {
-    return std::launder(reinterpret_cast<Static_body_data *>(
-        _data.get() + sizeof(Static_body_data) * handle.value));
+  Static_body_data *data(Static_body_handle static_body) noexcept {
+    return _data[static_body.value].get();
   }
 
   template <typename F> void for_each(F &&f) {
@@ -265,15 +357,22 @@ public:
   }
 
 private:
-  std::unique_ptr<std::byte[]> _data;
-  std::vector<std::uint32_t> _free_indices;
-  std::vector<bool> _occupancy_bits;
+  List<Lifetime_box<Static_body_data>> _data;
+  List<Static_body_handle> _available_handles;
+  Bit_list _occupancy_bits;
 };
 
 class Dynamic_object_list {
   using Allocator = Stack_allocator<>;
 
 public:
+  template <typename Allocator>
+  static std::pair<Block, Dynamic_object_list> make(Allocator &allocator,
+                                                    std::size_t max_size) {
+    auto const block = allocator.alloc(memory_requirement(max_size));
+    return {block, Dynamic_object_list{block, max_size}};
+  }
+
   static constexpr std::size_t
   memory_requirement(std::size_t max_size) noexcept {
     return Allocator::memory_requirement(
@@ -290,8 +389,8 @@ public:
                                std::size_t max_size) noexcept {
     auto allocator =
         Allocator{make_block(block_begin, memory_requirement(max_size))};
-    _object_types = make_list<Object_type>(allocator, max_size).second;
-    _object_handles = make_list<Object_handle>(allocator, max_size).second;
+    _object_types = List<Object_type>::make(allocator, max_size).second;
+    _object_handles = List<Object_handle>::make(allocator, max_size).second;
   }
 
   std::variant<Particle_handle, Rigid_body_handle>
@@ -356,14 +455,6 @@ private:
   List<Object_handle> _object_handles;
 };
 
-template <typename Allocator>
-std::pair<Block, Dynamic_object_list>
-make_dynamic_object_list(Allocator &allocator, std::size_t max_size) {
-  auto const block =
-      allocator.alloc(Dynamic_object_list::memory_requirement(max_size));
-  return {block, Dynamic_object_list{block, max_size}};
-}
-
 class Neighbor_group_storage {
   using Allocator = Stack_allocator<>;
 
@@ -374,6 +465,20 @@ public:
     std::uint32_t neighbor_pairs_begin;
     std::uint32_t neighbor_pairs_end;
   };
+
+  template <typename Allocator>
+  static std::pair<Block, Neighbor_group_storage>
+  make(Allocator &allocator,
+       std::size_t max_object_count,
+       std::size_t max_neighbor_pair_count,
+       std::size_t max_group_count) {
+    auto const block = allocator.alloc(memory_requirement(
+        max_object_count, max_neighbor_pair_count, max_group_count));
+    return {
+        block,
+        Neighbor_group_storage{
+            block, max_object_count, max_neighbor_pair_count, max_group_count}};
+  }
 
   static constexpr std::size_t
   memory_requirement(std::size_t max_object_count,
@@ -405,11 +510,11 @@ public:
         block_begin,
         memory_requirement(
             max_object_count, max_neighbor_pair_count, max_group_count))};
-    _objects = make_dynamic_object_list(allocator, max_object_count).second;
+    _objects = decltype(_objects)::make(allocator, max_object_count).second;
     _neighbor_pairs =
-        util::make_list<Neighbor_pair *>(allocator, max_neighbor_pair_count)
+        decltype(_neighbor_pairs)::make(allocator, max_neighbor_pair_count)
             .second;
-    _groups = util::make_list<Group>(allocator, max_group_count).second;
+    _groups = decltype(_groups)::make(allocator, max_group_count).second;
   }
 
   std::size_t object_count() const noexcept { return _objects.size(); }
@@ -476,24 +581,17 @@ private:
   List<Group> _groups;
 };
 
-template <typename Allocator>
-std::pair<Block, Neighbor_group_storage>
-make_neighbor_group_storage(Allocator &allocator,
-                            std::size_t max_object_count,
-                            std::size_t max_neighbor_pair_count,
-                            std::size_t max_group_count) {
-  auto const block = allocator.alloc(Neighbor_group_storage::memory_requirement(
-      max_object_count, max_neighbor_pair_count, max_group_count));
-  return {
-      block,
-      Neighbor_group_storage{
-          block, max_object_count, max_neighbor_pair_count, max_group_count}};
-}
-
 class Color_group_storage {
   using Allocator = Stack_allocator<>;
 
 public:
+  template <typename Allocator>
+  static std::pair<Block, Color_group_storage>
+  make(Allocator &allocator, std::size_t max_neighbor_pairs) {
+    auto const block = allocator.alloc(memory_requirement(max_neighbor_pairs));
+    return {block, Color_group_storage{block, max_neighbor_pairs}};
+  }
+
   static constexpr std::size_t
   memory_requirement(std::size_t max_neighbor_pairs) noexcept {
     return Allocator::memory_requirement({
@@ -511,8 +609,8 @@ public:
     auto allocator =
         Allocator{make_block(block, memory_requirement(max_neighbor_pairs))};
     _neighbor_pairs =
-        util::make_list<Neighbor_pair *>(allocator, max_neighbor_pairs).second;
-    _groups = util::make_list<Group>(allocator, max_colors).second;
+        List<Neighbor_pair *>::make(allocator, max_neighbor_pairs).second;
+    _groups = List<Group>::make(allocator, max_colors).second;
     _groups.resize(max_colors);
   }
 
@@ -557,14 +655,6 @@ private:
   List<Neighbor_pair *> _neighbor_pairs;
   List<Group> _groups;
 };
-
-template <typename Allocator>
-std::pair<Block, Color_group_storage>
-make_color_group_storage(Allocator &allocator, std::size_t max_neighbor_pairs) {
-  auto const block = allocator.alloc(
-      Color_group_storage::memory_requirement(max_neighbor_pairs));
-  return {block, Color_group_storage{block, max_neighbor_pairs}};
-}
 
 struct Positional_constraint_problem {
   Vec3f direction;
@@ -624,7 +714,6 @@ struct Solve_state {
   Particle_storage *particles;
   Rigid_body_storage *rigid_bodies;
   Static_body_storage *static_bodies;
-  // Vec3f gravitational_delta_velocity;
   float inverse_delta_time;
   float restitution_separating_velocity_threshold;
 };
@@ -1429,6 +1518,11 @@ public:
   static constexpr std::size_t
   memory_requirement(World_create_info const &create_info) {
     return Stack_allocator<>::memory_requirement({
+        decltype(_particles)::memory_requirement(create_info.max_particles),
+        decltype(_rigid_bodies)::memory_requirement(
+            create_info.max_rigid_bodies),
+        decltype(_static_bodies)::memory_requirement(
+            create_info.max_static_bodies),
         decltype(_aabb_tree)::memory_requirement(
             create_info.max_aabb_tree_leaf_nodes,
             create_info.max_aabb_tree_internal_nodes),
@@ -1447,8 +1541,7 @@ public:
             create_info.max_neighbor_pairs),
         decltype(_color_groups)::memory_requirement(
             create_info.max_neighbor_pairs),
-        decltype(_solve_contacts)::memory_requirement(
-            create_info.max_neighbor_pairs),
+        decltype(_contacts)::memory_requirement(create_info.max_neighbor_pairs),
         decltype(_solve_chunks)::memory_requirement(
             create_info.max_neighbor_pairs),
         decltype(_position_solve_tasks)::memory_requirement(
@@ -1459,53 +1552,56 @@ public:
   }
 
   explicit Impl(World_create_info const &create_info)
-      : _particles{create_info.max_particles},
-        _static_bodies{create_info.max_static_bodies},
-        _rigid_bodies{create_info.max_rigid_bodies},
-        _gravitational_acceleration{create_info.gravitational_acceleration} {
+      : _gravitational_acceleration{create_info.gravitational_acceleration} {
     _block = util::System_allocator::instance()->alloc(
         memory_requirement(create_info));
     auto allocator = Stack_allocator<>{_block};
+    _particles =
+        Particle_storage::make(allocator, create_info.max_particles).second;
+    _rigid_bodies =
+        Rigid_body_storage::make(allocator, create_info.max_rigid_bodies)
+            .second;
+    _static_bodies =
+        Static_body_storage::make(allocator, create_info.max_static_bodies)
+            .second;
     _aabb_tree = make_aabb_tree<Aabb_tree_payload_t>(
                      allocator,
                      create_info.max_aabb_tree_leaf_nodes,
                      create_info.max_aabb_tree_internal_nodes)
                      .second;
-    _neighbor_pairs = util::make_list<Neighbor_pair>(
-                          allocator, create_info.max_neighbor_pairs)
-                          .second;
-    _neighbor_pair_ptrs = util::make_list<Neighbor_pair *>(
+    _neighbor_pairs =
+        List<Neighbor_pair>::make(allocator, create_info.max_neighbor_pairs)
+            .second;
+    _neighbor_pair_ptrs = List<Neighbor_pair *>::make(
                               allocator, 2 * create_info.max_neighbor_pairs)
                               .second;
     _neighbor_groups =
-        make_neighbor_group_storage(allocator,
-                                    create_info.max_particles +
-                                        create_info.max_rigid_bodies,
-                                    create_info.max_neighbor_pairs,
-                                    create_info.max_neighbor_groups)
+        Neighbor_group_storage::make(allocator,
+                                     create_info.max_particles +
+                                         create_info.max_rigid_bodies,
+                                     create_info.max_neighbor_pairs,
+                                     create_info.max_neighbor_groups)
             .second;
     _neighbor_group_awake_indices =
-        util::make_list<std::uint32_t>(allocator,
-                                       create_info.max_neighbor_groups)
+        List<std::uint32_t>::make(allocator, create_info.max_neighbor_groups)
             .second;
-    _coloring_bits = util::make_bit_list(allocator, max_colors).second;
+    _coloring_bits = Bit_list::make(allocator, max_colors).second;
     _coloring_bits.resize(max_colors);
-    _coloring_fringe = util::make_queue<Neighbor_pair *>(
-                           allocator, create_info.max_neighbor_pairs)
-                           .second;
+    _coloring_fringe =
+        Queue<Neighbor_pair *>::make(allocator, create_info.max_neighbor_pairs)
+            .second;
     _color_groups =
-        make_color_group_storage(allocator, create_info.max_neighbor_pairs)
+        Color_group_storage::make(allocator, create_info.max_neighbor_pairs)
             .second;
-    _solve_contacts =
-        util::make_list<Contact>(allocator, create_info.max_neighbor_pairs)
-            .second;
+    _contacts =
+        List<Contact>::make(allocator, create_info.max_neighbor_pairs).second;
     _solve_chunks =
-        util::make_list<Solve_chunk>(allocator, create_info.max_neighbor_pairs)
+        List<Solve_chunk>::make(allocator, create_info.max_neighbor_pairs)
             .second;
-    _position_solve_tasks = util::make_list<Position_solve_task>(
+    _position_solve_tasks = List<Position_solve_task>::make(
                                 allocator, create_info.max_neighbor_pairs)
                                 .second;
-    _velocity_solve_tasks = util::make_list<Velocity_solve_task>(
+    _velocity_solve_tasks = List<Velocity_solve_task>::make(
                                 allocator, create_info.max_neighbor_pairs)
                                 .second;
   }
@@ -1514,7 +1610,7 @@ public:
     _velocity_solve_tasks = {};
     _position_solve_tasks = {};
     _solve_chunks = {};
-    _solve_contacts = {};
+    _contacts = {};
     _color_groups = {};
     _coloring_fringe = {};
     _coloring_bits = {};
@@ -1659,7 +1755,7 @@ public:
         h_inv,
         2.0f * length(_gravitational_acceleration) * h,
     };
-    _solve_contacts.clear();
+    _contacts.clear();
     _solve_chunks.clear();
     _position_solve_tasks.clear();
     _velocity_solve_tasks.clear();
@@ -1672,9 +1768,9 @@ public:
           auto const chunk_size = min(group.size() - j, max_solve_chunk_size);
           _solve_chunks.push_back(
               {.pairs = group.data() + j,
-               .contacts = _solve_contacts.data() + _solve_contacts.size(),
+               .contacts = _contacts.data() + _contacts.size(),
                .size = chunk_size});
-          _solve_contacts.resize(_solve_contacts.size() + chunk_size);
+          _contacts.resize(_contacts.size() + chunk_size);
           _position_solve_tasks.emplace_back(&solve_state,
                                              &_solve_chunks.back());
           _velocity_solve_tasks.emplace_back(&solve_state,
@@ -2351,10 +2447,10 @@ private:
   }
 
   Block _block;
-  Aabb_tree<Aabb_tree_payload_t> _aabb_tree;
   Particle_storage _particles;
   Static_body_storage _static_bodies;
   Rigid_body_storage _rigid_bodies;
+  Aabb_tree<Aabb_tree_payload_t> _aabb_tree;
   List<Neighbor_pair> _neighbor_pairs;
   List<Neighbor_pair *> _neighbor_pair_ptrs;
   Neighbor_group_storage _neighbor_groups;
@@ -2362,7 +2458,7 @@ private:
   Bit_list _coloring_bits;
   Queue<Neighbor_pair *> _coloring_fringe;
   Color_group_storage _color_groups;
-  List<Contact> _solve_contacts;
+  List<Contact> _contacts;
   List<Solve_chunk> _solve_chunks;
   List<Position_solve_task> _position_solve_tasks;
   List<Velocity_solve_task> _velocity_solve_tasks;

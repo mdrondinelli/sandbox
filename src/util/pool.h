@@ -9,6 +9,13 @@ namespace marlon {
 namespace util {
 template <typename T> class Pool {
 public:
+  template <typename Allocator>
+  static std::pair<Block, Pool> make(Allocator &allocator,
+                                     std::size_t max_objects) {
+    auto const block = allocator.alloc(memory_requirement(max_objects));
+    return {block, Pool{block, max_objects}};
+  }
+
   static constexpr std::size_t
   memory_requirement(std::size_t max_objects) noexcept {
     return sizeof(T) * max_objects;
@@ -47,13 +54,6 @@ private:
                       std::max(sizeof(T), sizeof(void *))>
       _allocator;
 };
-
-template <typename T, typename Allocator>
-std::pair<Block, Pool<T>> make_pool(Allocator &allocator,
-                                    std::size_t max_objects) {
-  auto const block = allocator.alloc(Pool<T>::memory_requirement(max_objects));
-  return {block, Pool<T>(block, max_objects)};
-}
 } // namespace util
 } // namespace marlon
 

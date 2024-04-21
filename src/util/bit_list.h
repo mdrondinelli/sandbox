@@ -1,13 +1,12 @@
 #ifndef MARLON_UTIL_BIT_LIST_H
 #define MARLON_UTIL_BIT_LIST_H
 
-// #include "list.h"
-
 #include <cstddef>
 #include <cstdint>
 
 #include <limits>
 #include <span>
+#include <utility>
 
 #include "capacity_error.h"
 #include "memory.h"
@@ -16,6 +15,13 @@ namespace marlon {
 namespace util {
 class Bit_list {
 public:
+  template <typename Allocator>
+  static std::pair<Block, Bit_list> make(Allocator &allocator,
+                                         std::size_t max_size) noexcept {
+    auto const block = allocator.alloc(memory_requirement(max_size));
+    return {block, Bit_list{block, max_size}};
+  }
+
   static constexpr std::size_t
   memory_requirement(std::size_t max_size) noexcept {
     return (max_size + 63) / 64 * sizeof(std::uint64_t);
@@ -148,13 +154,6 @@ private:
   std::span<std::uint64_t> _data;
   std::size_t _size{};
 };
-
-template <typename Allocator>
-std::pair<Block, Bit_list> make_bit_list(Allocator &allocator,
-                                         std::size_t max_size) {
-  auto const block = allocator.alloc(Bit_list::memory_requirement(max_size));
-  return {block, Bit_list{block, max_size}};
-}
 } // namespace util
 } // namespace marlon
 

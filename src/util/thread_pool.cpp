@@ -11,7 +11,7 @@ Thread_pool::Thread_pool(unsigned thread_count,
     : _push_index{std::size_t{}} {
   auto block = Block{};
   std::tie(block, _threads) =
-      make_list<Thread>(*System_allocator::instance(), thread_count);
+      List<Thread>::make(*System_allocator::instance(), thread_count);
   try {
     for (unsigned i = 0; i != thread_count; ++i) {
       _threads.emplace_back(

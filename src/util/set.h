@@ -137,6 +137,26 @@ public:
     Node *_node;
   };
 
+  template <typename Allocator>
+  static std::pair<Block, Set> make(Allocator &allocator,
+                                    std::size_t max_node_count) {
+    return make(allocator, max_node_count, max_node_count);
+  }
+
+  template <typename Allocator>
+  static std::pair<Block, Set> make(Allocator &allocator,
+                                    std::size_t max_node_count,
+                                    std::size_t max_bucket_count) {
+    auto const block =
+        allocator.alloc(memory_requirement(max_node_count, max_bucket_count));
+    return {block, Set{block, max_node_count, max_bucket_count}};
+  }
+
+  static constexpr std::size_t
+  memory_requirement(std::size_t max_node_count) noexcept {
+    return memory_requirement(max_node_count, max_node_count);
+  }
+
   static constexpr std::size_t
   memory_requirement(std::size_t max_node_count,
                      std::size_t max_bucket_count) noexcept {
@@ -146,11 +166,6 @@ public:
             std::bit_ceil(std::max(max_bucket_count, std::size_t{2}))),
         Pool_allocator<sizeof(Node)>::memory_requirement(max_node_count + 1),
     });
-  }
-
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_node_count) noexcept {
-    return memory_requirement(max_node_count, max_node_count);
   }
 
   constexpr Set() noexcept = default;
@@ -173,14 +188,15 @@ public:
         std::bit_ceil(std::max(max_bucket_count, std::size_t{2}));
     auto allocator = Stack_allocator<_alignment>{make_block(
         block_begin, memory_requirement(max_node_count, max_bucket_count))};
-    _buckets = make_list<Bucket>(allocator, max_bucket_count).second;
+    _buckets = List<Bucket>::make(allocator, max_bucket_count).second;
     _buckets.resize(2);
     _nodes =
         make_pool_allocator<sizeof(Node)>(allocator, max_node_count + 1).second;
   }
 
   Set(Set &&other) noexcept
-      : _buckets{std::move(other._buckets)}, _nodes{std::move(other._nodes)},
+      : _buckets{std::move(other._buckets)},
+        _nodes{std::move(other._nodes)},
         _head{std::exchange(other._head, nullptr)},
         _size{std::exchange(other._size, 0)},
         _max_load_factor{other._max_load_factor} {}
@@ -627,28 +643,6 @@ private:
 template <typename T,
           typename Hash = Hash<T>,
           typename Equal = Equal<T>,
-          typename Allocator>
-std::pair<Block, Set<T, Hash, Equal>> make_set(Allocator &allocator,
-                                               std::size_t max_node_count,
-                                               std::size_t max_bucket_count) {
-  auto const block = allocator.alloc(Set<T, Hash, Equal>::memory_requirement(
-      max_node_count, max_bucket_count));
-  return {block, Set<T, Hash, Equal>{block, max_node_count, max_bucket_count}};
-}
-
-template <typename T,
-          typename Hash = Hash<T>,
-          typename Equal = Equal<T>,
-          typename Allocator>
-std::pair<Block, Set<T, Hash, Equal>> make_set(Allocator &allocator,
-                                               std::size_t max_node_count) {
-  return make_set<T, Hash, Equal, Allocator>(
-      allocator, max_node_count, max_node_count);
-}
-
-template <typename T,
-          typename Hash = Hash<T>,
-          typename Equal = Equal<T>,
           typename Allocator = Polymorphic_allocator>
 class Allocating_set {
 public:
@@ -697,7 +691,7 @@ public:
   void clear() noexcept { _impl->clear(); }
 
   template <typename K> std::pair<Iterator, bool> insert(K &&x) {
-    
+
     prepare_for_new_element();
     return _impl->insert(std::forward<K>(x));
   }

@@ -1,6 +1,8 @@
 #ifndef MARLON_UTIL_STACK_H
 #define MARLON_UTIL_STACK_H
 
+#include <utility>
+
 #include "capacity_error.h"
 #include "lifetime_box.h"
 #include "memory.h"
@@ -11,6 +13,13 @@ template <typename T> class List {
 public:
   using Const_iterator = T const *;
   using Iterator = T *;
+
+  template <typename Allocator>
+  static constexpr std::pair<Block, List> make(Allocator &allocator,
+                                               std::size_t max_size) {
+    auto const block = allocator.alloc(memory_requirement(max_size));
+    return {block, List{block, max_size}};
+  }
 
   static constexpr std::size_t
   memory_requirement(std::size_t max_size) noexcept {
@@ -144,13 +153,6 @@ private:
   T *_buffer_end;
 };
 
-template <typename T, typename Allocator>
-std::pair<Block, List<T>> make_list(Allocator &allocator,
-                                    std::size_t max_size) {
-  auto const block = allocator.alloc(List<T>::memory_requirement(max_size));
-  return {block, List<T>{block, max_size}};
-}
-
 template <typename T, typename Allocator = Polymorphic_allocator>
 class Allocating_list {
 public:
@@ -225,7 +227,7 @@ public:
 
   void reserve(std::size_t capacity) {
     if (capacity > _impl->capacity()) {
-      auto temp = make_list<T>(_allocator, capacity).second;
+      auto temp = List<T>::make(_allocator, capacity).second;
       for (auto &object : *_impl) {
         temp.emplace_back(std::move(object));
       }

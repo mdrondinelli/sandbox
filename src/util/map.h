@@ -5,7 +5,9 @@
 
 namespace marlon {
 namespace util {
-template <typename K, typename V, typename KeyHash = Hash<K>,
+template <typename K,
+          typename V,
+          typename KeyHash = Hash<K>,
           typename KeyEqual = Equal<K>>
 class Map {
   struct PairHash {
@@ -40,6 +42,21 @@ public:
   using Iterator = typename decltype(_impl)::Iterator;
   using Const_iterator = typename decltype(_impl)::Const_iterator;
 
+  template <typename Allocator>
+  static std::pair<Block, Map> make(Allocator &allocator,
+                                    std::size_t max_node_count) {
+    return make(allocator, max_node_count, max_node_count);
+  }
+
+  template <typename Allocator>
+  static std::pair<Block, Map> make(Allocator &allocator,
+                                    std::size_t max_node_count,
+                                    std::size_t max_bucket_count) {
+    auto const block =
+        allocator.alloc(memory_requirement(max_size, max_bucket_count));
+    return {block, Map{block, max_node_count, max_bucket_count}};
+  }
+
   static constexpr std::size_t
   memory_requirement(std::size_t max_node_count) noexcept {
     return memory_requirement(max_node_count, max_node_count);
@@ -57,14 +74,16 @@ public:
   explicit Map(Block block, std::size_t max_node_count) noexcept
       : _impl{block, max_node_count} {}
 
-  explicit Map(Block block, std::size_t max_node_count,
+  explicit Map(Block block,
+               std::size_t max_node_count,
                std::size_t max_bucket_count)
       : _impl{block, max_node_count, max_bucket_count} {}
 
   explicit Map(void *block_begin, std::size_t max_node_count) noexcept
       : _impl{block_begin, max_node_count} {}
 
-  explicit Map(void *block_begin, std::size_t max_node_count,
+  explicit Map(void *block_begin,
+               std::size_t max_node_count,
                std::size_t max_bucket_count) noexcept
       : _impl{block_begin, max_node_count, max_bucket_count} {}
 
@@ -135,25 +154,6 @@ public:
 
   void rehash(std::size_t count) noexcept { _impl.rehash(count); }
 };
-
-template <typename K, typename V, typename KeyHash = Hash<K>,
-          typename KeyEqual = Equal<K>, typename Allocator>
-std::pair<Block, Map<K, V, KeyHash, KeyEqual>>
-make_map(Allocator &allocator, std::size_t max_size) {
-  return make_map<K, V, KeyHash, KeyEqual, Allocator>(allocator, max_size, max_size);
-}
-
-template <typename K, typename V, typename KeyHash = Hash<K>,
-          typename KeyEqual = Equal<K>, typename Allocator>
-std::pair<Block, Map<K, V, KeyHash, KeyEqual>>
-make_map(Allocator &allocator, std::size_t max_size,
-         std::size_t max_bucket_count) {
-  auto const block =
-      allocator.alloc(Map<K, V, KeyHash, KeyEqual>::memory_requirement(
-          max_size, max_bucket_count));
-  return {block,
-          Map<K, V, KeyHash, KeyEqual>{block, max_size, max_bucket_count}};
-}
 } // namespace util
 } // namespace marlon
 
