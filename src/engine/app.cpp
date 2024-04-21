@@ -22,6 +22,8 @@
 
 namespace marlon {
 using namespace math;
+using util::Scheduling_policy;
+using util::Thread_pool;
 
 namespace engine {
 class App::Runtime {
@@ -44,7 +46,7 @@ public:
         }()},
         _scene{_graphics.create_scene_unique({})} {}
 
-  util::Thread_pool *get_threads() noexcept { return &_threads; }
+  Thread_pool *get_threads() noexcept { return &_threads; }
 
   physics::World *get_world() noexcept { return &_world; }
 
@@ -74,7 +76,7 @@ public:
   }
 
 private:
-  util::Thread_pool _threads;
+  Thread_pool _threads;
   physics::World _world;
   Glfw_init_guard _glfw_init_guard;
   Window _window;
@@ -165,10 +167,10 @@ void App::loop() {
       auto world_simulate_info = _world_simulate_info;
       world_simulate_info.thread_pool = _runtime->get_threads();
       world_simulate_info.thread_pool->set_scheduling_policy(
-          util::Scheduling_policy::spin);
+          Scheduling_policy::spin);
       _runtime->get_world()->simulate(world_simulate_info);
       world_simulate_info.thread_pool->set_scheduling_policy(
-          util::Scheduling_policy::block);
+          Scheduling_policy::block);
       auto const physics_end_time = clock::now();
       _physics_simulation_wall_time = std::chrono::duration_cast<duration>(
                                           physics_end_time - physics_begin_time)
