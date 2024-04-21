@@ -1051,16 +1051,16 @@ private:
   }
 
   void apply_impulse(Rigid_body_data *rigid_body,
-                     Mat3x3f const &inverse_inertia_tensor,
+                     Mat3x3f const &rotated_inverse_inertia_tensor,
                      Vec3f const &local_position,
                      Vec3f const &local_impulse,
                      Vec3f const &global_impulse) const noexcept {
     rigid_body->position += global_impulse * rigid_body->inverse_mass;
-    rigid_body->orientation +=
-        0.5f *
-        Quatf{0.0f,
-              inverse_inertia_tensor * cross(local_position, local_impulse)} *
-        rigid_body->orientation;
+    rigid_body->orientation += 0.5f *
+                               Quatf{0.0f,
+                                     rotated_inverse_inertia_tensor *
+                                         cross(local_position, local_impulse)} *
+                               rigid_body->orientation;
   }
 
   void apply_impulse(Static_body_data *,
