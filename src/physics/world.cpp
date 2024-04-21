@@ -989,6 +989,16 @@ private:
         contact.lambda_n * local_normal[0],
         contact.lambda_n * local_normal[1],
     };
+    apply_impulse(data.first,
+                  rotation[0] * inverse_inertia_tensor[0],
+                  contact.local_positions[0],
+                  local_impulse[0],
+                  global_impulse);
+    apply_impulse(data.second,
+                  rotation[1] * inverse_inertia_tensor[1],
+                  contact.local_positions[1],
+                  -local_impulse[1],
+                  -global_impulse);
     auto const current_contact_position = std::array<Vec3f, 2>{
         get_position(data.first) + rotation[0] * contact.local_positions[0],
         get_position(data.second) + rotation[1] * contact.local_positions[1],
@@ -1025,21 +1035,21 @@ private:
                   data.second->material.static_friction_coefficient);
       if (lambda_t < static_friction_coefficient * contact.lambda_n) {
         contact.lambda_t = lambda_t;
-        global_impulse += contact.lambda_t * correction_direction;
-        local_impulse[0] += contact.lambda_t * local_correction_direction[0];
-        local_impulse[1] += contact.lambda_t * local_correction_direction[1];
+        global_impulse = contact.lambda_t * correction_direction;
+        local_impulse[0] = contact.lambda_t * local_correction_direction[0];
+        local_impulse[1] = contact.lambda_t * local_correction_direction[1];
+        apply_impulse(data.first,
+                      rotation[0] * inverse_inertia_tensor[0],
+                      contact.local_positions[0],
+                      local_impulse[0],
+                      global_impulse);
+        apply_impulse(data.second,
+                      rotation[1] * inverse_inertia_tensor[1],
+                      contact.local_positions[1],
+                      -local_impulse[1],
+                      -global_impulse);
       }
     }
-    apply_impulse(data.first,
-                  rotation[0] * inverse_inertia_tensor[0],
-                  contact.local_positions[0],
-                  local_impulse[0],
-                  global_impulse);
-    apply_impulse(data.second,
-                  rotation[1] * inverse_inertia_tensor[1],
-                  contact.local_positions[1],
-                  -local_impulse[1],
-                  -global_impulse);
   }
 
   void apply_impulse(Particle_data *particle,
@@ -1228,6 +1238,10 @@ private:
                      Contact const &contact) const noexcept {
     auto const data =
         std::pair{get_data(objects.first), get_data(objects.second)};
+    auto const inverse_inertia_tensor = std::array<Mat3x3f, 2>{
+        get_inverse_inertia_tensor(data.first),
+        get_inverse_inertia_tensor(data.second),
+    };
     auto const rotation = std::array<Mat3x3f, 2>{
         get_rotation(data.first),
         get_rotation(data.second),
@@ -1236,47 +1250,42 @@ private:
         rotation[0] * contact.local_positions[0],
         rotation[1] * contact.local_positions[1],
     };
-    auto const relative_velocity =
-        get_velocity(data.first, relative_position[0]) -
-        get_velocity(data.second, relative_position[1]);
-    auto const separating_velocity = dot(contact.normal, relative_velocity);
-    auto const tangential_velocity =
-        relative_velocity - contact.normal * separating_velocity;
-    auto const delta_velocity =
-        get_friction_velocity_update(data, contact, tangential_velocity) +
-        get_restitution_velocity_update(data, contact, separating_velocity);
-    if (delta_velocity != Vec3f::zero()) {
-      auto const I_inv_1 = get_inverse_inertia_tensor(data.first);
-      auto const I_inv_2 = get_inverse_inertia_tensor(data.second);
-      auto const delta_velocity_direction = normalize(delta_velocity);
-      auto const w_1 = get_generalized_inverse_mass(
-          data.first, I_inv_1, relative_position[0], delta_velocity_direction);
-      auto const w_2 = get_generalized_inverse_mass(
-          data.second, I_inv_2, relative_position[1], delta_velocity_direction);
-      auto const impulse = delta_velocity / (w_1 + w_2);
-      apply_impulse(data.first, I_inv_1, relative_position[0], impulse);
-      apply_impulse(data.second, I_inv_2, relative_position[1], -impulse);
+    apply_restitution(data, contact, inverse_inertia_tensor, relative_position);
+    if (!std::is_same_v<T, U> && contact.lambda_t == 0.0f) {
+      apply_dynamic_friction(
+          data, contact, inverse_inertia_tensor, relative_position);
     }
   }
 
   template <typename T, typename U>
-  Vec3f get_friction_velocity_update(
+  void apply_restitution(
       std::pair<T, U> data,
       Contact const &contact,
-      Vec3f const &tangential_velocity) const noexcept {
-    if (tangential_velocity != Vec3f::zero()) {
-      auto const friction_coefficient =
-          0.5f * (get_dynamic_friction_coefficient(data.first) +
-                  get_dynamic_friction_coefficient(data.second));
-      auto const tangential_speed = length(tangential_velocity);
-      auto const delta_velocity_direction =
-          -tangential_velocity / tangential_speed;
-      return delta_velocity_direction *
-             min(friction_coefficient * contact.lambda_n *
-                     _state->inverse_delta_time,
-                 tangential_speed);
-    } else {
-      return Vec3f::zero();
+      std::array<Mat3x3f, 2> const &inverse_inertia_tensor,
+      std::array<Vec3f, 2> const &relative_position) const noexcept {
+    auto const relative_velocity =
+        get_velocity(data.first, relative_position[0]) -
+        get_velocity(data.second, relative_position[1]);
+    auto const separating_velocity = dot(contact.normal, relative_velocity);
+    auto const delta_velocity =
+        get_restitution_velocity_update(data, contact, separating_velocity);
+    if (delta_velocity != Vec3f::zero()) {
+      auto const delta_velocity_direction = normalize(delta_velocity);
+      auto const w_1 = get_generalized_inverse_mass(data.first,
+                                                    inverse_inertia_tensor[0],
+                                                    relative_position[0],
+                                                    delta_velocity_direction);
+      auto const w_2 = get_generalized_inverse_mass(data.second,
+                                                    inverse_inertia_tensor[0],
+                                                    relative_position[1],
+                                                    delta_velocity_direction);
+      auto const impulse = delta_velocity / (w_1 + w_2);
+      apply_impulse(
+          data.first, inverse_inertia_tensor[0], relative_position[0], impulse);
+      apply_impulse(data.second,
+                    inverse_inertia_tensor[1],
+                    relative_position[1],
+                    -impulse);
     }
   }
 
@@ -1297,6 +1306,61 @@ private:
     return contact.normal *
            (-separating_velocity +
             min(-restitution_coefficient * contact.separating_velocity, 0.0f));
+  }
+
+  template <typename T, typename U>
+  void apply_dynamic_friction(
+      std::pair<T, U> data,
+      Contact const &contact,
+      std::array<Mat3x3f, 2> const &inverse_inertia_tensor,
+      std::array<Vec3f, 2> const &relative_position) const noexcept {
+    auto const relative_velocity =
+        get_velocity(data.first, relative_position[0]) -
+        get_velocity(data.second, relative_position[1]);
+    auto const separating_velocity = dot(contact.normal, relative_velocity);
+    auto const tangential_velocity =
+        relative_velocity - contact.normal * separating_velocity;
+    auto const delta_velocity =
+        get_friction_velocity_update(data, contact, tangential_velocity);
+    if (delta_velocity != Vec3f::zero()) {
+      auto const delta_velocity_direction = normalize(delta_velocity);
+      auto const w_1 = get_generalized_inverse_mass(data.first,
+                                                    inverse_inertia_tensor[0],
+                                                    relative_position[0],
+                                                    delta_velocity_direction);
+      auto const w_2 = get_generalized_inverse_mass(data.second,
+                                                    inverse_inertia_tensor[1],
+                                                    relative_position[1],
+                                                    delta_velocity_direction);
+      auto const impulse = delta_velocity / (w_1 + w_2);
+      apply_impulse(
+          data.first, inverse_inertia_tensor[0], relative_position[0], impulse);
+      apply_impulse(data.second,
+                    inverse_inertia_tensor[1],
+                    relative_position[1],
+                    -impulse);
+    }
+  }
+
+  template <typename T, typename U>
+  Vec3f get_friction_velocity_update(
+      std::pair<T, U> data,
+      Contact const &contact,
+      Vec3f const &tangential_velocity) const noexcept {
+    if (tangential_velocity != Vec3f::zero()) {
+      auto const dynamic_friction_coefficient =
+          0.5f * (get_dynamic_friction_coefficient(data.first) +
+                  get_dynamic_friction_coefficient(data.second));
+      auto const tangential_speed = length(tangential_velocity);
+      auto const delta_velocity_direction =
+          -tangential_velocity / tangential_speed;
+      return delta_velocity_direction *
+             min(dynamic_friction_coefficient * contact.lambda_n *
+                     _state->inverse_delta_time,
+                 tangential_speed);
+    } else {
+      return Vec3f::zero();
+    }
   }
 
   void apply_impulse(Particle_data *particle,
@@ -1391,6 +1455,22 @@ private:
     return 0.0f;
   }
 
+  // float
+  // get_static_friction_coefficient(Particle_data *particle) const noexcept {
+  //   return particle->material.static_friction_coefficient;
+  // }
+
+  // float
+  // get_static_friction_coefficient(Rigid_body_data *rigid_body) const noexcept
+  // {
+  //   return rigid_body->material.static_friction_coefficient;
+  // }
+
+  // float get_static_friction_coefficient(
+  //     Static_body_data *static_body) const noexcept {
+  //   return static_body->material.static_friction_coefficient;
+  // }
+
   float
   get_dynamic_friction_coefficient(Particle_data *particle) const noexcept {
     return particle->material.dynamic_friction_coefficient;
@@ -1438,10 +1518,10 @@ private:
 
 // integration constants
 auto constexpr velocity_damping_factor = 0.99f;
-auto constexpr waking_motion_epsilon = 1.0f / 256.0f;
+auto constexpr waking_motion_epsilon = 0.01f;
 auto constexpr waking_motion_initializer = 2.0f * waking_motion_epsilon;
-auto constexpr waking_motion_limit = 8.0f * waking_motion_epsilon;
-auto constexpr waking_motion_smoothing_factor = 7.0f / 8.0f;
+auto constexpr waking_motion_limit = 10.0f * waking_motion_epsilon;
+auto constexpr waking_motion_smoothing_factor = 0.8f;
 } // namespace
 
 class World::Impl {
