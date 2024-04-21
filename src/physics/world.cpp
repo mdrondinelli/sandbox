@@ -657,53 +657,34 @@ private:
 };
 
 struct Positional_constraint_problem {
-  Vec3f direction;
+  std::array<Vec3f, 2> local_position;
+  std::array<Vec3f, 2> local_direction;
   float distance;
-  std::array<Vec3f, 2> relative_position;
   std::array<float, 2> inverse_mass;
   std::array<Mat3x3f, 2> inverse_inertia_tensor;
 };
 
-struct Positional_constraint_solution {
-  std::array<Vec3f, 2> delta_position;
-  std::array<Vec3f, 2> delta_orientation;
-  float delta_lambda;
-};
-
-Positional_constraint_solution
-solve_positional_constraint(Positional_constraint_problem const &problem) {
-  auto const &n = problem.direction;
+float solve_positional_constraint(
+    Positional_constraint_problem const &problem) {
+  auto const &r_1 = problem.local_position[0];
+  auto const &r_2 = problem.local_position[1];
+  auto const &n_1 = problem.local_direction[0];
+  auto const &n_2 = problem.local_direction[1];
   auto const c = problem.distance;
-  auto const &r_1 = problem.relative_position[0];
-  auto const &r_2 = problem.relative_position[1];
   auto const m_inv_1 = problem.inverse_mass[0];
   auto const m_inv_2 = problem.inverse_mass[1];
   auto const &I_inv_1 = problem.inverse_inertia_tensor[0];
   auto const &I_inv_2 = problem.inverse_inertia_tensor[1];
-  auto const r_1_cross_n = cross(r_1, n);
-  auto const r_2_cross_n = cross(r_2, n);
+  auto const r_1_cross_n = cross(r_1, n_1);
+  auto const r_2_cross_n = cross(r_2, n_2);
   auto const w_1 = m_inv_1 + dot(r_1_cross_n, I_inv_1 * r_1_cross_n);
   auto const w_2 = m_inv_2 + dot(r_2_cross_n, I_inv_2 * r_2_cross_n);
-  auto const delta_lambda = c / (w_1 + w_2);
-  auto const p = delta_lambda * n;
-  return {
-      .delta_position =
-          {
-              p * m_inv_1,
-              -p * m_inv_2,
-          },
-      .delta_orientation =
-          {
-              I_inv_1 * cross(r_1, p),
-              I_inv_2 * cross(r_2, -p),
-          },
-      .delta_lambda = delta_lambda,
-  };
+  return c / (w_1 + w_2);
 }
 
 struct Contact {
   Vec3f normal;
-  std::array<Vec3f, 2> relative_positions;
+  std::array<Vec3f, 2> local_positions;
   float separating_velocity;
   float lambda_n;
   float lambda_t;
@@ -803,9 +784,11 @@ private:
     if (auto const contact_geometry = get_contact_geometry(data)) {
       auto const relative_position =
           contact_geometry->position - get_position(data.second);
+      auto const local_position =
+          transpose(get_rotation(data.second)) * relative_position;
       auto contact = Contact{
           .normal = contact_geometry->normal,
-          .relative_positions = {Vec3f{}, relative_position},
+          .local_positions = {Vec3f{}, local_position},
           .separating_velocity =
               dot(get_velocity(data.first) -
                       get_velocity(data.second, relative_position),
@@ -844,9 +827,13 @@ private:
           contact_geometry->position - get_position(data.first),
           contact_geometry->position - get_position(data.second),
       };
+      auto const local_positions = std::array<Vec3f, 2>{
+          transpose(get_rotation(data.first)) * relative_positions[0],
+          transpose(get_rotation(data.second)) * relative_positions[1],
+      };
       auto contact = Contact{
           .normal = contact_geometry->normal,
-          .relative_positions = relative_positions,
+          .local_positions = local_positions,
           .separating_velocity =
               dot(get_velocity(data.first, relative_positions[0]) -
                       get_velocity(data.second, relative_positions[1]),
@@ -866,9 +853,11 @@ private:
     if (auto const contact_geometry = get_contact_geometry(data)) {
       auto const relative_position =
           contact_geometry->position - get_position(data.first);
+      auto const local_position =
+          transpose(get_rotation(data.first)) * relative_position;
       auto contact = Contact{
           .normal = contact_geometry->normal,
-          .relative_positions = {relative_position, Vec3f{}},
+          .local_positions = {local_position, Vec3f{}},
           .separating_velocity =
               dot(get_velocity(data.first, relative_position),
                   contact_geometry->normal),
@@ -968,94 +957,117 @@ private:
   void solve_contact(std::pair<T, U> data,
                      Contact &contact,
                      float separation) const noexcept {
-    auto const previous_rotation = std::array<Mat3x3f, 2>{
-        Mat3x3f::rotation(get_previous_orientation(data.first)),
-        Mat3x3f::rotation(get_previous_orientation(data.second)),
-    };
     auto const rotation = std::array<Mat3x3f, 2>{
-        Mat3x3f::rotation(get_orientation(data.first)),
-        Mat3x3f::rotation(get_orientation(data.second)),
+        get_rotation(data.first),
+        get_rotation(data.second),
     };
     auto const inverse_rotation = std::array<Mat3x3f, 2>{
         transpose(rotation[0]),
         transpose(rotation[1]),
+    };
+    auto const local_normal = std::array<Vec3f, 2>{
+        inverse_rotation[0] * contact.normal,
+        inverse_rotation[1] * contact.normal,
     };
     auto const inverse_mass = std::array<float, 2>{
         get_inverse_mass(data.first),
         get_inverse_mass(data.second),
     };
     auto const inverse_inertia_tensor = std::array<Mat3x3f, 2>{
-        rotation[0] * get_inverse_inertia_tensor(data.first) *
-            inverse_rotation[0],
-        rotation[1] * get_inverse_inertia_tensor(data.second) *
-            inverse_rotation[1],
+        get_inverse_inertia_tensor(data.first),
+        get_inverse_inertia_tensor(data.second),
     };
-    auto const separation_solution = solve_positional_constraint({
-        .direction = contact.normal,
+    contact.lambda_n = solve_positional_constraint({
+        .local_position = contact.local_positions,
+        .local_direction = local_normal,
         .distance = -separation,
-        .relative_position = contact.relative_positions,
         .inverse_mass = inverse_mass,
         .inverse_inertia_tensor = inverse_inertia_tensor,
     });
-    contact.lambda_n = separation_solution.delta_lambda;
-    auto const relative_contact_movement =
-        ((get_position(data.first) + contact.relative_positions[0]) -
-         (get_previous_position(data.first) +
-          previous_rotation[0] * inverse_rotation[0] *
-              contact.relative_positions[0])) -
-        ((get_position(data.second) + contact.relative_positions[1]) -
-         (get_previous_position(data.second) +
-          previous_rotation[1] * inverse_rotation[1] *
-              contact.relative_positions[1]));
-    auto const tangential_relative_contact_movement =
-        perp_unit(relative_contact_movement, contact.normal);
-    auto delta_position = separation_solution.delta_position;
-    auto delta_orientation = separation_solution.delta_orientation;
-    if (tangential_relative_contact_movement != Vec3f::zero()) {
+    auto global_impulse = contact.lambda_n * contact.normal;
+    auto local_impulse = std::array<Vec3f, 2>{
+        contact.lambda_n * local_normal[0],
+        contact.lambda_n * local_normal[1],
+    };
+    auto const current_contact_position = std::array<Vec3f, 2>{
+        get_position(data.first) + rotation[0] * contact.local_positions[0],
+        get_position(data.second) + rotation[1] * contact.local_positions[1],
+    };
+    auto const previous_contact_position = std::array<Vec3f, 2>{
+        get_previous_position(data.first) +
+            get_previous_rotation(data.first) * contact.local_positions[0],
+        get_previous_position(data.second) +
+            get_previous_rotation(data.second) * contact.local_positions[1],
+    };
+    auto const relative_contact_motion =
+        (current_contact_position[0] - previous_contact_position[0]) -
+        (current_contact_position[1] - previous_contact_position[1]);
+    auto const tangential_relative_contact_motion =
+        perp_unit(relative_contact_motion, contact.normal);
+    if (tangential_relative_contact_motion != Vec3f::zero()) {
       auto const correction_distance =
-          length(tangential_relative_contact_movement);
+          length(tangential_relative_contact_motion);
       auto const correction_direction =
-          tangential_relative_contact_movement / -correction_distance;
-      auto const friction_solution = solve_positional_constraint(
-          {.direction = correction_direction,
-           .distance = correction_distance,
-           .relative_position = contact.relative_positions,
-           .inverse_mass = inverse_mass,
-           .inverse_inertia_tensor = inverse_inertia_tensor});
+          tangential_relative_contact_motion / -correction_distance;
+      auto const local_correction_direction = std::array<Vec3f, 2>{
+          inverse_rotation[0] * correction_direction,
+          inverse_rotation[1] * correction_direction,
+      };
+      auto const lambda_t = solve_positional_constraint({
+          .local_position = contact.local_positions,
+          .local_direction = local_correction_direction,
+          .distance = correction_distance,
+          .inverse_mass = inverse_mass,
+          .inverse_inertia_tensor = inverse_inertia_tensor,
+      });
       auto const static_friction_coefficient =
           0.5f * (data.first->material.static_friction_coefficient +
                   data.second->material.static_friction_coefficient);
-      if (friction_solution.delta_lambda <
-          static_friction_coefficient * contact.lambda_n) {
-        contact.lambda_t = friction_solution.delta_lambda;
-        for (auto i = 0; i != 2; ++i) {
-          delta_position[i] += friction_solution.delta_position[i];
-          delta_orientation[i] += friction_solution.delta_orientation[i];
-        }
+      if (lambda_t < static_friction_coefficient * contact.lambda_n) {
+        contact.lambda_t = lambda_t;
+        global_impulse += contact.lambda_t * correction_direction;
+        local_impulse[0] += contact.lambda_t * local_correction_direction[0];
+        local_impulse[1] += contact.lambda_t * local_correction_direction[1];
       }
     }
-    update_position(data.first, delta_position[0], delta_orientation[0]);
-    update_position(data.second, delta_position[1], delta_orientation[1]);
+    apply_impulse(data.first,
+                  rotation[0] * inverse_inertia_tensor[0],
+                  contact.local_positions[0],
+                  local_impulse[0],
+                  global_impulse);
+    apply_impulse(data.second,
+                  rotation[1] * inverse_inertia_tensor[1],
+                  contact.local_positions[1],
+                  -local_impulse[1],
+                  -global_impulse);
   }
 
-  void update_position(Particle_data *particle,
-                       Vec3f const &delta_position,
-                       Vec3f const &) const noexcept {
-    particle->position += delta_position;
+  void apply_impulse(Particle_data *particle,
+                     Mat3x3f const &,
+                     Vec3f const &,
+                     Vec3f const &,
+                     Vec3f const &global_impulse) const noexcept {
+    particle->position += global_impulse * particle->inverse_mass;
   }
 
-  void update_position(Rigid_body_data *body,
-                       Vec3f const &delta_position,
-                       Vec3f const &delta_orientation) const noexcept {
-    body->position += delta_position;
-    body->orientation +=
-        0.5f * Quatf{0.0f, delta_orientation} * body->orientation;
-    body->orientation = normalize(body->orientation);
+  void apply_impulse(Rigid_body_data *rigid_body,
+                     Mat3x3f const &inverse_inertia_tensor,
+                     Vec3f const &local_position,
+                     Vec3f const &local_impulse,
+                     Vec3f const &global_impulse) const noexcept {
+    rigid_body->position += global_impulse * rigid_body->inverse_mass;
+    rigid_body->orientation +=
+        0.5f *
+        Quatf{0.0f,
+              inverse_inertia_tensor * cross(local_position, local_impulse)} *
+        rigid_body->orientation;
   }
 
-  void update_position(Static_body_data *,
-                       Vec3f const &,
-                       Vec3f const &) const noexcept {}
+  void apply_impulse(Static_body_data *,
+                     Mat3x3f const &,
+                     Vec3f const &,
+                     Vec3f const &,
+                     Vec3f const &) const noexcept {}
 
   Vec3f get_previous_position(Particle_data *particle) const noexcept {
     return particle->previous_position;
@@ -1081,28 +1093,36 @@ private:
     return column(static_body->transform, 3);
   }
 
-  Quatf get_previous_orientation(Particle_data *) const noexcept {
-    return Quatf::identity();
+  Mat3x3f get_previous_rotation(Particle_data *particle) const noexcept {
+    return get_rotation(particle);
   }
 
-  Quatf get_previous_orientation(Rigid_body_data *rigid_body) const noexcept {
-    return rigid_body->previous_orientation;
+  Mat3x3f get_previous_rotation(Rigid_body_data *rigid_body) const noexcept {
+    return Mat3x3f::rotation(rigid_body->previous_orientation);
   }
 
-  Quatf get_previous_orientation(Static_body_data *) const noexcept {
-    return Quatf::identity();
+  Mat3x3f get_previous_rotation(Static_body_data *static_body) const noexcept {
+    return get_rotation(static_body);
   }
 
-  Quatf get_orientation(Particle_data *) const noexcept {
-    return Quatf::identity();
+  Mat3x3f get_rotation(Particle_data *) const noexcept {
+    return Mat3x3f::identity();
   }
 
-  Quatf get_orientation(Rigid_body_data *rigid_body) const noexcept {
-    return rigid_body->orientation;
+  Mat3x3f get_rotation(Rigid_body_data *rigid_body) const noexcept {
+    return Mat3x3f::rotation(rigid_body->orientation);
   }
 
-  Quatf get_orientation(Static_body_data *) const noexcept {
-    return Quatf::identity();
+  Mat3x3f get_rotation(Static_body_data *static_body) const noexcept {
+    return {{static_body->transform[0][0],
+             static_body->transform[0][1],
+             static_body->transform[0][2]},
+            {static_body->transform[1][0],
+             static_body->transform[1][1],
+             static_body->transform[1][2]},
+            {static_body->transform[2][0],
+             static_body->transform[2][1],
+             static_body->transform[2][2]}};
   }
 
   Vec3f get_velocity(Particle_data *particle) const noexcept {
@@ -1208,9 +1228,17 @@ private:
                      Contact const &contact) const noexcept {
     auto const data =
         std::pair{get_data(objects.first), get_data(objects.second)};
+    auto const rotation = std::array<Mat3x3f, 2>{
+        get_rotation(data.first),
+        get_rotation(data.second),
+    };
+    auto const relative_position = std::array<Vec3f, 2>{
+        rotation[0] * contact.local_positions[0],
+        rotation[1] * contact.local_positions[1],
+    };
     auto const relative_velocity =
-        get_velocity(data.first, contact.relative_positions[0]) -
-        get_velocity(data.second, contact.relative_positions[1]);
+        get_velocity(data.first, relative_position[0]) -
+        get_velocity(data.second, relative_position[1]);
     auto const separating_velocity = dot(contact.normal, relative_velocity);
     auto const tangential_velocity =
         relative_velocity - contact.normal * separating_velocity;
@@ -1221,21 +1249,13 @@ private:
       auto const I_inv_1 = get_inverse_inertia_tensor(data.first);
       auto const I_inv_2 = get_inverse_inertia_tensor(data.second);
       auto const delta_velocity_direction = normalize(delta_velocity);
-      auto const w_1 =
-          get_generalized_inverse_mass(data.first,
-                                       I_inv_1,
-                                       contact.relative_positions[0],
-                                       delta_velocity_direction);
-      auto const w_2 =
-          get_generalized_inverse_mass(data.second,
-                                       I_inv_2,
-                                       contact.relative_positions[1],
-                                       delta_velocity_direction);
+      auto const w_1 = get_generalized_inverse_mass(
+          data.first, I_inv_1, relative_position[0], delta_velocity_direction);
+      auto const w_2 = get_generalized_inverse_mass(
+          data.second, I_inv_2, relative_position[1], delta_velocity_direction);
       auto const impulse = delta_velocity / (w_1 + w_2);
-      apply_impulse(
-          data.first, I_inv_1, contact.relative_positions[0], impulse);
-      apply_impulse(
-          data.second, I_inv_2, contact.relative_positions[1], -impulse);
+      apply_impulse(data.first, I_inv_1, relative_position[0], impulse);
+      apply_impulse(data.second, I_inv_2, relative_position[1], -impulse);
     }
   }
 
@@ -1299,6 +1319,26 @@ private:
                      Mat3x3f const &,
                      Vec3f const &,
                      Vec3f const &) const noexcept {}
+
+  Mat3x3f get_rotation(Particle_data *) const noexcept {
+    return Mat3x3f::identity();
+  }
+
+  Mat3x3f get_rotation(Rigid_body_data *rigid_body) const noexcept {
+    return Mat3x3f::rotation(rigid_body->orientation);
+  }
+
+  Mat3x3f get_rotation(Static_body_data *static_body) const noexcept {
+    return {{static_body->transform[0][0],
+             static_body->transform[0][1],
+             static_body->transform[0][2]},
+            {static_body->transform[1][0],
+             static_body->transform[1][1],
+             static_body->transform[1][2]},
+            {static_body->transform[2][0],
+             static_body->transform[2][1],
+             static_body->transform[2][2]}};
+  }
 
   Vec3f get_velocity(Particle_data *particle, Vec3f const &) const noexcept {
     return particle->velocity;
