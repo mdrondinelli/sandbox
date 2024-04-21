@@ -211,7 +211,7 @@ create_wireframe_cube_mesh(graphics::Graphics *graphics) {
 }
 
 constexpr float physics_delta_time = 1.0f / 128.0f;
-constexpr unsigned physics_substeps = 8;
+constexpr unsigned physics_substeps = 10;
 
 class Phase {
 public:
@@ -307,6 +307,80 @@ private:
   float _box_spawn_z;
 };
 
+constexpr auto pyramid_layers = 11;
+
+class Pyramid_phase : public Phase {
+public:
+  Pyramid_phase() = default;
+
+  explicit Pyramid_phase(client::Dynamic_prop_manager *box_manager)
+      : _box_manager{box_manager}, _boxes{util::System_allocator::instance()} {}
+
+  void on_start() final {
+    _box_spawn_timer = 0.0f;
+    _box_spawn_layer = 0;
+    _box_spawn_row = 0;
+    _box_spawn_col = 0;
+    _timer_started = false;
+    _timer = 0.0f;
+    std::cout << "Pyramid phase:\n";
+  }
+
+  void post_physics() final {
+    // auto constexpr spacing = 0.61f;
+    _box_spawn_timer += physics_delta_time;
+    if (_timer_started) {
+      _timer += physics_delta_time;
+      if (_timer > 1.0f) {
+        stop();
+      }
+    } else if (_box_spawn_timer > 0.0f) {
+      _box_spawn_timer -= 0.1f;
+      auto const size = pyramid_layers - _box_spawn_layer;
+      if (_boxes.size() >= 2) {
+        return;
+      }
+      _boxes.emplace_back(_box_manager->create({
+          // .position =
+              // math::Vec3f{spacing * _box_spawn_row - 0.5f * spacing * size,
+              //             spacing * _box_spawn_layer + 0.4f,
+              //             spacing * _box_spawn_col - 0.5f * spacing * size},
+          .position = math::Vec3f{0.0f, 0.4f + _box_spawn_col * 10.0f, 0.0f},
+          .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
+                                                 math::deg_to_rad(90.0f)),
+          .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
+      }));
+      if (++_box_spawn_col == size) {
+        _box_spawn_col = 0;
+        if (++_box_spawn_row == size) {
+          _box_spawn_row = 0;
+          if (++_box_spawn_layer == pyramid_layers) {
+            _timer_started = true;
+          }
+        }
+      }
+    }
+  }
+
+  void on_stop() final {
+    for (auto const box : _boxes) {
+      _box_manager->destroy(box);
+    }
+    _boxes.clear();
+  }
+
+private:
+  client::Dynamic_prop_manager *_box_manager;
+  util::Allocating_list<client::Dynamic_prop_handle> _boxes;
+  float _box_spawn_timer;
+  int _box_spawn_layer;
+  int _box_spawn_row;
+  int _box_spawn_col;
+  bool _timer_started;
+  float _timer;
+};
+
 class Ring_phase : public Phase {
 public:
   Ring_phase() = default;
@@ -357,68 +431,6 @@ private:
   float _box_spawn_angle;
 };
 
-constexpr auto pyramid_layers = 7;
-
-class Pyramid_phase : public Phase {
-public:
-  Pyramid_phase() = default;
-
-  explicit Pyramid_phase(client::Dynamic_prop_manager *box_manager)
-      : _box_manager{box_manager}, _boxes{util::System_allocator::instance()} {}
-
-  void on_start() final {
-    _box_spawn_timer = 0.0f;
-    _box_spawn_layer = 0;
-    _box_spawn_row = 0;
-    _box_spawn_col = 0;
-    std::cout << "Pyramid phase:\n";
-  }
-
-  void post_physics() final {
-    auto constexpr spacing = 0.61f;
-    _box_spawn_timer += physics_delta_time;
-    if (_box_spawn_timer > 0.0f) {
-      _box_spawn_timer -= 0.1f;
-      auto const size = pyramid_layers - _box_spawn_layer;
-      auto const new_box = _box_manager->create({
-          .position =
-              math::Vec3f{spacing * _box_spawn_row - 0.5f * spacing * size,
-                          spacing * _box_spawn_layer + 0.4f,
-                          spacing * _box_spawn_col - 0.5f * spacing * size},
-          .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                                 math::deg_to_rad(90.0f)),
-          .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-      });
-      _boxes.emplace_back(new_box);
-      if (++_box_spawn_col == size) {
-        _box_spawn_col = 0;
-        if (++_box_spawn_row == size) {
-          _box_spawn_row = 0;
-          if (++_box_spawn_layer == pyramid_layers) {
-            stop();
-          }
-        }
-      }
-    }
-  }
-
-  void on_stop() final {
-    for (auto const box : _boxes) {
-      _box_manager->destroy(box);
-    }
-    _boxes.clear();
-  }
-
-private:
-  client::Dynamic_prop_manager *_box_manager;
-  util::Allocating_list<client::Dynamic_prop_handle> _boxes;
-  float _box_spawn_timer;
-  int _box_spawn_layer;
-  int _box_spawn_row;
-  int _box_spawn_col;
-};
-
 class Client : public engine::App {
 public:
   Client()
@@ -455,17 +467,18 @@ public:
                     .restitution_coefficient = 0.3f,
                 },
         });
-    auto const box_mass = 80.0f;
-    auto const box_shape = physics::Box{{0.3f, 0.3f, 0.3f}};
+    auto const box_mass = 216.0f;
+    auto const box_radius = 0.3f;
+    auto const box_shape = physics::Box{{box_radius, box_radius, box_radius}};
     _box_manager = std::make_unique<client::Dynamic_prop_manager>(
         client::Dynamic_prop_manager_create_info{
             .scene = scene,
             .surface_mesh = _resources.cube_mesh.get(),
             .surface_material = _resources.striped_cotton_material.get(),
             .surface_pretransform =
-                math::Mat3x4f{{box_shape.half_extents[0], 0.0f, 0.0f, 0.0f},
-                              {0.0f, box_shape.half_extents[1], 0.0f, 0.0f},
-                              {0.0f, 0.0f, box_shape.half_extents[2], 0.0f}},
+                math::Mat3x4f{{box_radius, 0.0f, 0.0f, 0.0f},
+                              {0.0f, box_radius, 0.0f, 0.0f},
+                              {0.0f, 0.0f, box_radius, 0.0f}},
             .space = world,
             .body_mass = box_mass,
             .body_inertia_tensor =
@@ -475,7 +488,7 @@ public:
                 {
                     .static_friction_coefficient = 0.3f,
                     .dynamic_friction_coefficient = 0.2f,
-                    .restitution_coefficient = 0.08f,
+                    .restitution_coefficient = 0.0f,
                 },
         });
     // _red_ball_manager->create({.position = {-1.5f, 0.5f, -1.5f}});
@@ -484,9 +497,9 @@ public:
         .shape = physics::Box{{100.0f, 0.5f, 100.0f}},
         .material =
             {
-                .static_friction_coefficient = 0.4f,
-                .dynamic_friction_coefficient = 0.3f,
-                .restitution_coefficient = 0.1f,
+                .static_friction_coefficient = 0.3f,
+                .dynamic_friction_coefficient = 0.2f,
+                .restitution_coefficient = 0.0f,
             },
         .position = {0.0f, -0.5f, 0.0f},
     });
@@ -505,8 +518,8 @@ public:
     _column_phase = Column_phase{_box_manager.get(), &_selection};
     _ring_phase = Ring_phase{_box_manager.get()};
     _pyramid_phase = Pyramid_phase{_box_manager.get()};
-    _phases = {&_pyramid_phase, &_column_phase, &_ring_phase};
-    _phases[_phase_index]->start();
+    _phases = {&_column_phase, &_pyramid_phase, &_ring_phase};
+    _phases[++_phase_index]->start();
   }
 
   void post_input() final {
