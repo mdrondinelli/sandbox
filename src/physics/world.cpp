@@ -123,6 +123,34 @@ struct Neighbor_pair {
     }
   }
 
+  std::variant<Particle_handle, Rigid_body_handle, Static_body_handle>
+  other(Particle_handle object) const noexcept {
+    switch (type) {
+    case Object_pair_type::particle_particle:
+      return Particle_handle{objects[objects[0] == object.value ? 1 : 0]};
+    case Object_pair_type::particle_rigid_body:
+      return Rigid_body_handle{objects[1]};
+    case Object_pair_type::particle_static_body:
+      return Static_body_handle{objects[1]};
+    default:
+      math::unreachable();
+    }
+  }
+
+  std::variant<Particle_handle, Rigid_body_handle, Static_body_handle>
+  other(Rigid_body_handle object) const noexcept {
+    switch (type) {
+    case Object_pair_type::particle_rigid_body:
+      return Particle_handle{objects[0]};
+    case Object_pair_type::rigid_body_rigid_body:
+      return Rigid_body_handle{objects[objects[0] == object.value ? 1 : 0]};
+    case Object_pair_type::rigid_body_static_body:
+      return Static_body_handle{objects[1]};
+    default:
+      math::unreachable();
+    }
+  }
+
   std::array<std::uint32_t, 2> objects;
   Object_pair_type type;
   std::uint16_t color{color_unmarked};
@@ -1991,82 +2019,25 @@ private:
     _particles.for_each(unmark);
     _rigid_bodies.for_each(unmark);
     auto const visitor = [this](auto &&handle) {
-      using T = std::decay_t<decltype(handle)>;
       for (auto const pair : get_neighbor_pairs(get_data(handle))) {
-        if constexpr (std::is_same_v<T, Particle_handle>) {
-          switch (pair->type) {
-          case Object_pair_type::particle_particle: {
-            auto const neighbor_handle = Particle_handle{
-                pair->objects[pair->objects[0] == handle.value]};
-            auto const neighbor_data = _particles.data(neighbor_handle);
-            if (!neighbor_data->marked) {
-              neighbor_data->marked = true;
-              _neighbor_groups.add_to_group(neighbor_handle);
-            }
-            if (pair->color == color_unmarked) {
-              pair->color = color_marked;
-              _neighbor_groups.add_to_group(pair);
-            }
-            continue;
-          }
-          case Object_pair_type::particle_rigid_body: {
-            auto const neighbor_handle = Rigid_body_handle{pair->objects[1]};
-            auto const neighbor_data = _rigid_bodies.data(neighbor_handle);
-            if (!neighbor_data->marked) {
-              neighbor_data->marked = true;
-              _neighbor_groups.add_to_group(neighbor_handle);
-            }
-            if (pair->color == color_unmarked) {
-              pair->color = color_marked;
-              _neighbor_groups.add_to_group(pair);
-            }
-            continue;
-          }
-          case Object_pair_type::particle_static_body: {
-            _neighbor_groups.add_to_group(pair);
-            continue;
-          }
-          default:
-            continue;
-          }
-        } else {
-          static_assert(std::is_same_v<T, Rigid_body_handle>);
-          switch (pair->type) {
-          case Object_pair_type::particle_rigid_body: {
-            auto const neighbor_handle = Particle_handle{pair->objects[0]};
-            auto const neighbor_data = _particles.data(neighbor_handle);
-            if (!neighbor_data->marked) {
-              neighbor_data->marked = true;
-              _neighbor_groups.add_to_group(neighbor_handle);
-            }
-            if (pair->color == color_unmarked) {
-              pair->color = color_marked;
-              _neighbor_groups.add_to_group(pair);
-            }
-            continue;
-          }
-          case Object_pair_type::rigid_body_rigid_body: {
-            auto const neighbor_handle = Rigid_body_handle{
-                pair->objects[pair->objects[0] == handle.value]};
-            auto const neighbor_data = _rigid_bodies.data(neighbor_handle);
-            if (!neighbor_data->marked) {
-              neighbor_data->marked = true;
-              _neighbor_groups.add_to_group(neighbor_handle);
-            }
-            if (pair->color == color_unmarked) {
-              pair->color = color_marked;
-              _neighbor_groups.add_to_group(pair);
-            }
-            continue;
-          }
-          case Object_pair_type::rigid_body_static_body: {
-            _neighbor_groups.add_to_group(pair);
-            continue;
-          }
-          default:
-            continue;
-          }
-        }
+        std::visit(
+            [&](auto &&neighbor_handle) {
+              using T = std::decay_t<decltype(neighbor_handle)>;
+              if constexpr (!std::is_same_v<T, Static_body_handle>) {
+                auto const neighbor_data = get_data(neighbor_handle);
+                if (!neighbor_data->marked) {
+                  neighbor_data->marked = true;
+                  _neighbor_groups.add_to_group(neighbor_handle);
+                }
+                if (pair->color == color_unmarked) {
+                  pair->color = color_marked;
+                  _neighbor_groups.add_to_group(pair);
+                }
+              } else {
+                _neighbor_groups.add_to_group(pair);
+              }
+            },
+            pair->other(handle));
       }
     };
     auto fringe_index = std::size_t{};
