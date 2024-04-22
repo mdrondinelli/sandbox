@@ -91,6 +91,33 @@ struct Neighbor_pair {
       std::pair<Static_body_handle, Rigid_body_handle> objects) noexcept
       : Neighbor_pair{{objects.second, objects.first}} {}
 
+  std::variant<std::pair<Particle_handle, Particle_handle>,
+               std::pair<Particle_handle, Rigid_body_handle>,
+               std::pair<Particle_handle, Static_body_handle>,
+               std::pair<Rigid_body_handle, Rigid_body_handle>,
+               std::pair<Rigid_body_handle, Static_body_handle>>
+  both() const noexcept {
+    switch (type) {
+    case Object_pair_type::particle_particle:
+      return std::pair{Particle_handle{objects[0]},
+                       Particle_handle{objects[1]}};
+    case Object_pair_type::particle_rigid_body:
+      return std::pair{Particle_handle{objects[0]},
+                       Rigid_body_handle{objects[1]}};
+    case Object_pair_type::particle_static_body:
+      return std::pair{Particle_handle{objects[0]},
+                       Static_body_handle{objects[1]}};
+    case Object_pair_type::rigid_body_rigid_body:
+      return std::pair{Rigid_body_handle{objects[0]},
+                       Rigid_body_handle{objects[1]}};
+    case Object_pair_type::rigid_body_static_body:
+      return std::pair{Rigid_body_handle{objects[0]},
+                       Static_body_handle{objects[1]}};
+    default:
+      math::unreachable();
+    }
+  }
+
   std::variant<Particle_handle, Rigid_body_handle> first() const noexcept {
     switch (type) {
     case Object_pair_type::particle_particle:
@@ -813,41 +840,12 @@ public:
   void run(unsigned) final {
     for (auto i = std::size_t{}; i != _chunk->size; ++i) {
       auto const pair = _chunk->pairs[i];
-      auto contact = std::optional<Contact>{};
-      switch (pair->type) {
-      case Object_pair_type::particle_particle: {
-        contact =
-            solve_neighbor_pair({get_data(Particle_handle{pair->objects[0]}),
-                                 get_data(Particle_handle{pair->objects[1]})});
-        break;
-      }
-      case Object_pair_type::particle_rigid_body: {
-        contact = solve_neighbor_pair(
-            {get_data(Particle_handle{pair->objects[0]}),
-             get_data(Rigid_body_handle{pair->objects[1]})});
-        break;
-      }
-      case Object_pair_type::particle_static_body: {
-        contact = solve_neighbor_pair(
-            {get_data(Particle_handle{pair->objects[0]}),
-             get_data(Static_body_handle{pair->objects[1]})});
-        break;
-      }
-      case Object_pair_type::rigid_body_rigid_body: {
-        contact = solve_neighbor_pair(
-            {get_data(Rigid_body_handle{pair->objects[0]}),
-             get_data(Rigid_body_handle{pair->objects[1]})});
-        break;
-      }
-      case Object_pair_type::rigid_body_static_body: {
-        contact = solve_neighbor_pair(
-            {get_data(Rigid_body_handle{pair->objects[0]}),
-             get_data(Static_body_handle{pair->objects[1]})});
-        break;
-      }
-      default:
-        math::unreachable();
-      }
+      auto const contact = std::visit(
+          [&](auto &&objects) {
+            return solve_neighbor_pair(
+                {get_data(objects.first), get_data(objects.second)});
+          },
+          pair->both());
       if (contact) {
         _chunk->contacts[i] = *contact;
       } else {
@@ -1292,38 +1290,13 @@ public:
       auto const &contact = _chunk->contacts[i];
       auto const &normal = contact.normal;
       if (normal != math::Vec3f::zero()) {
-        switch (_chunk->pairs[i]->type) {
-        case Object_pair_type::particle_particle:
-          solve_contact(
-              std::pair{Particle_handle{_chunk->pairs[i]->objects[0]},
-                        Particle_handle{_chunk->pairs[i]->objects[1]}},
-              contact);
-          continue;
-        case Object_pair_type::particle_rigid_body:
-          solve_contact(
-              std::pair{Particle_handle{_chunk->pairs[i]->objects[0]},
-                        Rigid_body_handle{_chunk->pairs[i]->objects[1]}},
-              contact);
-          continue;
-        case Object_pair_type::particle_static_body:
-          solve_contact(
-              std::pair{Particle_handle{_chunk->pairs[i]->objects[0]},
-                        Static_body_handle{_chunk->pairs[i]->objects[1]}},
-              contact);
-          continue;
-        case Object_pair_type::rigid_body_rigid_body:
-          solve_contact(
-              std::pair{Rigid_body_handle{_chunk->pairs[i]->objects[0]},
-                        Rigid_body_handle{_chunk->pairs[i]->objects[1]}},
-              contact);
-          continue;
-        case Object_pair_type::rigid_body_static_body:
-          solve_contact(
-              std::pair{Rigid_body_handle{_chunk->pairs[i]->objects[0]},
-                        Static_body_handle{_chunk->pairs[i]->objects[1]}},
-              contact);
-          continue;
-        }
+        std::visit(
+            [&](auto &&objects) {
+              solve_contact(
+                  std::pair{get_data(objects.first), get_data(objects.second)},
+                  contact);
+            },
+            _chunk->pairs[i]->both());
       }
     }
     _state->latch->count_down();
@@ -1331,10 +1304,8 @@ public:
 
 private:
   template <typename T, typename U>
-  void solve_contact(std::pair<T, U> objects,
+  void solve_contact(std::pair<T, U> data,
                      Contact const &contact) const noexcept {
-    auto const data =
-        std::pair{get_data(objects.first), get_data(objects.second)};
     auto const inverse_inertia_tensor = std::array<Mat3x3f, 2>{
         get_inverse_inertia_tensor(data.first),
         get_inverse_inertia_tensor(data.second),
