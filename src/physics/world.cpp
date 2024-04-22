@@ -2085,21 +2085,10 @@ private:
           auto const object = _neighbor_groups.object(i);
           std::visit(
               [&](auto &&handle) {
-                using T = std::decay_t<decltype(handle)>;
-                if constexpr (std::is_same_v<T, Particle_handle>) {
-                  auto const data = _particles.data(handle);
-                  if (data->awake) {
-                    data->velocity = Vec3f::zero();
-                    data->awake = false;
-                  }
-                } else {
-                  static_assert(std::is_same_v<T, Rigid_body_handle>);
-                  auto const data = _rigid_bodies.data(handle);
-                  if (data->awake) {
-                    data->velocity = Vec3f::zero();
-                    data->angular_velocity = Vec3f::zero();
-                    data->awake = false;
-                  }
+                auto const data = get_data(handle);
+                if (data->awake) {
+                  data->awake = false;
+                  freeze(data);
                 }
               },
               object);
@@ -2111,20 +2100,10 @@ private:
             auto const object = _neighbor_groups.object(i);
             std::visit(
                 [&](auto &&handle) {
-                  using T = std::decay_t<decltype(handle)>;
-                  if constexpr (std::is_same_v<T, Particle_handle>) {
-                    auto const data = _particles.data(handle);
-                    if (!data->awake) {
-                      data->waking_motion = waking_motion_initializer;
-                      data->awake = true;
-                    }
-                  } else {
-                    static_assert(std::is_same_v<T, Rigid_body_handle>);
-                    auto const data = _rigid_bodies.data(handle);
-                    if (!data->awake) {
-                      data->waking_motion = waking_motion_initializer;
-                      data->awake = true;
-                    }
+                  auto const data = get_data(handle);
+                  if (!data->awake) {
+                    data->awake = true;
+                    data->waking_motion = waking_motion_initializer;
                   }
                 },
                 object);
@@ -2135,6 +2114,15 @@ private:
     } else {
       return false;
     }
+  }
+
+  void freeze(Particle_data *data) {
+    data->velocity = Vec3f::zero();
+  }
+
+  void freeze(Rigid_body_data *data) {
+    data->velocity = Vec3f::zero();
+    data->angular_velocity = Vec3f::zero();
   }
 
   void color_neighbor_group(std::size_t group_index) {
