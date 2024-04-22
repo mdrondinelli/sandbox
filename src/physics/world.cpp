@@ -91,6 +91,38 @@ struct Neighbor_pair {
       std::pair<Static_body_handle, Rigid_body_handle> objects) noexcept
       : Neighbor_pair{{objects.second, objects.first}} {}
 
+  std::variant<Particle_handle, Rigid_body_handle> first() const noexcept {
+    switch (type) {
+    case Object_pair_type::particle_particle:
+    case Object_pair_type::particle_rigid_body:
+    case Object_pair_type::particle_static_body:
+      return Particle_handle{objects[0]};
+    case Object_pair_type::rigid_body_rigid_body:
+    case Object_pair_type::rigid_body_static_body:
+      return Rigid_body_handle{objects[0]};
+    default:
+      math::unreachable();
+    }
+  }
+
+  std::variant<Particle_handle, Rigid_body_handle, Static_body_handle>
+  second() const noexcept {
+    switch (type) {
+    case Object_pair_type::particle_particle:
+      return Particle_handle{objects[1]};
+    case Object_pair_type::particle_rigid_body:
+      return Rigid_body_handle{objects[1]};
+    case Object_pair_type::particle_static_body:
+      return Static_body_handle{objects[1]};
+    case Object_pair_type::rigid_body_rigid_body:
+      return Rigid_body_handle{objects[1]};
+    case Object_pair_type::rigid_body_static_body:
+      return Static_body_handle{objects[1]};
+    default:
+      math::unreachable();
+    }
+  }
+
   std::array<std::uint32_t, 2> objects;
   Object_pair_type type;
   std::uint16_t color{color_unmarked};
@@ -1498,7 +1530,8 @@ private:
   // }
 
   // float
-  // get_static_friction_coefficient(Rigid_body_data *rigid_body) const noexcept
+  // get_static_friction_coefficient(Rigid_body_data *rigid_body) const
+  // noexcept
   // {
   //   return rigid_body->material.static_friction_coefficient;
   // }
@@ -1929,45 +1962,27 @@ private:
     _particles.for_each(alloc_neighbor_pairs);
     _rigid_bodies.for_each(alloc_neighbor_pairs);
     for (auto &pair : _neighbor_pairs) {
-      switch (pair.type) {
-      case Object_pair_type::particle_particle: {
-        assign_neighbor_pair(Particle_handle{pair.objects[0]}, &pair);
-        assign_neighbor_pair(Particle_handle{pair.objects[1]}, &pair);
-        continue;
-      }
-      case Object_pair_type::particle_rigid_body: {
-        assign_neighbor_pair(Particle_handle{pair.objects[0]}, &pair);
-        assign_neighbor_pair(Rigid_body_handle{pair.objects[1]}, &pair);
-        continue;
-      }
-      case Object_pair_type::particle_static_body: {
-        assign_neighbor_pair(Particle_handle{pair.objects[0]}, &pair);
-        continue;
-      }
-      case Object_pair_type::rigid_body_rigid_body: {
-        assign_neighbor_pair(Rigid_body_handle{pair.objects[0]}, &pair);
-        assign_neighbor_pair(Rigid_body_handle{pair.objects[1]}, &pair);
-        continue;
-      }
-      case Object_pair_type::rigid_body_static_body: {
-        assign_neighbor_pair(Rigid_body_handle{pair.objects[0]}, &pair);
-        continue;
-      }
-      }
+      std::visit(
+          [&](auto &&handle) { assign_neighbor_pair(get_data(handle), &pair); },
+          pair.first());
+      std::visit(
+          [&](auto &&handle) { assign_neighbor_pair(get_data(handle), &pair); },
+          pair.second());
     }
   }
 
-  void assign_neighbor_pair(Particle_handle particle,
+  void assign_neighbor_pair(Particle_data *data,
                             Neighbor_pair *neighbor_pair) noexcept {
-    auto const data = _particles.data(particle);
     data->neighbor_pairs[data->neighbor_count++] = neighbor_pair;
   }
 
-  void assign_neighbor_pair(Rigid_body_handle rigid_body,
+  void assign_neighbor_pair(Rigid_body_data *data,
                             Neighbor_pair *neighbor_pair) noexcept {
-    auto const data = _rigid_bodies.data(rigid_body);
     data->neighbor_pairs[data->neighbor_count++] = neighbor_pair;
   }
+
+  void assign_neighbor_pair(Static_body_data *,
+                            Neighbor_pair *) const noexcept {}
 
   void find_neighbor_groups() {
     auto const unmark = [](auto const, auto const data) {
