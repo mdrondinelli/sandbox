@@ -1348,7 +1348,7 @@ private:
         rotation[1] * contact.local_positions[1],
     };
     apply_restitution(data, contact, inverse_inertia_tensor, relative_position);
-    if (!std::is_same_v<T, U> && contact.lambda_t == 0.0f) {
+    if (contact.lambda_t == 0.0f) {
       apply_dynamic_friction(
           data, contact, inverse_inertia_tensor, relative_position);
     }
