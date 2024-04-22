@@ -53,7 +53,8 @@ auto constexpr color_marked{static_cast<std::uint16_t>(-2)};
 auto constexpr reserved_colors{std::size_t{2}};
 auto constexpr max_colors = (std::size_t{1} << 16) - reserved_colors;
 
-struct Neighbor_pair {
+class Neighbor_pair {
+public:
   explicit Neighbor_pair(
       std::pair<Particle_handle, Particle_handle> objects) noexcept
       : objects{objects.first.value, objects.second.value},
@@ -178,9 +179,14 @@ struct Neighbor_pair {
     }
   }
 
+  std::uint16_t color() const noexcept { return _color; }
+
+  void color(std::uint16_t color) noexcept { _color = color; }
+
+private:
   std::array<std::uint32_t, 2> objects;
   Object_pair_type type;
-  std::uint16_t color{color_unmarked};
+  std::uint16_t _color{color_unmarked};
 };
 
 struct Particle_data {
@@ -766,7 +772,7 @@ public:
   }
 
   void push_back(Neighbor_pair *neighbor_pair) {
-    _neighbor_pairs[_groups[neighbor_pair->color].neighbor_pairs_end++] =
+    _neighbor_pairs[_groups[neighbor_pair->color()].neighbor_pairs_end++] =
         neighbor_pair;
   }
 
@@ -1318,11 +1324,11 @@ private:
         rotation[0] * contact.local_positions[0],
         rotation[1] * contact.local_positions[1],
     };
-    apply_restitution(data, contact, inverse_inertia_tensor, relative_position);
     if (contact.lambda_t == 0.0f) {
       apply_dynamic_friction(
           data, contact, inverse_inertia_tensor, relative_position);
     }
+    apply_restitution(data, contact, inverse_inertia_tensor, relative_position);
   }
 
   template <typename T, typename U>
@@ -2000,8 +2006,8 @@ private:
                   neighbor_data->marked = true;
                   _neighbor_groups.add_to_group(neighbor_handle);
                 }
-                if (pair->color == color_unmarked) {
-                  pair->color = color_marked;
+                if (pair->color() == color_unmarked) {
+                  pair->color(color_marked);
                   _neighbor_groups.add_to_group(pair);
                 }
               } else {
@@ -2102,10 +2108,10 @@ private:
       return;
     }
     for (auto i = begin; i != end; ++i) {
-      _neighbor_groups.neighbor_pair(i)->color = color_unmarked;
+      _neighbor_groups.neighbor_pair(i)->color(color_unmarked);
     }
     auto const seed_pair = _neighbor_groups.neighbor_pair(begin);
-    seed_pair->color = color_marked;
+    seed_pair->color(color_marked);
     _coloring_fringe.emplace_back(seed_pair);
     do {
       auto const pair = _coloring_fringe.front();
@@ -2124,23 +2130,23 @@ private:
       _coloring_bits.reset();
       for (auto i{0}; i != 2; ++i) {
         for (auto const neighbor : neighbors[i]) {
-          if (neighbor->color == color_unmarked) {
-            neighbor->color = color_marked;
+          if (neighbor->color() == color_unmarked) {
+            neighbor->color(color_marked);
             _coloring_fringe.emplace_back(neighbor);
-          } else if (neighbor->color != color_marked) {
-            _coloring_bits.set(neighbor->color);
+          } else if (neighbor->color() != color_marked) {
+            _coloring_bits.set(neighbor->color());
           }
         }
       }
       for (auto i{std::size_t{}}; i != max_colors; ++i) {
         if (!_coloring_bits.get(i)) {
           auto const color = static_cast<std::uint16_t>(i);
-          pair->color = color;
+          pair->color(color);
           _color_groups.count(color);
           break;
         }
       }
-      if (pair->color == color_marked) {
+      if (pair->color() == color_marked) {
         throw std::runtime_error{"Failed to color neighbor group"};
       }
     } while (!_coloring_fringe.empty());
