@@ -2065,34 +2065,19 @@ private:
          (sleepable || !contains_awake || !contains_sleeping) &&
          i != group.objects_end;
          ++i) {
-      auto const object = _neighbor_groups.object(i);
       std::visit(
           [&](auto &&handle) {
-            using T = std::decay_t<decltype(handle)>;
-            if constexpr (std::is_same_v<T, Particle_handle>) {
-              auto const data = _particles.data(handle);
-              if (data->awake) {
-                contains_awake = true;
-                if (data->waking_motion > waking_motion_epsilon) {
-                  sleepable = false;
-                }
-              } else {
-                contains_sleeping = true;
+            auto const data = get_data(handle);
+            if (data->awake) {
+              contains_awake = true;
+              if (data->waking_motion > waking_motion_epsilon) {
+                sleepable = false;
               }
             } else {
-              static_assert(std::is_same_v<T, Rigid_body_handle>);
-              auto const data = _rigid_bodies.data(handle);
-              if (data->awake) {
-                contains_awake = true;
-                if (data->waking_motion > waking_motion_epsilon) {
-                  sleepable = false;
-                }
-              } else {
-                contains_sleeping = true;
-              }
+              contains_sleeping = true;
             }
           },
-          object);
+          _neighbor_groups.object(i));
     }
     if (contains_awake) {
       if (sleepable) {
