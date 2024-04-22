@@ -2116,9 +2116,7 @@ private:
     }
   }
 
-  void freeze(Particle_data *data) {
-    data->velocity = Vec3f::zero();
-  }
+  void freeze(Particle_data *data) { data->velocity = Vec3f::zero(); }
 
   void freeze(Rigid_body_data *data) {
     data->velocity = Vec3f::zero();
@@ -2142,34 +2140,16 @@ private:
       auto const pair = _coloring_fringe.front();
       _coloring_fringe.pop_front();
       auto neighbors = std::array<std::span<Neighbor_pair *const>, 2>{};
-      switch (pair->type) {
-      case Object_pair_type::particle_particle:
-        neighbors[0] =
-            get_neighbor_pairs(get_data(Particle_handle{pair->objects[0]}));
-        neighbors[1] =
-            get_neighbor_pairs(get_data(Particle_handle{pair->objects[1]}));
-        break;
-      case Object_pair_type::particle_rigid_body:
-        neighbors[0] =
-            get_neighbor_pairs(get_data(Particle_handle{pair->objects[0]}));
-        neighbors[1] =
-            get_neighbor_pairs(get_data(Rigid_body_handle{pair->objects[1]}));
-        break;
-      case Object_pair_type::particle_static_body:
-        neighbors[0] =
-            get_neighbor_pairs(get_data(Particle_handle{pair->objects[0]}));
-        break;
-      case Object_pair_type::rigid_body_rigid_body:
-        neighbors[0] =
-            get_neighbor_pairs(get_data(Rigid_body_handle{pair->objects[0]}));
-        neighbors[1] =
-            get_neighbor_pairs(get_data(Rigid_body_handle{pair->objects[1]}));
-        break;
-      case Object_pair_type::rigid_body_static_body:
-        neighbors[0] =
-            get_neighbor_pairs(get_data(Rigid_body_handle{pair->objects[0]}));
-        break;
-      }
+      std::visit(
+          [&](auto &&object) {
+            neighbors[0] = get_neighbor_pairs(get_data(object));
+          },
+          pair->first());
+      std::visit(
+          [&](auto &&object) {
+            neighbors[1] = get_neighbor_pairs(get_data(object));
+          },
+          pair->second());
       _coloring_bits.reset();
       for (auto i{0}; i != 2; ++i) {
         for (auto const neighbor : neighbors[i]) {
@@ -2405,6 +2385,11 @@ private:
   std::span<Neighbor_pair *const>
   get_neighbor_pairs(Rigid_body_data *rigid_body) const noexcept {
     return {rigid_body->neighbor_pairs, rigid_body->neighbor_count};
+  }
+
+  std::span<Neighbor_pair *const>
+  get_neighbor_pairs(Static_body_data *) const noexcept {
+    return {};
   }
 
   Particle_data const *get_data(Particle_handle particle) const noexcept {
