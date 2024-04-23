@@ -38,14 +38,6 @@ namespace {
 using Aabb_tree_payload_t =
     std::variant<Particle_handle, Rigid_body_handle, Static_body_handle>;
 
-enum class Object_pair_type : std::uint8_t {
-  particle_particle,
-  particle_rigid_body,
-  particle_static_body,
-  rigid_body_rigid_body,
-  rigid_body_static_body
-};
-
 auto constexpr color_unmarked{static_cast<std::uint16_t>(-1)};
 auto constexpr color_marked{static_cast<std::uint16_t>(-2)};
 auto constexpr reserved_colors{std::size_t{2}};
@@ -55,18 +47,15 @@ class Neighbor_pair {
 public:
   explicit Neighbor_pair(
       std::pair<Particle_handle, Particle_handle> objects) noexcept
-      : objects{objects.first.value(), objects.second.value()},
-        type{Object_pair_type::particle_particle} {}
+      : objects{objects.first.value(), objects.second.value()} {}
 
   explicit Neighbor_pair(
       std::pair<Particle_handle, Rigid_body_handle> objects) noexcept
-      : objects{objects.first.value(), objects.second.value()},
-        type{Object_pair_type::particle_rigid_body} {}
+      : objects{objects.first.value(), objects.second.value()} {}
 
   explicit Neighbor_pair(
       std::pair<Particle_handle, Static_body_handle> objects) noexcept
-      : objects{objects.first.value(), objects.second.value()},
-        type{Object_pair_type::particle_static_body} {}
+      : objects{objects.first.value(), objects.second.value()} {}
 
   explicit Neighbor_pair(
       std::pair<Rigid_body_handle, Particle_handle> objects) noexcept
@@ -74,13 +63,11 @@ public:
 
   explicit Neighbor_pair(
       std::pair<Rigid_body_handle, Rigid_body_handle> objects) noexcept
-      : objects{objects.first.value(), objects.second.value()},
-        type{Object_pair_type::rigid_body_rigid_body} {}
+      : objects{objects.first.value(), objects.second.value()} {}
 
   explicit Neighbor_pair(
       std::pair<Rigid_body_handle, Static_body_handle> objects) noexcept
-      : objects{objects.first.value(), objects.second.value()},
-        type{Object_pair_type::rigid_body_static_body} {}
+      : objects{objects.first.value(), objects.second.value()} {}
 
   explicit Neighbor_pair(
       std::pair<Static_body_handle, Particle_handle> objects) noexcept
@@ -90,91 +77,12 @@ public:
       std::pair<Static_body_handle, Rigid_body_handle> objects) noexcept
       : Neighbor_pair{{objects.second, objects.first}} {}
 
-  std::variant<std::pair<Particle_handle, Particle_handle>,
-               std::pair<Particle_handle, Rigid_body_handle>,
-               std::pair<Particle_handle, Static_body_handle>,
-               std::pair<Rigid_body_handle, Rigid_body_handle>,
-               std::pair<Rigid_body_handle, Static_body_handle>>
-  both() const noexcept {
-    switch (type) {
-    case Object_pair_type::particle_particle:
-      return std::pair{Particle_handle{objects[0]},
-                       Particle_handle{objects[1]}};
-    case Object_pair_type::particle_rigid_body:
-      return std::pair{Particle_handle{objects[0]},
-                       Rigid_body_handle{objects[1]}};
-    case Object_pair_type::particle_static_body:
-      return std::pair{Particle_handle{objects[0]},
-                       Static_body_handle{objects[1]}};
-    case Object_pair_type::rigid_body_rigid_body:
-      return std::pair{Rigid_body_handle{objects[0]},
-                       Rigid_body_handle{objects[1]}};
-    case Object_pair_type::rigid_body_static_body:
-      return std::pair{Rigid_body_handle{objects[0]},
-                       Static_body_handle{objects[1]}};
-    default:
-      math::unreachable();
-    }
-  }
+  Object_handle first() const noexcept { return objects[0]; }
 
-  std::variant<Particle_handle, Rigid_body_handle> first() const noexcept {
-    switch (type) {
-    case Object_pair_type::particle_particle:
-    case Object_pair_type::particle_rigid_body:
-    case Object_pair_type::particle_static_body:
-      return Particle_handle{objects[0]};
-    case Object_pair_type::rigid_body_rigid_body:
-    case Object_pair_type::rigid_body_static_body:
-      return Rigid_body_handle{objects[0]};
-    default:
-      math::unreachable();
-    }
-  }
+  Object_handle second() const noexcept { return objects[1]; }
 
-  std::variant<Particle_handle, Rigid_body_handle, Static_body_handle>
-  second() const noexcept {
-    switch (type) {
-    case Object_pair_type::particle_particle:
-      return Particle_handle{objects[1]};
-    case Object_pair_type::particle_rigid_body:
-      return Rigid_body_handle{objects[1]};
-    case Object_pair_type::particle_static_body:
-      return Static_body_handle{objects[1]};
-    case Object_pair_type::rigid_body_rigid_body:
-      return Rigid_body_handle{objects[1]};
-    case Object_pair_type::rigid_body_static_body:
-      return Static_body_handle{objects[1]};
-    default:
-      math::unreachable();
-    }
-  }
-
-  std::variant<Particle_handle, Rigid_body_handle, Static_body_handle>
-  other(Particle_handle object) const noexcept {
-    switch (type) {
-    case Object_pair_type::particle_particle:
-      return Particle_handle{objects[objects[0] == object.value() ? 1 : 0]};
-    case Object_pair_type::particle_rigid_body:
-      return Rigid_body_handle{objects[1]};
-    case Object_pair_type::particle_static_body:
-      return Static_body_handle{objects[1]};
-    default:
-      math::unreachable();
-    }
-  }
-
-  std::variant<Particle_handle, Rigid_body_handle, Static_body_handle>
-  other(Rigid_body_handle object) const noexcept {
-    switch (type) {
-    case Object_pair_type::particle_rigid_body:
-      return Particle_handle{objects[0]};
-    case Object_pair_type::rigid_body_rigid_body:
-      return Rigid_body_handle{objects[objects[0] == object.value() ? 1 : 0]};
-    case Object_pair_type::rigid_body_static_body:
-      return Static_body_handle{objects[1]};
-    default:
-      math::unreachable();
-    }
+  Object_handle other(Object_handle object) const noexcept {
+    return objects[objects[0] == object ? 1 : 0];
   }
 
   std::uint16_t color() const noexcept { return _color; }
@@ -182,8 +90,7 @@ public:
   void color(std::uint16_t color) noexcept { _color = color; }
 
 private:
-  std::array<std::uint32_t, 2> objects;
-  Object_pair_type type;
+  std::array<Object_handle, 2> objects;
   std::uint16_t _color{color_unmarked};
 };
 
@@ -746,12 +653,36 @@ public:
   void run(unsigned) final {
     for (auto i = std::size_t{}; i != _chunk->size; ++i) {
       auto const pair = _chunk->pairs[i];
-      auto const contact = std::visit(
-          [&](auto &&objects) {
-            return solve_neighbor_pair(
-                {get_data(objects.first), get_data(objects.second)});
+      auto const contact = visit(
+          [&](auto &&first_object) {
+            using T = std::decay_t<decltype(first_object)>;
+            if constexpr (std::is_same_v<T, Particle_handle>) {
+              return visit(
+                  [&](auto &&second_object) {
+                    return solve_neighbor_pair(
+                        {get_data(first_object), get_data(second_object)});
+                  },
+                  pair->second());
+            } else if constexpr (std::is_same_v<T, Rigid_body_handle>) {
+              return visit(
+                  [&](auto &&second_object) {
+                    using U = std::decay_t<decltype(second_object)>;
+                    if constexpr (std::is_same_v<U, Rigid_body_handle> ||
+                                  std::is_same_v<U, Static_body_handle>) {
+                      return solve_neighbor_pair(
+                          {get_data(first_object), get_data(second_object)});
+                    } else {
+                      math::unreachable();
+                      return std::optional<Contact>{};
+                    }
+                  },
+                  pair->second());
+            } else {
+              math::unreachable();
+              return std::optional<Contact>{};
+            }
           },
-          pair->both());
+          pair->first());
       if (contact) {
         _chunk->contacts[i] = *contact;
       } else {
@@ -1193,16 +1124,40 @@ public:
 
   void run(unsigned) final {
     for (auto i = std::size_t{}; i != _chunk->size; ++i) {
+      auto const pair = _chunk->pairs[i];
       auto const &contact = _chunk->contacts[i];
       auto const &normal = contact.normal;
       if (normal != math::Vec3f::zero()) {
-        std::visit(
-            [&](auto &&objects) {
-              solve_contact(
-                  std::pair{get_data(objects.first), get_data(objects.second)},
-                  contact);
+        visit(
+            [&](auto &&first_object) {
+              using T = std::decay_t<decltype(first_object)>;
+              if constexpr (std::is_same_v<T, Particle_handle>) {
+                visit(
+                    [&](auto &&second_object) {
+                      solve_contact(std::pair{get_data(first_object),
+                                              get_data(second_object)},
+                                    contact);
+                    },
+                    pair->second());
+              } else if constexpr (std::is_same_v<T, Rigid_body_handle>) {
+                visit(
+                    [&](auto &&second_object) {
+                      using U = std::decay_t<decltype(second_object)>;
+                      if constexpr (std::is_same_v<U, Rigid_body_handle> ||
+                                    std::is_same_v<U, Static_body_handle>) {
+                        solve_contact(std::pair{get_data(first_object),
+                                                get_data(second_object)},
+                                      contact);
+                      } else {
+                        math::unreachable();
+                      }
+                    },
+                    pair->second());
+              } else {
+                math::unreachable();
+              }
             },
-            _chunk->pairs[i]->both());
+            pair->first());
       }
     }
     _state->latch->count_down();
@@ -1867,10 +1822,10 @@ private:
     _particles.for_each(alloc_neighbor_pairs);
     _rigid_bodies.for_each(alloc_neighbor_pairs);
     for (auto &pair : _neighbor_pairs) {
-      std::visit(
+      visit(
           [&](auto &&handle) { assign_neighbor_pair(get_data(handle), &pair); },
           pair.first());
-      std::visit(
+      visit(
           [&](auto &&handle) { assign_neighbor_pair(get_data(handle), &pair); },
           pair.second());
     }
@@ -1899,7 +1854,7 @@ private:
       using T = std::decay_t<decltype(handle)>;
       if constexpr (!std::is_same_v<T, Static_body_handle>) {
         for (auto const pair : get_neighbor_pairs(get_data(handle))) {
-          std::visit(
+          visit(
               [&](auto &&neighbor_handle) {
                 using U = std::decay_t<decltype(neighbor_handle)>;
                 if constexpr (!std::is_same_v<U, Static_body_handle>) {
@@ -1916,7 +1871,7 @@ private:
                   _neighbor_groups.add_to_group(pair);
                 }
               },
-              pair->other(handle));
+              pair->other(handle.value()));
         }
       } else {
         math::unreachable();
@@ -2036,12 +1991,12 @@ private:
       auto const pair = _coloring_fringe.front();
       _coloring_fringe.pop_front();
       auto neighbors = std::array<std::span<Neighbor_pair *const>, 2>{};
-      std::visit(
+      visit(
           [&](auto &&object) {
             neighbors[0] = get_neighbor_pairs(get_data(object));
           },
           pair->first());
-      std::visit(
+      visit(
           [&](auto &&object) {
             neighbors[1] = get_neighbor_pairs(get_data(object));
           },
