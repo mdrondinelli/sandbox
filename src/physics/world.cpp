@@ -36,9 +36,7 @@ namespace physics {
 
 namespace {
 using Aabb_tree_payload_t =
-    std::variant<Particle_handle, Static_body_handle, Rigid_body_handle>;
-
-enum class Object_type : std::uint8_t { particle, rigid_body, static_body };
+    std::variant<Particle_handle, Rigid_body_handle, Static_body_handle>;
 
 enum class Object_pair_type : std::uint8_t {
   particle_particle,
@@ -57,17 +55,17 @@ class Neighbor_pair {
 public:
   explicit Neighbor_pair(
       std::pair<Particle_handle, Particle_handle> objects) noexcept
-      : objects{objects.first.value, objects.second.value},
+      : objects{objects.first.value(), objects.second.value()},
         type{Object_pair_type::particle_particle} {}
 
   explicit Neighbor_pair(
       std::pair<Particle_handle, Rigid_body_handle> objects) noexcept
-      : objects{objects.first.value, objects.second.value},
+      : objects{objects.first.value(), objects.second.value()},
         type{Object_pair_type::particle_rigid_body} {}
 
   explicit Neighbor_pair(
       std::pair<Particle_handle, Static_body_handle> objects) noexcept
-      : objects{objects.first.value, objects.second.value},
+      : objects{objects.first.value(), objects.second.value()},
         type{Object_pair_type::particle_static_body} {}
 
   explicit Neighbor_pair(
@@ -76,12 +74,12 @@ public:
 
   explicit Neighbor_pair(
       std::pair<Rigid_body_handle, Rigid_body_handle> objects) noexcept
-      : objects{objects.first.value, objects.second.value},
+      : objects{objects.first.value(), objects.second.value()},
         type{Object_pair_type::rigid_body_rigid_body} {}
 
   explicit Neighbor_pair(
       std::pair<Rigid_body_handle, Static_body_handle> objects) noexcept
-      : objects{objects.first.value, objects.second.value},
+      : objects{objects.first.value(), objects.second.value()},
         type{Object_pair_type::rigid_body_static_body} {}
 
   explicit Neighbor_pair(
@@ -155,7 +153,7 @@ public:
   other(Particle_handle object) const noexcept {
     switch (type) {
     case Object_pair_type::particle_particle:
-      return Particle_handle{objects[objects[0] == object.value ? 1 : 0]};
+      return Particle_handle{objects[objects[0] == object.value() ? 1 : 0]};
     case Object_pair_type::particle_rigid_body:
       return Rigid_body_handle{objects[1]};
     case Object_pair_type::particle_static_body:
@@ -171,7 +169,7 @@ public:
     case Object_pair_type::particle_rigid_body:
       return Particle_handle{objects[0]};
     case Object_pair_type::rigid_body_rigid_body:
-      return Rigid_body_handle{objects[objects[0] == object.value ? 1 : 0]};
+      return Rigid_body_handle{objects[objects[0] == object.value() ? 1 : 0]};
     case Object_pair_type::rigid_body_static_body:
       return Static_body_handle{objects[1]};
     default:
@@ -267,8 +265,8 @@ public:
         decltype(_available_handles)::make(allocator, max_particles).second;
     _available_handles.resize(max_particles);
     for (auto i = std::size_t{}; i != max_particles; ++i) {
-      _available_handles[i] = {
-          static_cast<std::uint32_t>(max_particles - i - 1)};
+      _available_handles[i] =
+          Particle_handle{static_cast<Object_handle>(max_particles - i - 1)};
     }
     _occupancy_bits = Bit_list::make(allocator, max_particles).second;
     _occupancy_bits.resize(max_particles);
@@ -280,22 +278,22 @@ public:
     }
     auto const result = _available_handles.back();
     _available_handles.pop_back();
-    _data[result.value].construct(data);
-    _occupancy_bits.set(result.value);
+    _data[result.index()].construct(data);
+    _occupancy_bits.set(result.index());
     return result;
   }
 
   void destroy(Particle_handle particle) {
     _available_handles.emplace_back(particle);
-    _occupancy_bits.reset(particle.value);
+    _occupancy_bits.reset(particle.index());
   }
 
   Particle_data const *data(Particle_handle particle) const noexcept {
-    return _data[particle.value].get();
+    return _data[particle.index()].get();
   }
 
   Particle_data *data(Particle_handle particle) noexcept {
-    return _data[particle.value].get();
+    return _data[particle.index()].get();
   }
 
   template <typename F> void for_each(F &&f) {
@@ -353,8 +351,8 @@ public:
         decltype(_available_handles)::make(allocator, max_rigid_bodies).second;
     _available_handles.resize(max_rigid_bodies);
     for (auto i = std::size_t{}; i != max_rigid_bodies; ++i) {
-      _available_handles[i] = {
-          static_cast<std::uint32_t>(max_rigid_bodies - i - 1)};
+      _available_handles[i] = Rigid_body_handle{
+          static_cast<Object_handle>(max_rigid_bodies - i - 1)};
     }
     _occupancy_bits = Bit_list::make(allocator, max_rigid_bodies).second;
     _occupancy_bits.resize(max_rigid_bodies);
@@ -366,22 +364,22 @@ public:
     }
     auto const result = _available_handles.back();
     _available_handles.pop_back();
-    _data[result.value].construct(data);
-    _occupancy_bits.set(result.value);
+    _data[result.index()].construct(data);
+    _occupancy_bits.set(result.index());
     return result;
   }
 
   void destroy(Rigid_body_handle rigid_body) {
     _available_handles.emplace_back(rigid_body);
-    _occupancy_bits.reset(rigid_body.value);
+    _occupancy_bits.reset(rigid_body.index());
   }
 
   Rigid_body_data const *data(Rigid_body_handle rigid_body) const noexcept {
-    return _data[rigid_body.value].get();
+    return _data[rigid_body.index()].get();
   }
 
   Rigid_body_data *data(Rigid_body_handle rigid_body) noexcept {
-    return _data[rigid_body.value].get();
+    return _data[rigid_body.index()].get();
   }
 
   template <typename F> void for_each(F &&f) {
@@ -439,8 +437,8 @@ public:
         decltype(_available_handles)::make(allocator, max_static_bodies).second;
     _available_handles.resize(max_static_bodies);
     for (auto i = std::size_t{}; i != max_static_bodies; ++i) {
-      _available_handles[i] = {
-          static_cast<std::uint32_t>(max_static_bodies - i - 1)};
+      _available_handles[i] = Static_body_handle{
+          static_cast<Object_handle>(max_static_bodies - i - 1)};
     }
     _occupancy_bits =
         decltype(_occupancy_bits)::make(allocator, max_static_bodies).second;
@@ -453,22 +451,22 @@ public:
     }
     auto const result = _available_handles.back();
     _available_handles.pop_back();
-    _data[result.value].construct(data);
-    _occupancy_bits.set(result.value);
+    _data[result.index()].construct(data);
+    _occupancy_bits.set(result.index());
     return result;
   }
 
   void destroy(Static_body_handle static_body) {
     _available_handles.emplace_back(static_body);
-    _occupancy_bits.reset(static_body.value);
+    _occupancy_bits.reset(static_body.index());
   }
 
   Static_body_data const *data(Static_body_handle static_body) const noexcept {
-    return _data[static_body.value].get();
+    return _data[static_body.index()].get();
   }
 
   Static_body_data *data(Static_body_handle static_body) noexcept {
-    return _data[static_body.value].get();
+    return _data[static_body.index()].get();
   }
 
   template <typename F> void for_each(F &&f) {
@@ -490,99 +488,6 @@ private:
   List<Lifetime_box<Static_body_data>> _data;
   List<Static_body_handle> _available_handles;
   Bit_list _occupancy_bits;
-};
-
-class Dynamic_object_list {
-  using Allocator = Stack_allocator<>;
-
-public:
-  template <typename Allocator>
-  static std::pair<Block, Dynamic_object_list> make(Allocator &allocator,
-                                                    std::size_t max_size) {
-    auto const block = allocator.alloc(memory_requirement(max_size));
-    return {block, Dynamic_object_list{block, max_size}};
-  }
-
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_size) noexcept {
-    return Allocator::memory_requirement(
-        {decltype(_object_types)::memory_requirement(max_size),
-         decltype(_object_handles)::memory_requirement(max_size)});
-  }
-
-  constexpr Dynamic_object_list() noexcept = default;
-
-  explicit Dynamic_object_list(Block block, std::size_t max_size) noexcept
-      : Dynamic_object_list{block.begin, max_size} {}
-
-  explicit Dynamic_object_list(void *block_begin,
-                               std::size_t max_size) noexcept {
-    auto allocator =
-        Allocator{make_block(block_begin, memory_requirement(max_size))};
-    _object_types = List<Object_type>::make(allocator, max_size).second;
-    _object_handles = List<Object_handle>::make(allocator, max_size).second;
-  }
-
-  std::variant<Particle_handle, Rigid_body_handle>
-  at(std::size_t i) const noexcept {
-    auto const object_type = _object_types[i];
-    auto const object_handle = _object_handles[i];
-    switch (object_type) {
-    case Object_type::particle:
-      return Particle_handle{object_handle};
-    case Object_type::rigid_body:
-      return Rigid_body_handle{object_handle};
-    case Object_type::static_body:
-    default:
-      math::unreachable();
-    }
-  }
-
-  std::variant<Particle_handle, Rigid_body_handle> front() const noexcept {
-    assert(!empty());
-    return at(0);
-  }
-
-  std::variant<Particle_handle, Rigid_body_handle> back() const noexcept {
-    assert(&_object_types.back() == &_object_types[size() - 1]);
-    return at(size() - 1);
-  }
-
-  bool empty() const noexcept { return _object_types.empty(); }
-
-  std::size_t size() const noexcept { return _object_types.size(); }
-
-  std::size_t max_size() const noexcept { return _object_types.max_size(); }
-
-  std::size_t capacity() const noexcept { return _object_types.capacity(); }
-
-  void clear() noexcept {
-    _object_types.clear();
-    _object_handles.clear();
-  }
-
-  void push_back(Particle_handle h) {
-    _object_types.push_back(Object_type::particle);
-    _object_handles.push_back(h.value);
-  }
-
-  void push_back(Rigid_body_handle h) {
-    _object_types.push_back(Object_type::rigid_body);
-    _object_handles.push_back(h.value);
-  }
-
-  void push_back(std::variant<Particle_handle, Rigid_body_handle> h) {
-    std::visit([this](auto &&arg) { push_back(arg); }, h);
-  }
-
-  void pop_back() {
-    _object_types.pop_back();
-    _object_handles.pop_back();
-  }
-
-private:
-  List<Object_type> _object_types;
-  List<Object_handle> _object_handles;
 };
 
 class Neighbor_group_storage {
@@ -649,9 +554,8 @@ public:
 
   std::size_t object_count() const noexcept { return _objects.size(); }
 
-  std::variant<Particle_handle, Rigid_body_handle>
-  object(std::size_t object_index) const noexcept {
-    return _objects.at(object_index);
+  Object_handle object(std::size_t object_index) const noexcept {
+    return _objects[object_index];
   }
 
   std::size_t neighbor_pair_count() const noexcept {
@@ -686,18 +590,14 @@ public:
     });
   }
 
-  void add_to_group(Particle_handle object) {
-    _objects.push_back(object);
+  void add_to_group(Particle_handle particle) {
+    _objects.push_back(particle.value());
     ++_groups.back().objects_end;
   }
 
-  void add_to_group(Rigid_body_handle object) {
-    _objects.push_back(object);
+  void add_to_group(Rigid_body_handle rigid_body) {
+    _objects.push_back(rigid_body.value());
     ++_groups.back().objects_end;
-  }
-
-  void add_to_group(std::variant<Particle_handle, Rigid_body_handle> object) {
-    std::visit([this](auto &&arg) { add_to_group(arg); }, object);
   }
 
   void add_to_group(Neighbor_pair *neighbor_pair) {
@@ -706,7 +606,7 @@ public:
   }
 
 private:
-  Dynamic_object_list _objects;
+  List<Object_handle> _objects;
   List<Neighbor_pair *> _neighbor_pairs;
   List<Group> _groups;
 };
@@ -1996,25 +1896,30 @@ private:
     _particles.for_each(unmark);
     _rigid_bodies.for_each(unmark);
     auto const visitor = [this](auto &&handle) {
-      for (auto const pair : get_neighbor_pairs(get_data(handle))) {
-        std::visit(
-            [&](auto &&neighbor_handle) {
-              using T = std::decay_t<decltype(neighbor_handle)>;
-              if constexpr (!std::is_same_v<T, Static_body_handle>) {
-                auto const neighbor_data = get_data(neighbor_handle);
-                if (!neighbor_data->marked) {
-                  neighbor_data->marked = true;
-                  _neighbor_groups.add_to_group(neighbor_handle);
-                }
-                if (pair->color() == color_unmarked) {
-                  pair->color(color_marked);
+      using T = std::decay_t<decltype(handle)>;
+      if constexpr (!std::is_same_v<T, Static_body_handle>) {
+        for (auto const pair : get_neighbor_pairs(get_data(handle))) {
+          std::visit(
+              [&](auto &&neighbor_handle) {
+                using U = std::decay_t<decltype(neighbor_handle)>;
+                if constexpr (!std::is_same_v<U, Static_body_handle>) {
+                  auto const neighbor_data = get_data(neighbor_handle);
+                  if (!neighbor_data->marked) {
+                    neighbor_data->marked = true;
+                    _neighbor_groups.add_to_group(neighbor_handle);
+                  }
+                  if (pair->color() == color_unmarked) {
+                    pair->color(color_marked);
+                    _neighbor_groups.add_to_group(pair);
+                  }
+                } else {
                   _neighbor_groups.add_to_group(pair);
                 }
-              } else {
-                _neighbor_groups.add_to_group(pair);
-              }
-            },
-            pair->other(handle));
+              },
+              pair->other(handle));
+        }
+      } else {
+        math::unreachable();
       }
     };
     auto fringe_index = std::size_t{};
@@ -2025,7 +1930,7 @@ private:
         _neighbor_groups.begin_group();
         _neighbor_groups.add_to_group(seed_handle);
         do {
-          std::visit(visitor, _neighbor_groups.object(fringe_index));
+          visit(visitor, _neighbor_groups.object(fringe_index));
         } while (++fringe_index != _neighbor_groups.object_count());
       }
     };
@@ -2042,16 +1947,21 @@ private:
          (sleepable || !contains_awake || !contains_sleeping) &&
          i != group.objects_end;
          ++i) {
-      std::visit(
+      visit(
           [&](auto &&handle) {
-            auto const data = get_data(handle);
-            if (data->awake) {
-              contains_awake = true;
-              if (data->waking_motion > waking_motion_epsilon) {
-                sleepable = false;
+            using T = std::decay_t<decltype(handle)>;
+            if constexpr (!std::is_same_v<T, Static_body_handle>) {
+              auto const data = get_data(handle);
+              if (data->awake) {
+                contains_awake = true;
+                if (data->waking_motion > waking_motion_epsilon) {
+                  sleepable = false;
+                }
+              } else {
+                contains_sleeping = true;
               }
             } else {
-              contains_sleeping = true;
+              math::unreachable();
             }
           },
           _neighbor_groups.object(i));
@@ -2060,12 +1970,17 @@ private:
       if (sleepable) {
         for (auto i = group.objects_begin; i != group.objects_end; ++i) {
           auto const object = _neighbor_groups.object(i);
-          std::visit(
+          visit(
               [&](auto &&handle) {
-                auto const data = get_data(handle);
-                if (data->awake) {
-                  data->awake = false;
-                  freeze(data);
+                using T = std::decay_t<decltype(handle)>;
+                if constexpr (!std::is_same_v<T, Static_body_handle>) {
+                  auto const data = get_data(handle);
+                  if (data->awake) {
+                    data->awake = false;
+                    freeze(data);
+                  }
+                } else {
+                  math::unreachable();
                 }
               },
               object);
@@ -2074,16 +1989,20 @@ private:
       } else {
         if (contains_sleeping) {
           for (auto i = group.objects_begin; i != group.objects_end; ++i) {
-            auto const object = _neighbor_groups.object(i);
-            std::visit(
+            visit(
                 [&](auto &&handle) {
-                  auto const data = get_data(handle);
-                  if (!data->awake) {
-                    data->awake = true;
-                    data->waking_motion = waking_motion_initializer;
+                  using T = std::decay_t<decltype(handle)>;
+                  if constexpr (!std::is_same_v<T, Static_body_handle>) {
+                    auto const data = get_data(handle);
+                    if (!data->awake) {
+                      data->awake = true;
+                      data->waking_motion = waking_motion_initializer;
+                    }
+                  } else {
+                    math::unreachable();
                   }
                 },
-                object);
+                _neighbor_groups.object(i));
           }
         }
         return true;
@@ -2180,53 +2099,56 @@ private:
                                 float waking_motion_smoothing_factor) {
     auto const &group = _neighbor_groups.group(group_index);
     for (auto i = group.objects_begin; i != group.objects_end; ++i) {
-      std::visit(
+      visit(
           [&](auto &&object) {
-            integrate(object,
-                      delta_time,
-                      velocity_damping_factor,
-                      waking_motion_smoothing_factor);
+            using T = std::decay_t<decltype(object)>;
+            if constexpr (!std::is_same_v<T, Static_body_handle>) {
+              integrate(get_data(object),
+                        delta_time,
+                        velocity_damping_factor,
+                        waking_motion_smoothing_factor);
+            } else {
+              math::unreachable();
+            }
           },
           _neighbor_groups.object(i));
     }
   }
 
-  void integrate(Particle_handle particle,
+  void integrate(Particle_data *particle,
                  float delta_time,
                  float velocity_damping_factor,
                  float waking_motion_smoothing_factor) {
-    auto const data = _particles.data(particle);
-    data->previous_position = data->position;
-    data->velocity += delta_time * _gravitational_acceleration;
-    data->velocity *= velocity_damping_factor;
-    data->position += delta_time * data->velocity;
-    data->waking_motion =
-        min((1.0f - waking_motion_smoothing_factor) * data->waking_motion +
-                waking_motion_smoothing_factor * length_squared(data->velocity),
-            waking_motion_limit);
+    particle->previous_position = particle->position;
+    particle->velocity += delta_time * _gravitational_acceleration;
+    particle->velocity *= velocity_damping_factor;
+    particle->position += delta_time * particle->velocity;
+    particle->waking_motion = min(
+        (1.0f - waking_motion_smoothing_factor) * particle->waking_motion +
+            waking_motion_smoothing_factor * length_squared(particle->velocity),
+        waking_motion_limit);
   }
 
-  void integrate(Rigid_body_handle rigid_body,
+  void integrate(Rigid_body_data *rigid_body,
                  float delta_time,
                  float velocity_damping_factor,
                  float waking_motion_smoothing_factor) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    data->previous_position = data->position;
-    data->previous_orientation = data->orientation;
-    data->velocity += delta_time * _gravitational_acceleration;
-    data->velocity *= velocity_damping_factor;
-    data->position += delta_time * data->velocity;
-    data->angular_velocity *= velocity_damping_factor;
-    data->orientation +=
-        Quatf{0.0f, 0.5f * delta_time * data->angular_velocity} *
-        data->orientation;
-    data->orientation = normalize(data->orientation);
-    data->waking_motion =
-        min((1.0f - waking_motion_smoothing_factor) * data->waking_motion +
-                waking_motion_smoothing_factor *
-                    (length_squared(data->velocity) +
-                     length_squared(data->angular_velocity)),
-            waking_motion_limit);
+    rigid_body->previous_position = rigid_body->position;
+    rigid_body->previous_orientation = rigid_body->orientation;
+    rigid_body->velocity += delta_time * _gravitational_acceleration;
+    rigid_body->velocity *= velocity_damping_factor;
+    rigid_body->position += delta_time * rigid_body->velocity;
+    rigid_body->angular_velocity *= velocity_damping_factor;
+    rigid_body->orientation +=
+        Quatf{0.0f, 0.5f * delta_time * rigid_body->angular_velocity} *
+        rigid_body->orientation;
+    rigid_body->orientation = normalize(rigid_body->orientation);
+    rigid_body->waking_motion = min(
+        (1.0f - waking_motion_smoothing_factor) * rigid_body->waking_motion +
+            waking_motion_smoothing_factor *
+                (length_squared(rigid_body->velocity) +
+                 length_squared(rigid_body->angular_velocity)),
+        waking_motion_limit);
   }
 
   void solve_positions(util::Thread_pool &thread_pool,
@@ -2265,26 +2187,33 @@ private:
                                         float inverse_delta_time) {
     auto const &group = _neighbor_groups.group(group_index);
     for (auto i = group.objects_begin; i != group.objects_end; ++i) {
-      std::visit(
-          [&](auto &&object) { derive_velocity(object, inverse_delta_time); },
+      visit(
+          [&](auto &&object) {
+            using T = std::decay_t<decltype(object)>;
+            if constexpr (!std::is_same_v<T, Static_body_handle>) {
+              derive_velocity(get_data(object), inverse_delta_time);
+            } else {
+              math::unreachable();
+            }
+          },
           _neighbor_groups.object(i));
     }
   }
 
-  void derive_velocity(Particle_handle particle, float inverse_delta_time) {
-    auto const data = _particles.data(particle);
-    data->velocity =
-        (data->position - data->previous_position) * inverse_delta_time;
+  void derive_velocity(Particle_data *particle, float inverse_delta_time) {
+    particle->velocity =
+        (particle->position - particle->previous_position) * inverse_delta_time;
   }
 
-  void derive_velocity(Rigid_body_handle rigid_body, float inverse_delta_time) {
-    auto const data = _rigid_bodies.data(rigid_body);
-    data->velocity =
-        (data->position - data->previous_position) * inverse_delta_time;
+  void derive_velocity(Rigid_body_data *rigid_body, float inverse_delta_time) {
+    rigid_body->velocity =
+        (rigid_body->position - rigid_body->previous_position) *
+        inverse_delta_time;
     auto const delta_orientation =
-        data->orientation * conjugate(data->previous_orientation);
-    data->angular_velocity = 2.0f * delta_orientation.v * inverse_delta_time;
-    data->angular_velocity *= delta_orientation.w >= 0.0f ? 1.0f : -1.0f;
+        rigid_body->orientation * conjugate(rigid_body->previous_orientation);
+    rigid_body->angular_velocity =
+        2.0f * delta_orientation.v * inverse_delta_time;
+    rigid_body->angular_velocity *= delta_orientation.w >= 0.0f ? 1.0f : -1.0f;
   }
 
   void solve_velocities(util::Thread_pool &thread_pool,

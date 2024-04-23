@@ -8,16 +8,12 @@
 #include <unordered_map>
 
 #include "../math/vec.h"
-#include "handle.h"
 #include "material.h"
+#include "object.h"
 
 namespace marlon {
 namespace physics {
 class Particle_motion_callback;
-
-struct Particle_handle {
-  Object_handle value;
-};
 
 struct Particle_create_info {
   Particle_motion_callback *motion_callback{};
@@ -39,7 +35,7 @@ public:
 };
 
 constexpr bool operator==(Particle_handle lhs, Particle_handle rhs) noexcept {
-  return lhs.value == rhs.value;
+  return lhs.value() == rhs.value();
 }
 } // namespace physics
 } // namespace marlon
@@ -48,7 +44,7 @@ namespace std {
 template <> struct hash<marlon::physics::Particle_handle> {
   std::size_t operator()(
       marlon::physics::Particle_handle particle_reference) const noexcept {
-    return hash<std::size_t>{}(particle_reference.value);
+    return hash<std::size_t>{}(particle_reference.value());
   }
 };
 } // namespace std
