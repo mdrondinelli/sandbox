@@ -33,11 +33,7 @@ using util::Stack_allocator;
 
 using util::make_block;
 namespace physics {
-
 namespace {
-using Aabb_tree_payload_t =
-    std::variant<Particle_handle, Rigid_body_handle, Static_body_handle>;
-
 auto constexpr color_unmarked{static_cast<std::uint16_t>(-1)};
 auto constexpr color_marked{static_cast<std::uint16_t>(-2)};
 auto constexpr reserved_colors{std::size_t{2}};
@@ -95,7 +91,7 @@ private:
 };
 
 struct Particle_data {
-  Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node{};
+  Aabb_tree<Object_handle>::Node *aabb_tree_node{};
   Neighbor_pair **neighbor_pairs{};
   Particle_motion_callback *motion_callback{};
   float radius{};
@@ -111,7 +107,7 @@ struct Particle_data {
 };
 
 struct Rigid_body_data {
-  Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node{};
+  Aabb_tree<Object_handle>::Node *aabb_tree_node{};
   Neighbor_pair **neighbor_pairs{};
   Rigid_body_motion_callback *motion_callback{};
   Shape shape;
@@ -131,7 +127,7 @@ struct Rigid_body_data {
 };
 
 struct Static_body_data {
-  Aabb_tree<Aabb_tree_payload_t>::Node *aabb_tree_node;
+  Aabb_tree<Object_handle>::Node *aabb_tree_node;
   Shape shape;
   Material material;
   Mat3x4f transform;
@@ -1507,11 +1503,11 @@ public:
     _static_bodies =
         Static_body_storage::make(allocator, create_info.max_static_bodies)
             .second;
-    _aabb_tree = make_aabb_tree<Aabb_tree_payload_t>(
-                     allocator,
-                     create_info.max_aabb_tree_leaf_nodes,
-                     create_info.max_aabb_tree_internal_nodes)
-                     .second;
+    _aabb_tree =
+        make_aabb_tree<Object_handle>(allocator,
+                                      create_info.max_aabb_tree_leaf_nodes,
+                                      create_info.max_aabb_tree_internal_nodes)
+            .second;
     _neighbor_pairs =
         List<Neighbor_pair>::make(allocator, create_info.max_neighbor_pairs)
             .second;
@@ -1570,7 +1566,7 @@ public:
         Aabb{create_info.position - Vec3f::all(create_info.radius),
              create_info.position + Vec3f::all(create_info.radius)};
     auto const particle = _particles.create({
-        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Particle_handle{}),
+        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Object_handle{}),
         .motion_callback = create_info.motion_callback,
         .radius = create_info.radius,
         .inverse_mass = 1.0f / create_info.mass,
@@ -1582,7 +1578,7 @@ public:
         .marked = false,
         .awake = true,
     });
-    _particles.data(particle)->aabb_tree_node->payload = particle;
+    _particles.data(particle)->aabb_tree_node->payload = particle.value();
     return particle;
   }
 
@@ -1609,7 +1605,7 @@ public:
         Mat3x4f::rigid(create_info.position, create_info.orientation);
     auto const bounds = physics::bounds(create_info.shape, transform);
     auto const rigid_body = _rigid_bodies.create({
-        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Rigid_body_handle{}),
+        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Object_handle{}),
         .motion_callback = create_info.motion_callback,
         .shape = create_info.shape,
         .inverse_mass = 1.0f / create_info.mass,
@@ -1625,7 +1621,8 @@ public:
         .marked = false,
         .awake = true,
     });
-    _rigid_bodies.data(rigid_body)->aabb_tree_node->payload = rigid_body;
+    _rigid_bodies.data(rigid_body)->aabb_tree_node->payload =
+        rigid_body.value();
     return rigid_body;
   }
 
@@ -1657,13 +1654,14 @@ public:
     auto const transform_inverse = rigid_inverse(transform);
     auto const bounds = physics::bounds(create_info.shape, transform);
     auto const static_body = _static_bodies.create({
-        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Static_body_handle{}),
+        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Object_handle{}),
         .shape = create_info.shape,
         .material = create_info.material,
         .transform = transform,
         .inverse_transform = transform_inverse,
     });
-    _static_bodies.data(static_body)->aabb_tree_node->payload = static_body;
+    _static_bodies.data(static_body)->aabb_tree_node->payload =
+        static_body.value();
     return static_body;
   }
 
@@ -1780,11 +1778,10 @@ private:
 
   void find_neighbor_pairs() {
     _aabb_tree.for_each_overlapping_leaf_pair(
-        [this](Aabb_tree_payload_t const &first_payload,
-               Aabb_tree_payload_t const &second_payload) {
-          std::visit(
+        [this](Object_handle first_payload, Object_handle second_payload) {
+          visit(
               [&](auto &&first_handle) {
-                std::visit(
+                visit(
                     [&](auto &&second_handle) {
                       using T = std::decay_t<decltype(first_handle)>;
                       using U = std::decay_t<decltype(second_handle)>;
@@ -2282,7 +2279,7 @@ private:
   Particle_storage _particles;
   Static_body_storage _static_bodies;
   Rigid_body_storage _rigid_bodies;
-  Aabb_tree<Aabb_tree_payload_t> _aabb_tree;
+  Aabb_tree<Object_handle> _aabb_tree;
   List<Neighbor_pair> _neighbor_pairs;
   List<Neighbor_pair *> _neighbor_pair_ptrs;
   Neighbor_group_storage _neighbor_groups;
