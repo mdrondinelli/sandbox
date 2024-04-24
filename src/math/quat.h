@@ -98,6 +98,11 @@ constexpr auto &operator-=(Quat<T> &q1, Quat<T> const &q2) noexcept {
   return q1 = (q1 - q2);
 }
 
+template <typename T>
+constexpr auto dot(Quat<T> const &q1, Quat<T> const &q2) noexcept {
+  return q1.w * q2.w + dot(q1.v, q2.v);
+}
+
 template <typename T> constexpr auto length_squared(Quat<T> const &q) noexcept {
   return q.w * q.w + length_squared(q.v);
 }
