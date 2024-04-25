@@ -53,7 +53,7 @@ public:
                                     std::size_t max_node_count,
                                     std::size_t max_bucket_count) {
     auto const block =
-        allocator.alloc(memory_requirement(max_size, max_bucket_count));
+        allocator.alloc(memory_requirement(max_node_count, max_bucket_count));
     return {block, Map{block, max_node_count, max_bucket_count}};
   }
 

@@ -21,6 +21,34 @@ struct World_create_info {
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 
+struct Particle_create_info {
+  Particle_motion_callback *motion_callback{};
+  float radius{0.0f};
+  float mass{1.0f};
+  Material material;
+  math::Vec3f position{math::Vec3f::zero()};
+  math::Vec3f velocity{math::Vec3f::zero()};
+};
+
+struct Rigid_body_create_info {
+  Rigid_body_motion_callback *motion_callback{};
+  Shape shape;
+  float mass{1.0f};
+  math::Mat3x3f inertia_tensor{math::Mat3x3f::identity()};
+  Material material;
+  math::Vec3f position{math::Vec3f::zero()};
+  math::Vec3f velocity{math::Vec3f::zero()};
+  math::Quatf orientation{math::Quatf::identity()};
+  math::Vec3f angular_velocity{math::Vec3f::zero()};
+};
+
+struct Static_body_create_info {
+  Shape shape;
+  Material material;
+  math::Vec3f position{math::Vec3f::zero()};
+  math::Quatf orientation{math::Quatf::identity()};
+};
+
 struct World_simulate_info {
   util::Thread_pool *thread_pool;
   float delta_time{1.0f / 64.0f};

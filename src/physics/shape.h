@@ -7,9 +7,9 @@
 #include <type_traits>
 #include <variant>
 
-#include "../math/mat.h"
-#include "../math/vec.h"
+#include "../math/math.h"
 #include "aabb.h"
+#include "contact.h"
 #include "particle.h"
 
 namespace marlon {
@@ -27,19 +27,6 @@ struct Box {
   math::Vec3f half_extents;
 };
 
-struct Positionless_contact_geometry {
-  math::Vec3f normal;
-  float separation;
-};
-
-struct Positionful_contact_geometry {
-  math::Vec3f position;
-  math::Vec3f normal;
-  float separation;
-};
-
-template <typename T> struct Support_function;
-
 class Shape {
 public:
   Shape(Ball const &ball) noexcept : _v{ball} {}
@@ -51,24 +38,20 @@ public:
   friend Aabb bounds(Shape const &shape,
                      math::Mat3x4f const &transform) noexcept;
 
-  friend std::optional<Positionless_contact_geometry>
-  particle_shape_positionless_contact_geometry(
-      math::Vec3f const &particle_position, float particle_radius,
-      Shape const &shape, math::Mat3x4f const &shape_transform,
-      math::Mat3x4f const &shape_transform_inverse) noexcept;
+  friend std::optional<Contact>
+  particle_shape_contact(float particle_radius,
+                         math::Vec3f const &particle_position,
+                         Shape const &shape,
+                         math::Mat3x4f const &shape_transform,
+                         math::Mat3x4f const &shape_transform_inv) noexcept;
 
-  friend std::optional<Positionful_contact_geometry>
-  particle_shape_positionful_contact_geometry(
-      math::Vec3f const &particle_position, float particle_radius,
-      Shape const &shape, math::Mat3x4f const &shape_transform,
-      math::Mat3x4f const &shape_transform_inverse) noexcept;
-
-  friend std::optional<Positionful_contact_geometry>
-  shape_shape_contact_geometry(
-      Shape const &shape_a, math::Mat3x4f const &transform_a,
-      math::Mat3x4f const &inverse_transform_a, Shape const &shape_b,
-      math::Mat3x4f const &transform_b,
-      math::Mat3x4f const &inverse_transform_b) noexcept;
+  friend std::optional<Contact>
+  shape_shape_contact(Shape const &shape_a,
+                      math::Mat3x4f const &transform_a,
+                      math::Mat3x4f const &transform_a_inv,
+                      Shape const &shape_b,
+                      math::Mat3x4f const &transform_b,
+                      math::Mat3x4f const &transform_b_inv) noexcept;
 
 private:
   std::variant<Ball, Capsule, Box> _v;
@@ -79,7 +62,8 @@ inline Aabb bounds(Ball const &ball, math::Vec3f const &position) {
           .max = position + math::Vec3f::all(ball.radius)};
 }
 
-inline Aabb bounds(Capsule const &capsule, math::Vec3f const &position,
+inline Aabb bounds(Capsule const &capsule,
+                   math::Vec3f const &position,
                    math::Vec3f const &axis) noexcept {
   auto const world_space_half_extents =
       abs(axis) + math::Vec3f::all(capsule.radius);
@@ -198,392 +182,355 @@ constexpr math::Mat3x3f surface_inertia_tensor(Box const &box) noexcept {
          (3.0f * (w * h + w * d + h * d));
 }
 
-inline std::optional<Positionless_contact_geometry>
-particle_ball_positionless_contact_geometry(
-    math::Vec3f const &particle_position, float particle_radius,
-    Ball const &ball, math::Vec3f const &ball_position) noexcept {
+inline std::optional<Contact>
+particle_shape_contact(float particle_radius,
+                       math::Vec3f const &particle_position,
+                       Ball const &ball,
+                       math::Mat3x4f const &ball_transform,
+                       math::Mat3x4f const &ball_transform_inv) noexcept {
+  using namespace math;
+  auto const ball_position = column(ball_transform, 3);
   auto const displacement = particle_position - ball_position;
   auto const distance2 = length_squared(displacement);
   auto const contact_distance = ball.radius + particle_radius;
   auto const contact_distance2 = contact_distance * contact_distance;
-  if (distance2 > contact_distance2) {
-    return std::nullopt;
-  } else if (distance2 != 0.0f) {
-    auto const distance = std::sqrt(distance2);
-    return Positionless_contact_geometry{
-        .normal = displacement / distance,
-        .separation = distance - contact_distance,
+  if (distance2 <= contact_distance2) {
+    auto const distance = sqrt(distance2);
+    auto const normal = displacement / distance;
+    auto const ball_relative_position = min(ball.radius, distance) * normal;
+    auto const ball_local_position =
+        ball_transform_inv * Vec4f{ball_relative_position, 0.0f};
+    auto const position = ball_position + ball_relative_position;
+    auto const particle_local_position = particle_position - position;
+    return Contact{
+        .normal = normal,
+        .local_positions = {particle_local_position, ball_local_position},
+        .separation_bias = distance - contact_distance,
     };
   } else {
-    return Positionless_contact_geometry{
-        .normal = math::Vec3f::x_axis(),
-        .separation = -contact_distance,
+    return std::nullopt;
+  }
+}
+
+inline std::optional<Contact> particle_shape_contact(
+    float /*particle_radius*/,
+    math::Vec3f const & /*particle_position*/,
+    Capsule const & /*capsule*/,
+    math::Mat3x4f const & /*capsule_transform*/,
+    math::Mat3x4f const & /*capsule_transform_inv*/) noexcept {
+  return std::nullopt;
+}
+
+inline std::optional<Contact>
+particle_shape_contact(float particle_radius,
+                       math::Vec3f const &particle_position,
+                       Box const &box,
+                       math::Mat3x4f const &box_transform,
+                       math::Mat3x4f const &box_transform_inverse) noexcept {
+  using namespace math;
+  auto const box_local_particle_position =
+      box_transform_inverse * Vec4f{particle_position, 1.0f};
+  if (abs(box_local_particle_position.x) - particle_radius >
+          box.half_extents[0] ||
+      abs(box_local_particle_position.y) - particle_radius >
+          box.half_extents[1] ||
+      abs(box_local_particle_position.z) - particle_radius >
+          box.half_extents[2]) {
+    return std::nullopt;
+  }
+  auto const box_local_clamped_particle_position =
+      clamp(box_local_particle_position, -box.half_extents, box.half_extents);
+  auto const box_local_displacement =
+      box_local_particle_position - box_local_clamped_particle_position;
+  auto const distance_squared = length_squared(box_local_displacement);
+  auto const particle_radius_squared = particle_radius * particle_radius;
+  if (distance_squared > particle_radius_squared) {
+    return std::nullopt;
+  } else if (distance_squared != 0.0f) {
+    auto const distance = sqrt(distance_squared);
+    auto const position =
+        box_transform * Vec4f{box_local_clamped_particle_position, 1.0f};
+    auto const particle_local_position = position - particle_position;
+    auto const normal = -particle_local_position / distance;
+    auto const separation = distance - particle_radius;
+    return Contact{
+        .normal = normal,
+        .local_positions = {box_local_clamped_particle_position,
+                            particle_local_position},
+        .separation_bias = separation,
+    };
+  } else {
+    auto const face_distances = std::array<float, 6>{
+        box_local_clamped_particle_position.x + box.half_extents[0],
+        box.half_extents[0] - box_local_clamped_particle_position.x,
+        box_local_clamped_particle_position.y + box.half_extents[1],
+        box.half_extents[1] - box_local_clamped_particle_position.y,
+        box_local_clamped_particle_position.z + box.half_extents[2],
+        box.half_extents[2] - box_local_clamped_particle_position.z,
+    };
+    auto const face_index =
+        std::min_element(face_distances.begin(), face_distances.end()) -
+        face_distances.begin();
+    auto const face_normals = std::array<Vec3f, 6>{
+        -column(box_transform, 0),
+        column(box_transform, 0),
+        -column(box_transform, 1),
+        column(box_transform, 1),
+        -column(box_transform, 2),
+        column(box_transform, 2),
+    };
+    // auto const position =
+    //     box_transform * Vec4f{box_local_clamped_particle_position, 1.0f};
+    // auto const particle_local_position = position - ;
+    auto const normal = face_normals[face_index];
+    auto const separation = -face_distances[face_index] - particle_radius;
+    return Contact{
+        .normal = normal,
+        .local_positions = {Vec3f::zero(), box_local_clamped_particle_position},
+        .separation_bias = separation,
     };
   }
 }
 
-inline std::optional<Positionless_contact_geometry>
-particle_capsule_positionless_contact_geometry(
-    math::Vec3f const &particle_position, float particle_radius,
-    Capsule const &capsule, math::Vec3f const &capsule_position,
-    math::Vec3f const &capsule_axis) noexcept {
-  auto const t =
-      std::clamp(dot(particle_position - capsule_position, capsule_axis),
-                 -capsule.half_height, capsule.half_height);
-  auto const p = capsule_position + t * capsule_axis;
-  auto const d = particle_position - p;
-  auto const distance_squared = length_squared(d);
-  auto const contact_distance = particle_radius + capsule.radius;
+inline std::optional<Contact>
+particle_shape_contact(float particle_radius,
+                       math::Vec3f const &particle_position,
+                       Shape const &shape,
+                       math::Mat3x4f const &shape_transform,
+                       math::Mat3x4f const &shape_transform_inv) noexcept {
+  return std::visit(
+      [&](auto &&arg) {
+        return particle_shape_contact(particle_radius,
+                                      particle_position,
+                                      arg,
+                                      shape_transform,
+                                      shape_transform_inv);
+      },
+      shape._v);
+}
+
+inline std::optional<Contact>
+shape_shape_contact(Ball const &b1,
+                    math::Mat3x4f const &b1_transform,
+                    math::Mat3x4f const &b1_transform_inv,
+                    Ball const &b2,
+                    math::Mat3x4f const &b2_transform,
+                    math::Mat3x4f const &b2_transform_inv) {
+  using namespace math;
+  auto const b1_position = column(b1_transform, 3);
+  auto const b2_position = column(b2_transform, 3);
+  auto const displacement = b1_position - b2_position;
+  auto const distance_squared = length_squared(displacement);
+  auto const contact_distance = b1.radius + b2.radius;
   auto const contact_distance_squared = contact_distance * contact_distance;
   if (distance_squared > contact_distance_squared) {
     return std::nullopt;
   } else if (distance_squared != 0.0f) {
-    auto const distance = std::sqrt(distance_squared);
-    return Positionless_contact_geometry{
-        .normal = d / distance,
-        .separation = distance - contact_distance,
-    };
-  } else {
-    auto const normal =
-        cross(std::abs(capsule_axis.x) < std::abs(capsule_axis.y)
-                  ? math::Vec3f::x_axis()
-                  : math::Vec3f::y_axis(),
-              capsule_axis);
-    return Positionless_contact_geometry{
+    auto const distance = sqrt(distance_squared);
+    auto const normal = displacement / distance;
+    auto const position =
+        0.5f * (b1_position + b2_position + (b2.radius - b1.radius) * normal);
+    auto const b1_relative_position = position - b1_position;
+    auto const b2_relative_position = position - b2_position;
+    auto const b1_local_position =
+        b1_transform_inv * Vec4f{b1_relative_position, 0.0f};
+    auto const b2_local_position =
+        b2_transform_inv * Vec4f{b2_relative_position, 0.0f};
+    return Contact{
         .normal = normal,
-        .separation = -contact_distance,
+        .local_positions = {b1_local_position, b2_local_position},
+        .separation_bias = distance - contact_distance,
+    };
+  } else {
+    return Contact{
+        .normal = Vec3f::x_axis(),
+        .local_positions = {Vec3f::zero(), Vec3f::zero()},
+        .separation_bias = -contact_distance,
     };
   }
 }
 
-inline std::optional<Positionless_contact_geometry>
-particle_box_positionless_contact_geometry(
-    math::Vec3f const &particle_position, float particle_radius, Box const &box,
-    math::Mat3x4f const &box_transform,
-    math::Mat3x4f const &box_transform_inverse) noexcept {
-  auto const shape_space_particle_position =
-      box_transform_inverse * math::Vec4f{particle_position, 1.0f};
-  if (std::abs(shape_space_particle_position.x) - particle_radius >
-          box.half_extents[0] ||
-      std::abs(shape_space_particle_position.y) - particle_radius >
-          box.half_extents[1] ||
-      std::abs(shape_space_particle_position.z) - particle_radius >
-          box.half_extents[2]) {
-    return std::nullopt;
-  }
-  auto const shape_space_clamped_particle_position =
-      math::Vec3f{std::clamp(shape_space_particle_position.x,
-                             -box.half_extents[0], box.half_extents[0]),
-                  std::clamp(shape_space_particle_position.y,
-                             -box.half_extents[1], box.half_extents[1]),
-                  std::clamp(shape_space_particle_position.z,
-                             -box.half_extents[2], box.half_extents[2])};
-  auto const displacement =
-      shape_space_particle_position - shape_space_clamped_particle_position;
-  auto const distance2 = math::length_squared(displacement);
-  auto const particle_radius2 = particle_radius * particle_radius;
-  if (distance2 > particle_radius2) {
-    return std::nullopt;
-  } else if (distance2 != 0.0f) {
-    auto const distance = std::sqrt(distance2);
-    auto const normal =
-        box_transform * math::Vec4f{displacement, 0.0f} / distance;
-    auto const separation = distance - particle_radius;
-    return Positionless_contact_geometry{.normal = normal,
-                                         .separation = separation};
-  } else {
-    auto const face_distances = std::array<float, 6>{
-        shape_space_clamped_particle_position.x + box.half_extents[0],
-        box.half_extents[0] - shape_space_clamped_particle_position.x,
-        shape_space_clamped_particle_position.y + box.half_extents[1],
-        box.half_extents[1] - shape_space_clamped_particle_position.y,
-        shape_space_clamped_particle_position.z + box.half_extents[2],
-        box.half_extents[2] - shape_space_clamped_particle_position.z};
-    auto const face_normals = std::array<math::Vec3f, 6>{
-        -column(box_transform, 0), column(box_transform, 0),
-        -column(box_transform, 1), column(box_transform, 1),
-        -column(box_transform, 2), column(box_transform, 2)};
-    auto const face_index =
-        std::min_element(face_distances.begin(), face_distances.end()) -
-        face_distances.begin();
-    auto const separation = -face_distances[face_index] - particle_radius;
-    auto const normal = face_normals[face_index];
-    return Positionless_contact_geometry{.normal = normal,
-                                         .separation = separation};
-  }
-}
-
-inline std::optional<Positionless_contact_geometry>
-particle_shape_positionless_contact_geometry(
-    math::Vec3f const &particle_position, float particle_radius,
-    Shape const &shape, math::Mat3x4f const &shape_transform,
-    math::Mat3x4f const &shape_transform_inverse) noexcept {
-  return std::visit(
-      [&](auto &&arg) {
-        using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, Ball>) {
-          return particle_ball_positionless_contact_geometry(
-              particle_position, particle_radius, arg,
-              column(shape_transform, 3));
-        } else if constexpr (std::is_same_v<T, Capsule>) {
-          return particle_capsule_positionless_contact_geometry(
-              particle_position, particle_radius, arg,
-              column(shape_transform, 3), column(shape_transform, 1));
-        } else {
-          static_assert(std::is_same_v<T, Box>);
-          return particle_box_positionless_contact_geometry(
-              particle_position, particle_radius, arg, shape_transform,
-              shape_transform_inverse);
-        }
-      },
-      shape._v);
-}
-
-inline std::optional<Positionful_contact_geometry>
-particle_ball_positionful_contact_geometry(
-    math::Vec3f const &particle_position, float particle_radius,
-    Ball const &ball, math::Vec3f const &ball_position) noexcept {
-  auto const displacement = particle_position - ball_position;
-  auto const distance2 = math::length_squared(displacement);
-  auto const contact_distance = ball.radius + particle_radius;
-  auto const contact_distance2 = contact_distance * contact_distance;
-  if (distance2 <= contact_distance2) {
-    auto const distance = std::sqrt(distance2);
-    auto const normal = displacement / distance;
-    auto const position =
-        ball_position + std::min(ball.radius, distance) * normal;
-    return Positionful_contact_geometry{.position = position,
-                                        .normal = normal,
-                                        .separation =
-                                            distance - contact_distance};
-  } else {
-    return std::nullopt;
-  }
-}
-
-inline std::optional<Positionful_contact_geometry>
-particle_capsule_positionful_contact_geometry(math::Vec3f const &, float,
-                                              Capsule const &,
-                                              math::Vec3f const &,
-                                              math::Vec3f const &) noexcept {
+inline std::optional<Contact>
+shape_shape_contact(Ball const & /*ball*/,
+                    math::Mat3x4f const & /*ball_transform*/,
+                    math::Mat3x4f const & /*ball_transform_inv*/,
+                    Capsule const & /*capsule*/,
+                    math::Mat3x4f const & /*capsule_transform*/,
+                    math::Mat3x4f const & /*capsule_transform_inv*/) noexcept {
   return std::nullopt;
 }
 
-inline std::optional<Positionful_contact_geometry>
-particle_box_positionful_contact_geometry(
-    math::Vec3f const &particle_position, float particle_radius, Box const &box,
-    math::Mat3x4f const &box_transform,
-    math::Mat3x4f const &box_transform_inverse) noexcept {
-  auto const shape_space_particle_position =
-      box_transform_inverse * math::Vec4f{particle_position, 1.0f};
-  if (std::abs(shape_space_particle_position.x) - particle_radius >
-          box.half_extents[0] ||
-      std::abs(shape_space_particle_position.y) - particle_radius >
-          box.half_extents[1] ||
-      std::abs(shape_space_particle_position.z) - particle_radius >
-          box.half_extents[2]) {
+inline std::optional<Contact>
+shape_shape_contact(Ball const &ball,
+                    math::Mat3x4f const &ball_transform,
+                    math::Mat3x4f const &ball_transform_inv,
+                    Box const &box,
+                    math::Mat3x4f const &box_transform,
+                    math::Mat3x4f const &box_transform_inv) {
+  using namespace math;
+  auto const ball_position = column(ball_transform, 3);
+  auto const box_local_ball_position =
+      box_transform_inv * Vec4f{ball_position, 1.0f};
+  if (abs(box_local_ball_position.x) - ball.radius > box.half_extents[0] ||
+      abs(box_local_ball_position.y) - ball.radius > box.half_extents[1] ||
+      abs(box_local_ball_position.z) - ball.radius > box.half_extents[2]) {
     return std::nullopt;
   }
-  auto const shape_space_clamped_particle_position =
-      math::Vec3f{std::clamp(shape_space_particle_position.x,
-                             -box.half_extents[0], box.half_extents[0]),
-                  std::clamp(shape_space_particle_position.y,
-                             -box.half_extents[1], box.half_extents[1]),
-                  std::clamp(shape_space_particle_position.z,
-                             -box.half_extents[2], box.half_extents[2])};
+  auto const box_local_clamped_ball_position =
+      clamp(box_local_ball_position, -box.half_extents, box.half_extents);
   auto const displacement =
-      shape_space_particle_position - shape_space_clamped_particle_position;
-  auto const distance2 = math::length_squared(displacement);
-  auto const particle_radius2 = particle_radius * particle_radius;
-  if (distance2 > particle_radius2) {
-    return std::nullopt;
-  } else if (distance2 != 0.0f) {
-    auto const position =
-        box_transform *
-        math::Vec4f{shape_space_clamped_particle_position, 1.0f};
-    auto const distance = std::sqrt(distance2);
-    auto const normal = (particle_position - position) / distance;
-    auto const separation = distance - particle_radius;
-    return Positionful_contact_geometry{
-        .position = position, .normal = normal, .separation = separation};
-  } else {
-    auto const face_distances = std::array<float, 6>{
-        shape_space_clamped_particle_position.x + box.half_extents[0],
-        box.half_extents[0] - shape_space_clamped_particle_position.x,
-        shape_space_clamped_particle_position.y + box.half_extents[1],
-        box.half_extents[1] - shape_space_clamped_particle_position.y,
-        shape_space_clamped_particle_position.z + box.half_extents[2],
-        box.half_extents[2] - shape_space_clamped_particle_position.z};
-    auto const face_index =
-        std::min_element(face_distances.begin(), face_distances.end()) -
-        face_distances.begin();
-    auto const face_normals = std::array<math::Vec3f, 6>{
-        -column(box_transform, 0), column(box_transform, 0),
-        -column(box_transform, 1), column(box_transform, 1),
-        -column(box_transform, 2), column(box_transform, 2)};
-    auto const position =
-        box_transform *
-        math::Vec4f{shape_space_clamped_particle_position, 1.0f};
-    auto const normal = face_normals[face_index];
-    auto const separation = -face_distances[face_index] - particle_radius;
-    return Positionful_contact_geometry{
-        .position = position, .normal = normal, .separation = separation};
-  }
-}
-
-inline std::optional<Positionful_contact_geometry>
-particle_shape_positionful_contact_geometry(
-    math::Vec3f const &particle_position, float particle_radius,
-    Shape const &shape, math::Mat3x4f const &shape_transform,
-    math::Mat3x4f const &shape_transform_inverse) noexcept {
-  return std::visit(
-      [&](auto &&arg) {
-        using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, Ball>) {
-          return particle_ball_positionful_contact_geometry(
-              particle_position, particle_radius, arg,
-              column(shape_transform, 3));
-        } else if constexpr (std::is_same_v<T, Capsule>) {
-          return particle_capsule_positionful_contact_geometry(
-              particle_position, particle_radius, arg,
-              column(shape_transform, 3), column(shape_transform, 1));
-        } else {
-          static_assert(std::is_same_v<T, Box>);
-          return particle_box_positionful_contact_geometry(
-              particle_position, particle_radius, arg, shape_transform,
-              shape_transform_inverse);
-        }
-      },
-      shape._v);
-}
-
-inline std::optional<Positionful_contact_geometry>
-ball_ball_contact_geometry(Ball const &b1, math::Vec3f const &b1_position,
-                           Ball const &b2, math::Vec3f const &b2_position) {
-  auto const displacement = b1_position - b2_position;
-  auto const distance2 = math::length_squared(displacement);
-  auto const contact_distance = b1.radius + b2.radius;
-  auto const contact_distance2 = contact_distance * contact_distance;
-  if (distance2 > contact_distance2) {
-    return std::nullopt;
-  } else if (distance2 != 0.0f) {
-    auto const distance = std::sqrt(distance2);
-    auto const normal = displacement / distance;
-    auto const position =
-        b1.radius < distance ? b1_position + normal * b1.radius : b2_position;
-    return Positionful_contact_geometry{.position = position,
-                                        .normal = normal,
-                                        .separation =
-                                            distance - contact_distance};
-  } else {
-    return Positionful_contact_geometry{.position = b1_position,
-                                        .normal = math::Vec3f{1.0f, 0.0f, 0.0f},
-                                        .separation = -contact_distance};
-  }
-}
-
-inline std::optional<Positionful_contact_geometry>
-ball_capsule_contact_geometry(Ball const &, math::Vec3f const &,
-                              Capsule const &, math::Vec3f const &,
-                              math::Vec3f const &) noexcept {
-  return std::nullopt;
-}
-
-inline std::optional<Positionful_contact_geometry>
-ball_box_contact_geometry(Ball const &ball, math::Vec3f const &ball_position,
-                          Box const &box, math::Mat3x4f const &box_transform,
-                          math::Mat3x4f const &inverse_box_transform) {
-  auto const box_space_ball_position =
-      inverse_box_transform * math::Vec4f{ball_position, 1.0f};
-  if (std::abs(box_space_ball_position.x) - ball.radius > box.half_extents[0] ||
-      std::abs(box_space_ball_position.y) - ball.radius > box.half_extents[1] ||
-      std::abs(box_space_ball_position.z) - ball.radius > box.half_extents[2]) {
-    return std::nullopt;
-  }
-  auto const clamped_box_space_ball_position =
-      math::Vec3f{std::clamp(box_space_ball_position.x, -box.half_extents[0],
-                             box.half_extents[0]),
-                  std::clamp(box_space_ball_position.y, -box.half_extents[1],
-                             box.half_extents[1]),
-                  std::clamp(box_space_ball_position.z, -box.half_extents[2],
-                             box.half_extents[2])};
-  auto const displacement =
-      box_space_ball_position - clamped_box_space_ball_position;
-  auto const distance2 = math::length_squared(displacement);
+      box_local_ball_position - box_local_clamped_ball_position;
+  auto const distance2 = length_squared(displacement);
   if (distance2 > ball.radius * ball.radius) {
     return std::nullopt;
   } else if (distance2 != 0.0f) {
-    auto const distance = std::sqrt(distance2);
     auto const position =
-        box_transform * math::Vec4f{clamped_box_space_ball_position, 1.0f};
+        box_transform * Vec4f{box_local_clamped_ball_position, 1.0f};
+    auto const ball_local_position = ball_transform_inv * Vec4f{position, 1.0f};
+    auto const distance = sqrt(distance2);
     auto const normal = (ball_position - position) / distance;
-    return Positionful_contact_geometry{.position = position,
-                                        .normal = normal,
-                                        .separation = distance - ball.radius};
+    return Contact{
+        .normal = normal,
+        .local_positions = {ball_local_position,
+                            box_local_clamped_ball_position},
+        .separation_bias = distance - ball.radius,
+    };
   } else {
-    auto const distances =
-        math::Vec3f{box.half_extents[0] - std::abs(box_space_ball_position.x),
-                    box.half_extents[1] - std::abs(box_space_ball_position.y),
-                    box.half_extents[2] - std::abs(box_space_ball_position.z)};
+    auto const distances = box.half_extents - abs(box_local_ball_position);
     auto const axis = distances.x <= distances.y && distances.x <= distances.z
                           ? 0
                       : distances.y <= distances.z ? 1
                                                    : 2;
     auto const normal =
-        (std::signbit(box_space_ball_position[axis]) ? -1.0f : 1.0f) *
-        math::Vec3f{box_transform[0][axis], box_transform[1][axis],
-                    box_transform[2][axis]};
-    return Positionful_contact_geometry{.position = ball_position,
-                                        .normal = normal,
-                                        .separation =
-                                            -distances[axis] - ball.radius};
+        (std::signbit(box_local_ball_position[axis]) ? -1.0f : 1.0f) *
+        Vec3f{box_transform[0][axis],
+              box_transform[1][axis],
+              box_transform[2][axis]};
+    return Contact{
+        .normal = normal,
+        .local_positions = {Vec3f::zero(), box_local_ball_position},
+        .separation_bias = -distances[axis] - ball.radius,
+    };
   }
 }
 
-inline std::optional<Positionful_contact_geometry>
-capsule_capsule_contact_geometry(Capsule const &, math::Vec3f const &,
-                                 math::Vec3f const &, Capsule const &,
-                                 math::Vec3f const &,
-                                 math::Vec3f const &) noexcept {
+inline std::optional<Contact>
+shape_shape_contact(Capsule const &capsule,
+                    math::Mat3x4f const &capsule_transform,
+                    math::Mat3x4f const &capsule_transform_inv,
+                    Ball const &ball,
+                    math::Mat3x4f const &ball_transform,
+                    math::Mat3x4f const &ball_transform_inv) noexcept {
+  auto result = shape_shape_contact(ball,
+                                    ball_transform,
+                                    ball_transform_inv,
+                                    capsule,
+                                    capsule_transform,
+                                    capsule_transform_inv);
+  if (result) {
+    result->normal = -result->normal;
+    std::swap(result->local_positions[0], result->local_positions[1]);
+  }
+  return result;
+}
+
+inline std::optional<Contact>
+shape_shape_contact(Capsule const & /*c1*/,
+                    math::Mat3x4f const & /*c1_transform*/,
+                    math::Mat3x4f const & /*c1_transform_inv*/,
+                    Capsule const & /*c2*/,
+                    math::Mat3x4f const & /*c2_transform*/,
+                    math::Mat3x4f const & /*c2_transform_inv*/) noexcept {
   return std::nullopt;
 }
 
-inline std::optional<Positionful_contact_geometry>
-capsule_box_contact_geometry(Capsule const &, math::Vec3f const &,
-                             math::Vec3f const &, Box const &,
-                             math::Mat3x4f const &) noexcept {
+inline std::optional<Contact>
+shape_shape_contact(Capsule const & /*capsule*/,
+                    math::Mat3x4f const & /*capsule_transform*/,
+                    math::Mat3x4f const & /*capsule_transform_inv*/,
+                    Box const & /*box*/,
+                    math::Mat3x4f const & /*box_transform*/,
+                    math::Mat3x4f const & /*box_transform_inv*/) noexcept {
   return std::nullopt;
 }
 
-inline std::optional<Positionful_contact_geometry>
-box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
-                         Box const &b2, math::Mat3x4f const &b2_transform) {
-  auto const project_to_axis = [](Box const &b, math::Mat3x4f const &m,
-                                  math::Vec3f const &v) {
-    return b.half_extents[0] * std::abs(dot(v, column(m, 0))) +
-           b.half_extents[1] * std::abs(dot(v, column(m, 1))) +
-           b.half_extents[2] * std::abs(dot(v, column(m, 2)));
-  };
+inline std::optional<Contact>
+shape_shape_contact(Box const &box,
+                    math::Mat3x4f const &box_transform,
+                    math::Mat3x4f const &box_transform_inv,
+                    Ball const &ball,
+                    math::Mat3x4f const &ball_transform,
+                    math::Mat3x4f const &ball_transform_inv) noexcept {
+  auto result = shape_shape_contact(ball,
+                                    ball_transform,
+                                    ball_transform_inv,
+                                    box,
+                                    box_transform,
+                                    box_transform_inv);
+  if (result) {
+    result->normal = -result->normal;
+    std::swap(result->local_positions[0], result->local_positions[1]);
+  }
+  return result;
+}
+
+inline std::optional<Contact>
+shape_shape_contact(Box const &box,
+                    math::Mat3x4f const &box_transform,
+                    math::Mat3x4f const &box_transform_inv,
+                    Capsule const &capsule,
+                    math::Mat3x4f const &capsule_transform,
+                    math::Mat3x4f const &capsule_transform_inv) noexcept {
+  auto result = shape_shape_contact(capsule,
+                                    capsule_transform,
+                                    capsule_transform_inv,
+                                    box,
+                                    box_transform,
+                                    box_transform_inv);
+  if (result) {
+    result->normal = -result->normal;
+    std::swap(result->local_positions[0], result->local_positions[1]);
+  }
+  return result;
+}
+
+inline std::optional<Contact>
+shape_shape_contact(Box const &b1,
+                    math::Mat3x4f const &b1_transform,
+                    math::Mat3x4f const &b1_transform_inv,
+                    Box const &b2,
+                    math::Mat3x4f const &b2_transform,
+                    math::Mat3x4f const &b2_transform_inv) {
+  using namespace math;
+  auto const project_to_axis =
+      [](Box const &b, Mat3x4f const &m, Vec3f const &v) {
+        return b.half_extents[0] * abs(dot(v, column(m, 0))) +
+               b.half_extents[1] * abs(dot(v, column(m, 1))) +
+               b.half_extents[2] * abs(dot(v, column(m, 2)));
+      };
   auto const center_displacement =
       column(b1_transform, 3) - column(b2_transform, 3);
-  auto const separation_on_axis = [&](math::Vec3f const &v) {
+  auto const separation_on_axis = [&](Vec3f const &v) {
     auto const b1_projection = project_to_axis(b1, b1_transform, v);
     auto const b2_projection = project_to_axis(b2, b2_transform, v);
-    auto const distance = std::abs(dot(center_displacement, v));
+    auto const distance = abs(dot(center_displacement, v));
     return distance - (b1_projection + b2_projection);
   };
-  auto const edge_edge_contact_position =
-      [&](math::Vec3f const &p1, math::Vec3f const &d1, float s1,
-          math::Vec3f const &p2, math::Vec3f const &d2, float s2,
-          bool use_one) -> math::Vec3f {
-    auto const d1_length2 = math::length_squared(d1);
-    auto const d2_length2 = math::length_squared(d2);
-    auto const d1_dot_d2 = math::dot(d1, d2);
+  auto const edge_edge_contact_position = [&](Vec3f const &p1,
+                                              Vec3f const &d1,
+                                              float s1,
+                                              Vec3f const &p2,
+                                              Vec3f const &d2,
+                                              float s2,
+                                              bool use_one) -> Vec3f {
+    auto const d1_length2 = length_squared(d1);
+    auto const d2_length2 = length_squared(d2);
+    auto const d1_dot_d2 = dot(d1, d2);
     auto const p_diff = p1 - p2;
-    auto const dp_sta_1 = math::dot(d1, p_diff);
-    auto const dp_sta_2 = math::dot(d2, p_diff);
+    auto const dp_sta_1 = dot(d1, p_diff);
+    auto const dp_sta_2 = dot(d2, p_diff);
     auto const denominator = d1_length2 * d2_length2 - d1_dot_d2 * d1_dot_d2;
-    if (std::abs(denominator) < 0.0001f) {
+    if (abs(denominator) < 0.0001f) {
       return use_one ? p1 : p2;
     }
     auto const inverse_denominator = 1.0f / denominator;
@@ -591,7 +538,7 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
         (d1_dot_d2 * dp_sta_2 - d2_length2 * dp_sta_1) * inverse_denominator;
     auto const mub =
         (d1_length2 * dp_sta_2 - d1_dot_d2 * dp_sta_1) * inverse_denominator;
-    if (std::abs(mua) > s1 || std::abs(mub) > s2) {
+    if (abs(mua) > s1 || abs(mub) > s2) {
       return use_one ? p1 : p2;
     } else {
       auto const c1 = d1 * mua + p1;
@@ -599,7 +546,7 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
       return 0.5f * (c1 + c2);
     }
   };
-  auto separating_axes = std::array<math::Vec3f, 15>{
+  auto separating_axes = std::array<Vec3f, 15>{
       column(b1_transform, 0),
       column(b1_transform, 1),
       column(b1_transform, 2),
@@ -653,159 +600,108 @@ box_box_contact_geometry(Box const &b1, math::Mat3x4f const &b1_transform,
     // vertex of box two on face of box one
     auto const axis = separating_axes[best_separating_axis_index];
     auto const normal = dot(axis, center_displacement) >= 0.0f ? axis : -axis;
-    auto const position =
-        b2_transform *
-        math::Vec4f{
-            dot(separating_axes[3], normal) >= 0.0f ? b2.half_extents[0]
-                                                    : -b2.half_extents[0],
-            dot(separating_axes[4], normal) >= 0.0f ? b2.half_extents[1]
-                                                    : -b2.half_extents[1],
-            dot(separating_axes[5], normal) >= 0.0f ? b2.half_extents[2]
-                                                    : -b2.half_extents[2],
-            1.0f};
-    return Positionful_contact_geometry{
-        .position = position, .normal = normal, .separation = best_separation};
+    auto const b2_local_position =
+        Vec3f{dot(separating_axes[3], normal) >= 0.0f ? b2.half_extents[0]
+                                                      : -b2.half_extents[0],
+              dot(separating_axes[4], normal) >= 0.0f ? b2.half_extents[1]
+                                                      : -b2.half_extents[1],
+              dot(separating_axes[5], normal) >= 0.0f ? b2.half_extents[2]
+                                                      : -b2.half_extents[2]};
+    auto const position = b2_transform * Vec4f{b2_local_position, 1.0f};
+    auto const b1_local_position = b1_transform_inv * Vec4f{position, 1.0f};
+    return Contact{
+        .normal = normal,
+        .local_positions = {b1_local_position, b2_local_position},
+        .separation_bias = best_separation,
+    };
   } else if (best_separating_axis_index < 6) {
     // vertex of box one on face of box two
     auto const axis = separating_axes[best_separating_axis_index];
     auto const normal = dot(axis, center_displacement) >= 0.0f ? axis : -axis;
-    auto const position =
-        b1_transform *
-        math::Vec4f{
-            dot(separating_axes[0], normal) >= 0.0f ? -b1.half_extents[0]
-                                                    : b1.half_extents[0],
-            dot(separating_axes[1], normal) >= 0.0f ? -b1.half_extents[1]
-                                                    : b1.half_extents[1],
-            dot(separating_axes[2], normal) >= 0.0f ? -b1.half_extents[2]
-                                                    : b1.half_extents[2],
-            1.0f};
-    return Positionful_contact_geometry{
-        .position = position, .normal = normal, .separation = best_separation};
+    auto const b1_local_position =
+        Vec3f{dot(separating_axes[0], normal) >= 0.0f ? -b1.half_extents[0]
+                                                      : b1.half_extents[0],
+              dot(separating_axes[1], normal) >= 0.0f ? -b1.half_extents[1]
+                                                      : b1.half_extents[1],
+              dot(separating_axes[2], normal) >= 0.0f ? -b1.half_extents[2]
+                                                      : b1.half_extents[2]};
+    auto const position = b1_transform * Vec4f{b1_local_position, 1.0f};
+    auto const b2_local_position = b2_transform_inv * Vec4f{position, 1.0f};
+    return Contact{
+        .normal = normal,
+        .local_positions = {b1_local_position, b2_local_position},
+        .separation_bias = best_separation,
+    };
   } else {
     auto const b1_axis_index = (best_separating_axis_index - 6) / 3;
     auto const b2_axis_index = (best_separating_axis_index - 6) % 3;
     auto const axis = separating_axes[best_separating_axis_index];
     auto const normal = dot(axis, center_displacement) < 0.0f ? -axis : axis;
     auto const b1_extents =
-        math::Vec3f{b1.half_extents[0], b1.half_extents[1], b1.half_extents[2]};
+        Vec3f{b1.half_extents[0], b1.half_extents[1], b1.half_extents[2]};
     auto const on_b1_edge =
         b1_transform *
-        math::Vec4f{math::Vec3f{[&](int axis_index) {
-                      if (axis_index == b1_axis_index) {
-                        return 0.0f;
-                      } else {
-                        return dot(separating_axes[axis_index], normal) > 0.0f
-                                   ? -b1_extents[axis_index]
-                                   : b1_extents[axis_index];
-                      }
-                    }},
-                    1.0f};
+        Vec4f{Vec3f{[&](int axis_index) {
+                if (axis_index == b1_axis_index) {
+                  return 0.0f;
+                } else {
+                  return dot(separating_axes[axis_index], normal) > 0.0f
+                             ? -b1_extents[axis_index]
+                             : b1_extents[axis_index];
+                }
+              }},
+              1.0f};
     auto const b2_extents =
-        math::Vec3f{b2.half_extents[0], b2.half_extents[1], b2.half_extents[2]};
+        Vec3f{b2.half_extents[0], b2.half_extents[1], b2.half_extents[2]};
     auto const on_b2_edge =
         b2_transform *
-        math::Vec4f{math::Vec3f{[&](int axis_index) {
-                      if (axis_index == b2_axis_index) {
-                        return 0.0f;
-                      } else {
-                        return dot(separating_axes[axis_index + 3], normal) <
-                                       0.0f
-                                   ? -b2_extents[axis_index]
-                                   : b2_extents[axis_index];
-                      }
-                    }},
-                    1.0f};
-    return Positionful_contact_geometry{
-        .position = edge_edge_contact_position(
-            on_b1_edge, separating_axes[b2_axis_index],
-            b1_extents[b1_axis_index], on_b2_edge,
-            separating_axes[b2_axis_index + 3], b2_extents[b2_axis_index],
-            best_basis_separating_axis_index >= 3),
+        Vec4f{Vec3f{[&](int axis_index) {
+                if (axis_index == b2_axis_index) {
+                  return 0.0f;
+                } else {
+                  return dot(separating_axes[axis_index + 3], normal) < 0.0f
+                             ? -b2_extents[axis_index]
+                             : b2_extents[axis_index];
+                }
+              }},
+              1.0f};
+    auto const position =
+        edge_edge_contact_position(on_b1_edge,
+                                   separating_axes[b2_axis_index],
+                                   b1_extents[b1_axis_index],
+                                   on_b2_edge,
+                                   separating_axes[b2_axis_index + 3],
+                                   b2_extents[b2_axis_index],
+                                   best_basis_separating_axis_index >= 3);
+    auto const b1_local_position = b1_transform_inv * Vec4f{position, 1.0f};
+    auto const b2_local_position = b2_transform_inv * Vec4f{position, 1.0f};
+    return Contact{
         .normal = normal,
-        .separation = best_separation};
+        .local_positions = {b1_local_position, b2_local_position},
+        .separation_bias = best_separation,
+    };
   }
 }
 
-inline std::optional<Positionful_contact_geometry> shape_shape_contact_geometry(
-    Shape const &shape_a, math::Mat3x4f const &transform_a,
-    math::Mat3x4f const &inverse_transform_a, Shape const &shape_b,
-    math::Mat3x4f const &transform_b,
-    math::Mat3x4f const &inverse_transform_b) noexcept {
+inline std::optional<Contact>
+shape_shape_contact(Shape const &shape_a,
+                    math::Mat3x4f const &transform_a,
+                    math::Mat3x4f const &transform_a_inv,
+                    Shape const &shape_b,
+                    math::Mat3x4f const &transform_b,
+                    math::Mat3x4f const &transform_b_inv) noexcept {
   return std::visit(
       [&](auto &&a) {
-        using T = std::decay_t<decltype(a)>;
-        if constexpr (std::is_same_v<T, Ball>) {
-          return std::visit(
-              [&](auto &&b) {
-                using U = std::decay_t<decltype(b)>;
-                if constexpr (std::is_same_v<U, Ball>) {
-                  return ball_ball_contact_geometry(a, column(transform_a, 3),
-                                                    b, column(transform_b, 3));
-                } else if constexpr (std::is_same_v<U, Capsule>) {
-                  return ball_capsule_contact_geometry(
-                      a, column(transform_a, 3), b, column(transform_b, 3),
-                      column(transform_b, 2));
-                } else {
-                  static_assert(std::is_same_v<U, Box>);
-                  return ball_box_contact_geometry(a, column(transform_a, 3), b,
-                                                   transform_b,
-                                                   inverse_transform_b);
-                }
-              },
-              shape_b._v);
-        } else if constexpr (std::is_same_v<T, Capsule>) {
-          return std::visit(
-              [&](auto &&b) {
-                using U = std::decay_t<decltype(b)>;
-                if constexpr (std::is_same_v<U, Ball>) {
-                  auto retval = ball_capsule_contact_geometry(
-                      b, column(transform_b, 3), a, column(transform_a, 3),
-                      column(transform_a, 1));
-                  if (retval) {
-                    retval->normal = -retval->normal;
-                  }
-                  return retval;
-                } else if constexpr (std::is_same_v<U, Capsule>) {
-                  return capsule_capsule_contact_geometry(
-                      a, column(transform_a, 3), column(transform_a, 1), b,
-                      column(transform_b, 3), column(transform_b, 1));
-                } else {
-                  static_assert(std::is_same_v<U, Box>);
-                  return capsule_box_contact_geometry(a, column(transform_a, 3),
-                                                      column(transform_a, 1), b,
-                                                      transform_b);
-                }
-              },
-              shape_b._v);
-        } else {
-          static_assert(std::is_same_v<T, Box>);
-          return std::visit(
-              [&](auto &&b) {
-                using U = std::decay_t<decltype(b)>;
-                if constexpr (std::is_same_v<U, Ball>) {
-                  auto retval = ball_box_contact_geometry(
-                      b, column(transform_b, 3), a, transform_a,
-                      inverse_transform_a);
-                  if (retval) {
-                    retval->normal = -retval->normal;
-                  }
-                  return retval;
-                } else if constexpr (std::is_same_v<U, Capsule>) {
-                  auto retval = capsule_box_contact_geometry(
-                      b, column(transform_b, 3), column(transform_b, 1), a,
-                      transform_a);
-                  if (retval) {
-                    retval->normal = -retval->normal;
-                  }
-                  return retval;
-                } else {
-                  static_assert(std::is_same_v<U, Box>);
-                  return box_box_contact_geometry(a, transform_a, b,
-                                                  transform_b);
-                }
-              },
-              shape_b._v);
-        }
+        return std::visit(
+            [&](auto &&b) {
+              return shape_shape_contact(a,
+                                         transform_a,
+                                         transform_a_inv,
+                                         b,
+                                         transform_b,
+                                         transform_b_inv);
+            },
+            shape_b._v);
       },
       shape_a._v);
 }

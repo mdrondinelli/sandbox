@@ -8,6 +8,7 @@
 
 #include <type_traits>
 
+#include "scalar.h"
 #include "unreachable.h"
 
 namespace marlon {
@@ -100,8 +101,9 @@ template <typename T> struct Vec<T, 3> {
 
   template <typename U>
   constexpr explicit Vec(Vec<U, 3> const &v) noexcept
-      : x{static_cast<T>(v.x)}, y{static_cast<T>(v.y)}, z{static_cast<T>(v.z)} {
-  }
+      : x{static_cast<T>(v.x)},
+        y{static_cast<T>(v.y)},
+        z{static_cast<T>(v.z)} {}
 
   constexpr T const &operator[](int n) const noexcept {
     assert(n >= 0 && n < 3);
@@ -186,7 +188,9 @@ template <typename T> struct Vec<T, 4> {
 
   template <typename U>
   constexpr explicit Vec(Vec<U, 4> const &v) noexcept
-      : x{static_cast<T>(v.x)}, y{static_cast<T>(v.y)}, z{static_cast<T>(v.z)},
+      : x{static_cast<T>(v.x)},
+        y{static_cast<T>(v.y)},
+        z{static_cast<T>(v.z)},
         w{static_cast<T>(v.w)} {}
 
   constexpr T const &operator[](int n) const noexcept {
@@ -359,10 +363,6 @@ constexpr auto &operator/=(Vec<T, N> &v, T s) noexcept {
   return v = (v / s);
 }
 
-template <typename T, int N> constexpr auto abs(Vec<T, N> const &v) noexcept {
-  return Vec<T, N>{[&](int i) { return std::abs(v[i]); }};
-}
-
 template <typename T, int N>
 constexpr auto length_squared(Vec<T, N> const &v) noexcept {
   auto retval = T(0);
@@ -393,8 +393,8 @@ constexpr auto dot(Vec<T, N> const &a, Vec<T, N> const &b) noexcept {
 
 template <typename T>
 constexpr auto cross(Vec<T, 3> const &a, Vec<T, 3> const &b) noexcept {
-  return Vec<T, 3>{a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
-                   a.x * b.y - a.y * b.x};
+  return Vec<T, 3>{
+      a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
 }
 
 template <typename T, int N>
@@ -415,6 +415,26 @@ constexpr auto perp(Vec<T, N> const &u, Vec<T, N> const &d) noexcept {
 template <typename T, int N>
 constexpr auto perp_unit(Vec<T, N> const &u, Vec<T, N> const &d) noexcept {
   return u - proj_unit(u, d);
+}
+
+template <typename T, int N>
+constexpr auto min(Vec<T, N> const &a, Vec<T, N> const &b) noexcept {
+  return Vec<T, N>{[&](int i) { return min(a[i], b[i]); }};
+}
+
+template <typename T, int N>
+constexpr auto max(Vec<T, N> const &a, Vec<T, N> const &b) noexcept {
+  return Vec<T, N>{[&](int i) { return max(a[i], b[i]); }};
+}
+
+template <typename T, int N>
+constexpr auto
+clamp(Vec<T, N> const &v, Vec<T, N> const &lo, Vec<T, N> const &hi) noexcept {
+  return Vec<T, N>{[&](int i) { return clamp(v[i], lo[i], hi[i]); }};
+}
+
+template <typename T, int N> constexpr auto abs(Vec<T, N> const &v) noexcept {
+  return Vec<T, N>{[&](int i) { return abs(v[i]); }};
 }
 } // namespace math
 } // namespace marlon
