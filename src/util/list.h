@@ -1,6 +1,8 @@
 #ifndef MARLON_UTIL_STACK_H
 #define MARLON_UTIL_STACK_H
 
+#include <cstddef>
+
 #include <utility>
 
 #include "capacity_error.h"
@@ -16,23 +18,22 @@ public:
 
   template <typename Allocator>
   static constexpr std::pair<Block, List> make(Allocator &allocator,
-                                               std::size_t max_size) {
+                                               Size max_size) {
     auto const block = allocator.alloc(memory_requirement(max_size));
     return {block, List{block, max_size}};
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_size) noexcept {
+  static constexpr Size memory_requirement(Size max_size) noexcept {
     return sizeof(T) * max_size;
   }
 
   constexpr List() noexcept
       : _begin{nullptr}, _stack_end{nullptr}, _buffer_end{nullptr} {}
 
-  explicit List(Block block, std::size_t max_size) noexcept
+  explicit List(Block block, Size max_size) noexcept
       : List{block.begin, max_size} {}
 
-  explicit List(void *block_begin, std::size_t max_size) noexcept
+  explicit List(void *block_begin, Size max_size) noexcept
       : _begin{static_cast<T *>(block_begin)},
         _stack_end{_begin},
         _buffer_end{_begin + max_size} {}
@@ -50,11 +51,9 @@ public:
 
   ~List() { clear(); }
 
-  T const &operator[](std::size_t index) const noexcept {
-    return _begin[index];
-  }
+  T const &operator[](Size index) const noexcept { return _begin[index]; }
 
-  T &operator[](std::size_t index) noexcept { return _begin[index]; }
+  T &operator[](Size index) noexcept { return _begin[index]; }
 
   T const &front() const noexcept { return *_begin; }
 
@@ -82,11 +81,11 @@ public:
 
   bool empty() const noexcept { return size() == 0; }
 
-  std::size_t size() const noexcept { return _stack_end - _begin; }
+  Size size() const noexcept { return _stack_end - _begin; }
 
-  std::size_t max_size() const noexcept { return _buffer_end - _begin; }
+  Size max_size() const noexcept { return _buffer_end - _begin; }
 
-  std::size_t capacity() const noexcept { return max_size(); }
+  Size capacity() const noexcept { return max_size(); }
 
   void clear() noexcept {
     auto const begin = _begin;
@@ -118,7 +117,7 @@ public:
 
   void pop_back() noexcept { (--_stack_end)->~T(); }
 
-  void resize(std::size_t count) {
+  void resize(Size count) {
     auto const stack_end = _stack_end;
     auto const new_stack_end = _begin + count;
     if (new_stack_end > _buffer_end) {
@@ -185,11 +184,9 @@ public:
     }
   }
 
-  T const &operator[](std::size_t index) const noexcept {
-    return (*_impl)[index];
-  }
+  T const &operator[](Size index) const noexcept { return (*_impl)[index]; }
 
-  T &operator[](std::size_t index) noexcept { return (*_impl)[index]; }
+  T &operator[](Size index) noexcept { return (*_impl)[index]; }
 
   T const &front() const noexcept { return _impl->front(); }
 
@@ -217,15 +214,13 @@ public:
 
   bool empty() const noexcept { return _impl->empty(); }
 
-  std::size_t size() const noexcept { return _impl->size(); }
+  Size size() const noexcept { return _impl->size(); }
 
-  std::size_t max_size() const noexcept {
-    return static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max());
-  }
+  Size max_size() const noexcept { return std::numeric_limits<Size>::max(); }
 
-  std::size_t capacity() const noexcept { return _impl->capacity(); }
+  Size capacity() const noexcept { return _impl->capacity(); }
 
-  void reserve(std::size_t capacity) {
+  void reserve(Size capacity) {
     if (capacity > _impl->capacity()) {
       auto temp = List<T>::make(_allocator, capacity).second;
       for (auto &object : *_impl) {
@@ -260,9 +255,9 @@ public:
 
   void pop_back() noexcept { _impl->pop_back(); }
 
-  void resize(std::size_t count) {
+  void resize(Size count) {
     if (capacity() < count) {
-      auto new_cap = std::max(capacity(), std::size_t{1});
+      auto new_cap = std::max(capacity(), Size{1});
       while (new_cap < count) {
         new_cap *= 2;
       }

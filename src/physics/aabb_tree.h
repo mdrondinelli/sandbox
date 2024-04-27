@@ -18,15 +18,26 @@ namespace physics {
 // Payload destructor doesn't get called when node is destroyed
 template <typename Payload> class Aabb_tree {
 public:
+  using Size = std::ptrdiff_t;
+
   struct Node {
     Node *parent;
     Aabb bounds;
     std::variant<std::array<Node *, 2>, Payload> payload;
   };
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t leaf_node_capacity,
-                     std::size_t internal_node_capacity) {
+  template <typename Allocator>
+  static std::pair<util::Block, Aabb_tree> make(Allocator &allocator,
+                                         Size leaf_node_capacity,
+                                         Size internal_node_capacity) {
+    auto const block = allocator.alloc(
+        memory_requirement(leaf_node_capacity, internal_node_capacity));
+    return {block,
+            Aabb_tree{block, leaf_node_capacity, internal_node_capacity}};
+  }
+
+  static constexpr Size memory_requirement(Size leaf_node_capacity,
+                                           Size internal_node_capacity) {
     return util::Stack_allocator<alignof(Node)>::memory_requirement({
         decltype(_leaf_node_pool)::memory_requirement(leaf_node_capacity),
         decltype(_leaf_node_set)::memory_requirement(leaf_node_capacity),
@@ -38,13 +49,13 @@ public:
   constexpr Aabb_tree() = default;
 
   explicit Aabb_tree(util::Block block,
-                     std::size_t leaf_node_capacity,
-                     std::size_t internal_node_capacity)
+                     Size leaf_node_capacity,
+                     Size internal_node_capacity)
       : Aabb_tree{block.begin, leaf_node_capacity, internal_node_capacity} {}
 
   explicit Aabb_tree(void *block,
-                     std::size_t leaf_node_capacity,
-                     std::size_t internal_node_capacity) {
+                     Size leaf_node_capacity,
+                     Size internal_node_capacity) {
     auto allocator = util::Stack_allocator<alignof(Node)>{make_block(
         block, memory_requirement(leaf_node_capacity, internal_node_capacity))};
     using leaf_node_pool_t = decltype(_leaf_node_pool);
@@ -264,18 +275,6 @@ private:
   util::List<Node> _internal_nodes;
   Node *_root_node{};
 };
-
-template <typename Payload, typename Allocator>
-std::pair<util::Block, Aabb_tree<Payload>>
-make_aabb_tree(Allocator &allocator,
-               std::size_t leaf_node_capacity,
-               std::size_t internal_node_capacity) {
-  auto const block = allocator.alloc(Aabb_tree<Payload>::memory_requirement(
-      leaf_node_capacity, internal_node_capacity));
-  return {
-      block,
-      Aabb_tree<Payload>{block, leaf_node_capacity, internal_node_capacity}};
-}
 } // namespace physics
 } // namespace marlon
 

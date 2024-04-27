@@ -138,54 +138,48 @@ public:
   };
 
   template <typename Allocator>
-  static std::pair<Block, Set> make(Allocator &allocator,
-                                    std::size_t max_node_count) {
+  static std::pair<Block, Set> make(Allocator &allocator, Size max_node_count) {
     return make(allocator, max_node_count, max_node_count);
   }
 
   template <typename Allocator>
-  static std::pair<Block, Set> make(Allocator &allocator,
-                                    std::size_t max_node_count,
-                                    std::size_t max_bucket_count) {
+  static std::pair<Block, Set>
+  make(Allocator &allocator, Size max_node_count, Size max_bucket_count) {
     auto const block =
         allocator.alloc(memory_requirement(max_node_count, max_bucket_count));
     return {block, Set{block, max_node_count, max_bucket_count}};
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_node_count) noexcept {
+  static constexpr Size memory_requirement(Size max_node_count) noexcept {
     return memory_requirement(max_node_count, max_node_count);
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_node_count,
-                     std::size_t max_bucket_count) noexcept {
+  static constexpr Size memory_requirement(Size max_node_count,
+                                           Size max_bucket_count) noexcept {
     // assert(std::has_single_bit(max_bucket_count));
     return Stack_allocator<_alignment>::memory_requirement({
-        List<Bucket>::memory_requirement(
-            std::bit_ceil(std::max(max_bucket_count, std::size_t{2}))),
+        List<Bucket>::memory_requirement(static_cast<Size>(std::bit_ceil(
+            static_cast<std::size_t>(std::max(max_bucket_count, Size{2}))))),
         Pool_allocator<sizeof(Node)>::memory_requirement(max_node_count + 1),
     });
   }
 
   constexpr Set() noexcept = default;
 
-  explicit Set(Block block, std::size_t max_node_count) noexcept
+  explicit Set(Block block, Size max_node_count) noexcept
       : Set{block, max_node_count, max_node_count} {}
 
-  explicit Set(Block block,
-               std::size_t max_node_count,
-               std::size_t max_bucket_count) noexcept
+  explicit Set(Block block, Size max_node_count, Size max_bucket_count) noexcept
       : Set{block.begin, max_node_count, max_bucket_count} {}
 
-  explicit Set(void *block_begin, std::size_t max_node_count) noexcept
+  explicit Set(void *block_begin, Size max_node_count) noexcept
       : Set{block_begin, max_node_count, max_node_count} {}
 
   explicit Set(void *block_begin,
-               std::size_t max_node_count,
-               std::size_t max_bucket_count) noexcept {
-    max_bucket_count =
-        std::bit_ceil(std::max(max_bucket_count, std::size_t{2}));
+               Size max_node_count,
+               Size max_bucket_count) noexcept {
+    max_bucket_count = static_cast<Size>(std::bit_ceil(
+        static_cast<std::size_t>(std::max(max_bucket_count, Size{2}))));
     auto allocator = Stack_allocator<_alignment>{make_block(
         block_begin, memory_requirement(max_node_count, max_bucket_count))};
     _buckets = List<Bucket>::make(allocator, max_bucket_count).second;
@@ -231,10 +225,10 @@ public:
 
   Const_iterator cend() const noexcept { return Const_iterator{nullptr}; }
 
-  std::size_t size() const noexcept { return _size; }
+  Size size() const noexcept { return _size; }
 
-  std::size_t max_size() const noexcept {
-    return std::max(_nodes.max_blocks(), std::size_t{1}) - 1;
+  Size max_size() const noexcept {
+    return std::max(_nodes.max_blocks(), Size{1}) - 1;
   }
 
   void clear() noexcept {
@@ -504,7 +498,7 @@ public:
     return result;
   }
 
-  template <typename K> std::size_t erase(K const &x) noexcept {
+  template <typename K> Size erase(K const &x) noexcept {
     auto const pos = find(x);
     if (pos != end()) {
       erase(pos);
@@ -558,9 +552,9 @@ public:
     }
   }
 
-  std::size_t bucket_count() const noexcept { return _buckets.size(); }
+  Size bucket_count() const noexcept { return _buckets.size(); }
 
-  std::size_t max_bucket_count() const noexcept { return _buckets.capacity(); }
+  Size max_bucket_count() const noexcept { return _buckets.capacity(); }
 
   float load_factor() const noexcept {
     return static_cast<float>(_size) / static_cast<float>(_buckets.size());
@@ -570,19 +564,19 @@ public:
 
   void max_load_factor(float ml) noexcept { _max_load_factor = ml; }
 
-  void rehash(std::size_t count) noexcept {
-    auto const n =
-        std::min(std::bit_ceil(std::max(
-                     {count,
-                      std::size_t{2},
-                      static_cast<std::size_t>(std::ceil(
-                          _size / static_cast<double>(_max_load_factor)))})),
-                 _buckets.capacity());
+  void rehash(Size count) noexcept {
+    auto const n = std::min(
+        static_cast<Size>(std::bit_ceil(static_cast<std::size_t>(
+            std::max({count,
+                      Size{2},
+                      static_cast<Size>(std::ceil(
+                          _size / static_cast<double>(_max_load_factor)))})))),
+        _buckets.capacity());
     if (_buckets.size() == n) {
       return;
     }
     _buckets.resize(n);
-    for (auto i = std::size_t{}; i != n; ++i) {
+    for (auto i = Size{}; i != n; ++i) {
       _buckets[i].node = nullptr;
     }
     auto node = _head;
@@ -623,20 +617,20 @@ private:
     std::swap(_max_load_factor, other._max_load_factor);
   }
 
-  std::size_t hash_index(std::size_t hash) const noexcept {
+  Size hash_index(std::size_t hash) const noexcept {
     return hash_index(hash, _buckets.size());
   }
 
-  std::size_t hash_index(std::size_t hash,
-                         std::size_t bucket_count) const noexcept {
-    return (hash * 11400714819323198485llu) >>
-           std::countl_zero(bucket_count - 1);
+  Size hash_index(std::size_t hash, Size bucket_count) const noexcept {
+    return static_cast<Size>(
+        (hash * 11400714819323198485llu) >>
+        std::countl_zero(static_cast<std::size_t>(bucket_count) - 1));
   }
 
   List<Bucket> _buckets;
   Pool_allocator<sizeof(Node)> _nodes;
   Node *_head{};
-  std::size_t _size{};
+  Size _size{};
   float _max_load_factor{1.0f};
 };
 
@@ -682,9 +676,9 @@ public:
 
   Const_iterator cend() const noexcept { return _impl->cend(); }
 
-  std::size_t size() const noexcept { return _impl->size(); }
+  Size size() const noexcept { return _impl->size(); }
 
-  std::size_t max_size() const noexcept {
+  Size max_size() const noexcept {
     return std::numeric_limits<std::ptrdiff_t>::max();
   }
 
@@ -706,7 +700,7 @@ public:
 
   Iterator erase(Const_iterator pos) noexcept { return _impl->erase(pos); }
 
-  template <typename K> std::size_t erase(K const &x) noexcept {
+  template <typename K> Size erase(K const &x) noexcept {
     return _impl->erase(x);
   }
 
@@ -718,9 +712,9 @@ public:
     return _impl->find(x);
   }
 
-  std::size_t bucket_count() const noexcept { return _impl->bucket_count(); }
+  Size bucket_count() const noexcept { return _impl->bucket_count(); }
 
-  std::size_t max_bucket_count() const noexcept {
+  Size max_bucket_count() const noexcept {
     return std::numeric_limits<std::ptrdiff_t>::max() ^
            (std::numeric_limits<std::ptrdiff_t>::max() >> 1);
   }
@@ -731,12 +725,13 @@ public:
 
   void max_load_factor(float ml) noexcept {}
 
-  void rehash(std::size_t count) noexcept {
-    auto const max_bucket_count = std::bit_ceil(
-        std::max(count,
-                 static_cast<std::size_t>(std::ceil(
-                     size() / static_cast<double>(max_load_factor())))));
-    auto const max_node_count = static_cast<std::size_t>(
+  void rehash(Size count) noexcept {
+    auto const max_bucket_count =
+        static_cast<Size>(std::bit_ceil(static_count<std::size_t>(
+            std::max(count,
+                     static_cast<Size>(std::ceil(
+                         size() / static_cast<double>(max_load_factor())))))));
+    auto const max_node_count = static_cast<Size>(
         max_bucket_count * static_cast<double>(max_load_factor()));
     if (max_bucket_count > _impl->max_bucket_count() ||
         max_node_count > _impl->max_size()) {
@@ -762,9 +757,9 @@ public:
     }
   }
 
-  void reserve(std::size_t count) {
-    rehash(std::bit_ceil(static_cast<std::size_t>(
-        std::ceil(count / static_cast<double>(max_load_factor())))));
+  void reserve(Size count) {
+    rehash(static_cast<Size>(std::bit_ceil(static_cast<std::size_t>(
+        std::ceil(count / static_cast<double>(max_load_factor()))))));
   }
 
 private:

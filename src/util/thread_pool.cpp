@@ -6,42 +6,65 @@
 
 namespace marlon {
 namespace util {
-Thread_pool::Thread_pool(unsigned thread_count,
-                         Scheduling_policy scheduling_policy)
-    : _push_index{std::size_t{}} {
-  auto block = Block{};
-  std::tie(block, _threads) =
-      List<Thread>::make(*System_allocator::instance(), thread_count);
-  try {
-    for (unsigned i = 0; i != thread_count; ++i) {
-      _threads.emplace_back(
-          _threads.data(), thread_count, i, scheduling_policy);
+Thread_pool::Thread_pool(Size thread_count, Scheduling_policy scheduling_policy)
+    : _push_index{Size{}} {
+  if (thread_count > 0) {
+    auto block = Block{};
+    std::tie(block, _threads) =
+        List<Thread>::make(*System_allocator::instance(), thread_count);
+    try {
+      for (int i = 0; i != thread_count; ++i) {
+        _threads.emplace_back(
+            _threads.data(), thread_count, i, scheduling_policy);
+      }
+    } catch (...) {
+      _threads = {};
+      System_allocator::instance()->free(block);
+      throw;
     }
-  } catch (...) {
-    _threads = {};
-    System_allocator::instance()->free(block);
-    throw;
   }
 }
 
 Thread_pool::~Thread_pool() {
-  auto const block = make_block(
-      _threads.data(), List<Thread>::memory_requirement(_threads.max_size()));
-  _threads = {};
-  System_allocator::instance()->free(block);
+  if (!empty()) {
+    auto const block = make_block(
+        _threads.data(), List<Thread>::memory_requirement(_threads.max_size()));
+    _threads = {};
+    System_allocator::instance()->free(block);
+  }
 }
 
-std::size_t Thread_pool::size() const noexcept { return _threads.size(); }
+bool Thread_pool::empty() const noexcept { return size() <= 0; }
 
-void Thread_pool::push(Task *task) {
+Size Thread_pool::size() const noexcept {
+  return _threads.size();
+}
+
+Size Thread_pool::push_notify(Task *task) {
+  auto const index = push_silent(task);
+  _threads[index].notify();
+  return index;
+}
+
+Size Thread_pool::push_silent(Task *task) {
   auto const base = _push_index++;
-  for (auto offset = std::size_t{}; offset != 2 * _threads.size(); ++offset) {
+  for (auto offset = Size{}; offset != 2 * _threads.size(); ++offset) {
     auto const index = (base + offset) % _threads.size();
-    if (_threads[index].try_push(task)) {
-      return;
+    auto &thread = _threads[index];
+    if (thread.try_push(task)) {
+      return index;
     }
   }
-  _threads[base % _threads.size()].push(task);
+  auto const index = base % _threads.size();
+  auto &thread = _threads[index];
+  thread.push(task);
+  return index;
+}
+
+void Thread_pool::notify() {
+  for (auto &thread : _threads) {
+    thread.notify();
+  }
 }
 
 void Thread_pool::set_scheduling_policy(Scheduling_policy scheduling_policy) {
@@ -51,8 +74,8 @@ void Thread_pool::set_scheduling_policy(Scheduling_policy scheduling_policy) {
 }
 
 Thread_pool::Thread::Thread(Thread *threads,
-                            unsigned thread_count,
-                            unsigned index,
+                            Size thread_count,
+                            Size index,
                             Scheduling_policy scheduling_policy)
     : _threads{threads},
       _thread_count{thread_count},
@@ -65,10 +88,10 @@ Thread_pool::Thread::Thread(Thread *threads,
           _queue.reserve(1024);
         }
         auto rng = std::minstd_rand{std::random_device{}()};
-        auto try_steal = [&](unsigned attempts) -> Task * {
-          auto d = std::uniform_int_distribution<std::size_t>{
-              std::size_t{1}, _thread_count - 1};
-          for (auto attempt = 0u; attempt != attempts; ++attempt) {
+        auto try_steal = [&](int attempts) -> Task * {
+          auto d = std::uniform_int_distribution<Size>{
+              Size{1}, std::max(Size{1}, _thread_count - 1)};
+          for (auto attempt = 0; attempt < attempts; ++attempt) {
             auto const offset = d(rng);
             auto const index = (_index + offset) % _thread_count;
             auto &thread = _threads[index];
@@ -116,7 +139,7 @@ Thread_pool::Thread::Thread(Thread *threads,
               std::cerr << "Exception in Task::run\n";
             }
           } else if (stop_token.stop_requested()) {
-            break;
+            return;
           }
         }
       }} {}
@@ -129,23 +152,19 @@ Thread_pool::Thread::~Thread() {
 void Thread_pool::Thread::push(Task *task) {
   auto lock = std::unique_lock{_mutex};
   _queue.push_back(task);
-  if (_scheduling_policy == Scheduling_policy::block) {
-    lock.unlock();
-    _condvar.notify_one();
-  }
 }
 
 bool Thread_pool::Thread::try_push(Task *task) {
   if (auto lock = std::unique_lock{_mutex, std::try_to_lock}) {
     _queue.push_back(task);
-    if (_scheduling_policy == Scheduling_policy::block) {
-      lock.unlock();
-      _condvar.notify_one();
-    }
     return true;
   } else {
     return false;
   }
+}
+
+void Thread_pool::Thread::notify() {
+  _condvar.notify_one();
 }
 
 void Thread_pool::Thread::set_scheduling_policy(
@@ -154,7 +173,7 @@ void Thread_pool::Thread::set_scheduling_policy(
     auto const lock = std::scoped_lock{_mutex};
     _scheduling_policy = scheduling_policy;
   }
-  _condvar.notify_one();
+  notify();
 }
 } // namespace util
 } // namespace marlon

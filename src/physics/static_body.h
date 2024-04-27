@@ -14,8 +14,8 @@ struct Static_body_data {
   Aabb_tree<Object_handle>::Node *aabb_tree_node;
   Shape shape;
   Material material;
-  math::Mat3x4f transform;
-  math::Mat3x4f inverse_transform;
+  math::Vec3f position;
+  math::Quatf orientation;
 };
 
 class Static_body_storage {
@@ -24,13 +24,13 @@ class Static_body_storage {
 public:
   template <typename Allocator>
   static std::pair<util::Block, Static_body_storage>
-  make(Allocator &allocator, std::size_t max_static_bodies) {
+  make(Allocator &allocator, util::Size max_static_bodies) {
     auto const block = allocator.alloc(memory_requirement(max_static_bodies));
     return {block, Static_body_storage{block, max_static_bodies}};
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_static_bodies) noexcept {
+  static constexpr util::Size
+  memory_requirement(util::Size max_static_bodies) noexcept {
     return Allocator::memory_requirement({
         decltype(_data)::memory_requirement(max_static_bodies),
         decltype(_available_handles)::memory_requirement(max_static_bodies),
@@ -41,24 +41,23 @@ public:
   constexpr Static_body_storage() = default;
 
   explicit Static_body_storage(util::Block block,
-                               std::size_t max_static_bodies) noexcept
+                               util::Size max_static_bodies) noexcept
       : Static_body_storage{block.begin, max_static_bodies} {}
 
   explicit Static_body_storage(void *block,
-                               std::size_t max_static_bodies) noexcept {
-    auto allocator =
-        Allocator{util::make_block(block, memory_requirement(max_static_bodies))};
+                               util::Size max_static_bodies) noexcept {
+    auto allocator = Allocator{
+        util::make_block(block, memory_requirement(max_static_bodies))};
     _data = decltype(_data)::make(allocator, max_static_bodies).second;
     _data.resize(max_static_bodies);
     _available_handles =
         decltype(_available_handles)::make(allocator, max_static_bodies).second;
     _available_handles.resize(max_static_bodies);
-    for (auto i = std::size_t{}; i != max_static_bodies; ++i) {
+    for (auto i = util::Size{}; i != max_static_bodies; ++i) {
       _available_handles[i] = Static_body_handle{
           static_cast<Object_handle>(max_static_bodies - i - 1)};
     }
-    _occupancy_bits =
-        util::Bit_list::make(allocator, max_static_bodies).second;
+    _occupancy_bits = util::Bit_list::make(allocator, max_static_bodies).second;
     _occupancy_bits.resize(max_static_bodies);
   }
 
@@ -89,8 +88,8 @@ public:
   template <typename F> void for_each(F &&f) {
     auto const n = _occupancy_bits.size();
     auto const m = _occupancy_bits.size() - _free_indices.size();
-    auto k = std::size_t{};
-    for (auto i = std::size_t{}; i != n; ++i) {
+    auto k = util::Size{};
+    for (auto i = util::Size{}; i != n; ++i) {
       if (_occupancy_bits[i]) {
         auto const handle = Static_body_handle{static_cast<std::uint32_t>(i)};
         f(handle, data(handle));

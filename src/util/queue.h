@@ -53,14 +53,12 @@ public:
     friend class Const_iterator;
     friend class Queue;
 
-    explicit Iterator(std::span<T> slots,
-                      std::size_t index,
-                      std::size_t offset) noexcept
+    explicit Iterator(std::span<T> slots, Size index, Size offset) noexcept
         : _slots{slots}, _index{index}, _offset{offset} {}
 
     std::span<T> _slots;
-    std::size_t _index;
-    std::size_t _offset;
+    Size _index;
+    Size _offset;
   };
 
   class Const_iterator {
@@ -105,21 +103,20 @@ public:
     friend class Queue;
 
     std::span<T const> _slots;
-    std::size_t _index;
-    std::size_t _offset;
+    Size _index;
+    Size _offset;
   };
 
   template <typename Allocator>
-  static std::pair<Block, Queue> make(Allocator &allocator,
-                                      std::size_t max_size) {
+  static std::pair<Block, Queue> make(Allocator &allocator, Size max_size) {
     auto const block = allocator.alloc(memory_requirement(max_size));
     return {block, Queue{block, max_size}};
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_size) noexcept {
+  static constexpr Size memory_requirement(Size max_size) noexcept {
     if (max_size != 0) {
-      return sizeof(T) * std::bit_ceil(max_size);
+      return static_cast<Size>(
+          sizeof(T) * std::bit_ceil(static_cast<std::size_t>(max_size)));
     } else {
       return 0;
     }
@@ -127,18 +124,19 @@ public:
 
   constexpr Queue() noexcept = default;
 
-  explicit Queue(Block block, std::size_t max_size) noexcept
+  explicit Queue(Block block, Size max_size) noexcept
       : Queue{block.begin, max_size} {}
 
-  explicit Queue(void *block, std::size_t max_size) noexcept
+  explicit Queue(void *block, Size max_size) noexcept
       : _slots{static_cast<T *>(block),
-               max_size != 0 ? std::bit_ceil(max_size) : 0} {}
+               max_size != 0 ? std::bit_ceil(static_cast<std::size_t>(max_size))
+                             : 0} {}
 
   Queue(Queue<T> &&other) noexcept
       : _slots{std::exchange(other._slots, std::span<T>{})},
-        _size{std::exchange(other._size, std::size_t{})},
-        _head{std::exchange(other._head, std::size_t{})},
-        _tail{std::exchange(other._tail, std::size_t{})} {}
+        _size{std::exchange(other._size, Size{})},
+        _head{std::exchange(other._head, Size{})},
+        _tail{std::exchange(other._tail, Size{})} {}
 
   Queue &operator=(Queue<T> &&other) noexcept {
     auto temp = Queue<T>{std::move(other)};
@@ -182,14 +180,14 @@ public:
 
   bool empty() const noexcept { return size() == 0; }
 
-  std::size_t size() const noexcept { return _size; }
+  Size size() const noexcept { return _size; }
 
-  std::size_t max_size() const noexcept { return _slots.size(); }
+  Size max_size() const noexcept { return _slots.size(); }
 
-  std::size_t capacity() const noexcept { return max_size(); }
+  Size capacity() const noexcept { return max_size(); }
 
   void clear() noexcept {
-    for (std::size_t i = 0; i != _size; ++i) {
+    for (Size i = 0; i != _size; ++i) {
       _slots[(_head + i) & (_slots.size() - 1)].~T();
     }
     _size = {};
@@ -227,7 +225,7 @@ public:
   }
 
   void push_back(T const &object) {
-    if (_size != _slots.size()) {
+    if (_size != static_cast<Size>(_slots.size())) {
       new (&_slots[_tail]) T(object);
       ++_size;
       _tail = (_tail + 1) & (_slots.size() - 1);
@@ -237,7 +235,7 @@ public:
   }
 
   template <typename... Args> T &emplace_back(Args &&...args) {
-    if (_size != _slots.size()) {
+    if (_size != static_cast<Size>(_slots.size())) {
       auto &result = *new (&_slots[_tail]) T(std::forward<Args>(args)...);
       ++_size;
       _tail = (_tail + 1) & (_slots.size() - 1);
@@ -263,9 +261,9 @@ private:
   }
 
   std::span<T> _slots;
-  std::size_t _size{};
-  std::size_t _head{};
-  std::size_t _tail{};
+  Size _size{};
+  Size _head{};
+  Size _tail{};
 };
 
 template <typename T, class Allocator = Polymorphic_allocator>
@@ -316,15 +314,13 @@ public:
 
   bool empty() const noexcept { return _impl->empty(); }
 
-  std::size_t size() const noexcept { return _impl->size(); }
+  Size size() const noexcept { return _impl->size(); }
 
-  std::size_t max_size() const noexcept {
-    return std::numeric_limits<std::size_t>::max();
-  }
+  Size max_size() const noexcept { return std::numeric_limits<Size>::max(); }
 
-  std::size_t capacity() const noexcept { return _impl->capacity(); }
+  Size capacity() const noexcept { return _impl->capacity(); }
 
-  void reserve(std::size_t capacity) {
+  void reserve(Size capacity) {
     if (capacity > _impl->capacity()) {
       auto temp = Queue<T>::make(_allocator, capacity).second;
       for (auto &object : *_impl) {

@@ -17,23 +17,24 @@ class Bit_list {
 public:
   template <typename Allocator>
   static std::pair<Block, Bit_list> make(Allocator &allocator,
-                                         std::size_t max_size) noexcept {
+                                         Size max_size) noexcept {
     auto const block = allocator.alloc(memory_requirement(max_size));
     return {block, Bit_list{block, max_size}};
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_size) noexcept {
+  static constexpr Size memory_requirement(Size max_size) noexcept {
     return (max_size + 63) / 64 * sizeof(std::uint64_t);
   }
 
   constexpr Bit_list() noexcept = default;
 
-  explicit Bit_list(Block block, std::size_t max_size) noexcept
+  explicit Bit_list(Block block, Size max_size) noexcept
       : Bit_list{block.begin, max_size} {}
 
-  explicit Bit_list(void *block, std::size_t max_size) noexcept
-      : _data{static_cast<std::uint64_t *>(block), (max_size + 63) / 64} {}
+  explicit Bit_list(void *block, Size max_size) noexcept
+      : _data{static_cast<std::uint64_t *>(block),
+              static_cast<std::size_t>((max_size + 63) / 64)} {
+  }
 
   Bit_list(Bit_list const &other) = delete;
 
@@ -41,7 +42,7 @@ public:
 
   constexpr Bit_list(Bit_list &&other) noexcept
       : _data{std::exchange(other._data, std::span<std::uint64_t>{})},
-        _size{std::exchange(other._size, std::size_t{})} {}
+        _size{std::exchange(other._size, Size{})} {}
 
   constexpr Bit_list &operator=(Bit_list &&other) noexcept {
     auto temp{std::move(other)};
@@ -49,13 +50,13 @@ public:
     return *this;
   }
 
-  constexpr bool get(std::size_t index) const noexcept {
+  constexpr bool get(Size index) const noexcept {
     auto const n = index >> 6;
     auto const m = index & 63;
     return _data[n] >> m & 1;
   }
 
-  constexpr void set(std::size_t index, bool value) noexcept {
+  constexpr void set(Size index, bool value) noexcept {
     if (value) {
       set(index);
     } else {
@@ -63,7 +64,7 @@ public:
     }
   }
 
-  constexpr void set(std::size_t index) noexcept {
+  constexpr void set(Size index) noexcept {
     auto const n = index >> 6;
     auto const m = index & 63;
     _data[n] |= std::uint64_t{1} << m;
@@ -75,7 +76,7 @@ public:
     }
   }
 
-  constexpr void reset(std::size_t index) noexcept {
+  constexpr void reset(Size index) noexcept {
     auto const n = index >> 6;
     auto const m = index & 63;
     _data[n] &= ~(std::uint64_t{1} << m);
@@ -87,7 +88,7 @@ public:
     }
   }
 
-  constexpr void flip(std::size_t index) noexcept {
+  constexpr void flip(Size index) noexcept {
     auto const n = index >> 6;
     auto const m = index & 63;
     _data[n] ^= std::uint64_t{1} << m;
@@ -95,11 +96,11 @@ public:
 
   constexpr bool empty() const noexcept { return size() == 0; }
 
-  constexpr std::size_t size() const noexcept { return _size; }
+  constexpr Size size() const noexcept { return _size; }
 
-  constexpr std::size_t max_size() const noexcept { return _data.size() << 6; }
+  constexpr Size max_size() const noexcept { return _data.size() << 6; }
 
-  constexpr std::size_t capacity() const noexcept { return max_size(); }
+  constexpr Size capacity() const noexcept { return max_size(); }
 
   void clear() noexcept { _size = 0; }
 
@@ -118,7 +119,7 @@ public:
 
   void pop_back() noexcept { --_size; }
 
-  void resize(std::size_t count) {
+  void resize(Size count) {
     if (max_size() < count) {
       throw Capacity_error{"Capacity_error in Bit_list::resize"};
     }
@@ -152,7 +153,7 @@ private:
   }
 
   std::span<std::uint64_t> _data;
-  std::size_t _size{};
+  Size _size{};
 };
 } // namespace util
 } // namespace marlon

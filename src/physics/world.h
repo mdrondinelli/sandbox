@@ -2,7 +2,9 @@
 #define MARLON_PHYSICS_SPACE_H
 
 #include <memory>
+#include <thread>
 
+#include "../util/size.h"
 #include "../util/thread_pool.h"
 #include "particle.h"
 #include "rigid_body.h"
@@ -11,13 +13,16 @@
 namespace marlon {
 namespace physics {
 struct World_create_info {
-  std::size_t max_aabb_tree_leaf_nodes{100000};
-  std::size_t max_aabb_tree_internal_nodes{100000};
-  std::size_t max_particles{10000};
-  std::size_t max_rigid_bodies{10000};
-  std::size_t max_static_bodies{100000};
-  std::size_t max_neighbor_pairs{20000};
-  std::size_t max_neighbor_groups{10000};
+  util::Size worker_thread_count{math::max(
+      static_cast<util::Size>(std::thread::hardware_concurrency() / 2 - 1),
+      util::Size{0})};
+  util::Size max_aabb_tree_leaf_nodes{100000};
+  util::Size max_aabb_tree_internal_nodes{100000};
+  int max_particles{10000};
+  int max_rigid_bodies{10000};
+  int max_static_bodies{100000};
+  util::Size max_neighbor_pairs{20000};
+  util::Size max_neighbor_groups{10000};
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 
@@ -50,9 +55,8 @@ struct Static_body_create_info {
 };
 
 struct World_simulate_info {
-  util::Thread_pool *thread_pool;
-  float delta_time{1.0f / 64.0f};
-  int substep_count{16};
+  float delta_time{1.0f / 128.0f};
+  int substep_count{10};
 };
 
 class World {

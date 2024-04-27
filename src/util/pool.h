@@ -10,14 +10,12 @@ namespace util {
 template <typename T> class Pool {
 public:
   template <typename Allocator>
-  static std::pair<Block, Pool> make(Allocator &allocator,
-                                     std::size_t max_objects) {
+  static std::pair<Block, Pool> make(Allocator &allocator, Size max_objects) {
     auto const block = allocator.alloc(memory_requirement(max_objects));
     return {block, Pool{block, max_objects}};
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_objects) noexcept {
+  static constexpr Size memory_requirement(Size max_objects) noexcept {
     return sizeof(T) * max_objects;
   }
 
@@ -31,10 +29,10 @@ public:
 
   Pool &operator=(Pool<T> &&other) = default;
 
-  explicit Pool(Block block, std::size_t max_objects) noexcept
+  explicit Pool(Block block, Size max_objects) noexcept
       : Pool{block.begin, max_objects} {}
 
-  explicit Pool(void *block_begin, std::size_t max_objects) noexcept
+  explicit Pool(void *block_begin, Size max_objects) noexcept
       : _allocator{Stack_allocator<alignof(T)>{
             make_block(block_begin, memory_requirement(max_objects))}} {}
 

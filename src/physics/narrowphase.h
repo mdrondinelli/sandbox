@@ -60,11 +60,15 @@ std::optional<Contact> object_object_contact(
 
 std::optional<Contact> object_object_contact(
     std::pair<Particle_data *, Static_body_data *> data) noexcept {
+  using namespace math;
+  auto const transform =
+      Mat3x4f::rigid(data.second->position, data.second->orientation);
+  auto const inverse_transform = rigid_inverse(transform);
   return particle_shape_contact(data.first->radius,
                                 data.first->position,
                                 data.second->shape,
-                                data.second->transform,
-                                data.second->inverse_transform);
+                                transform,
+                                inverse_transform);
 }
 
 std::optional<Contact> object_object_contact(
@@ -73,28 +77,33 @@ std::optional<Contact> object_object_contact(
   auto const transforms = std::pair{
       Mat3x4f::rigid(data.first->position, data.first->orientation),
       Mat3x4f::rigid(data.second->position, data.second->orientation)};
-  auto const transform_invs = std::pair{rigid_inverse(transforms.first),
-                                        rigid_inverse(transforms.second)};
+  auto const inverser_transforms = std::pair{rigid_inverse(transforms.first),
+                                             rigid_inverse(transforms.second)};
   return shape_shape_contact(data.first->shape,
                              transforms.first,
-                             transform_invs.first,
+                             inverser_transforms.first,
                              data.second->shape,
                              transforms.second,
-                             transform_invs.second);
+                             inverser_transforms.second);
 }
 
-std::optional<Contact>
-object_object_contact(std::pair<Rigid_body_data *, Static_body_data *> data) noexcept {
+std::optional<Contact> object_object_contact(
+    std::pair<Rigid_body_data *, Static_body_data *> data) noexcept {
   using namespace math;
-  auto const transform = 
-      Mat3x4f::rigid(data.first->position, data.first->orientation);
-  auto const transform_inv = rigid_inverse(transform);
+  auto const transforms = std::array<Mat3x4f, 2>{
+      Mat3x4f::rigid(data.first->position, data.first->orientation),
+      Mat3x4f::rigid(data.second->position, data.second->orientation),
+  };
+  auto const inverse_transforms = std::array<Mat3x4f, 2>{
+      rigid_inverse(transforms[0]),
+      rigid_inverse(transforms[1]),
+  };
   return shape_shape_contact(data.first->shape,
-                             transform,
-                             transform_inv,
+                             transforms[0],
+                             inverse_transforms[0],
                              data.second->shape,
-                             data.second->transform,
-                             data.second->inverse_transform);
+                             transforms[1],
+                             inverse_transforms[1]);
   return std::nullopt;
 }
 } // namespace physics

@@ -10,6 +10,8 @@
 #include <span>
 #include <utility>
 
+#include "size.h"
+
 namespace marlon {
 namespace util {
 struct Block {
@@ -21,15 +23,16 @@ constexpr Block make_block(void *begin, void *end) noexcept {
   return {begin, end};
 }
 
-constexpr Block make_block(void *begin, std::size_t size) noexcept {
+constexpr Block make_block(void *begin, Size size) noexcept {
   return {begin, static_cast<std::byte *>(begin) + size};
 }
 
-constexpr std::size_t align(std::size_t size, std::size_t alignment) noexcept {
-  return (size + alignment - 1) & (~alignment + 1);
+constexpr Size align(Size size, Size alignment) noexcept {
+
+  return (size + alignment - 1) & -alignment;
 }
 
-inline std::ptrdiff_t ptrdiff(void const *p1, void const *p2) noexcept {
+inline Size ptrdiff(void const *p1, void const *p2) noexcept {
   return std::bit_cast<std::uintptr_t>(p1) - std::bit_cast<std::uintptr_t>(p2);
 }
 
@@ -39,19 +42,19 @@ class Allocator {
 public:
   virtual ~Allocator() = default;
 
-  virtual Block alloc(std::size_t size) = 0;
+  virtual Block alloc(Size size) = 0;
 
   virtual void free(Block block) noexcept = 0;
 
-  Unique_block alloc_unique(std::size_t size);
+  Unique_block alloc_unique(Size size);
 };
 
-template <std::size_t Alignment = alignof(std::max_align_t)>
+template <Size Alignment = alignof(std::max_align_t)>
 class Stack_allocator : public Allocator {
 public:
-  static constexpr std::size_t memory_requirement(
-      std::initializer_list<std::size_t> allocation_sizes) noexcept {
-    auto result = std::size_t{};
+  static constexpr Size
+  memory_requirement(std::initializer_list<Size> allocation_sizes) noexcept {
+    auto result = Size{};
     for (auto const size : allocation_sizes) {
       result += align(size, Alignment);
     }
@@ -63,7 +66,7 @@ public:
   explicit Stack_allocator(Block block) noexcept
       : _block{block}, _top{block.begin} {}
 
-  Block alloc(std::size_t size) final {
+  Block alloc(Size size) final {
     auto const block_end = static_cast<std::byte *>(_top) + size;
     auto const aligned_block_end =
         static_cast<std::byte *>(_top) + align(size, Alignment);
@@ -98,7 +101,7 @@ private:
   void *_top;
 };
 
-template <class Parent, std::size_t MinSize, std::size_t MaxSize = MinSize>
+template <class Parent, Size MinSize, Size MaxSize = MinSize>
 class Free_list_allocator : public Allocator {
 public:
   Free_list_allocator() = default;
@@ -107,7 +110,7 @@ public:
 
   explicit Free_list_allocator(Parent &&parent) : _parent{std::move(parent)} {}
 
-  Block alloc(std::size_t size) final {
+  Block alloc(Size size) final {
     if (size >= MinSize && size <= MaxSize) {
       if (_root) {
         auto const result = make_block(_root, size);
@@ -122,7 +125,7 @@ public:
   }
 
   void free(Block block) noexcept final {
-    auto const size = static_cast<std::size_t>(ptrdiff(block.end, block.begin));
+    auto const size = ptrdiff(block.end, block.begin);
     if (size >= MinSize && size <= MaxSize) {
       _root = new (block.begin) Node{.next = _root};
     } else {
@@ -143,10 +146,10 @@ private:
   static_assert(MaxSize >= sizeof(Node));
 };
 
-template <std::size_t MinSize, std::size_t MaxSize = MinSize>
+template <Size MinSize, Size MaxSize = MinSize>
 class Pool_allocator : public Allocator {
 public:
-  static constexpr std::size_t memory_requirement(std::size_t max_blocks) {
+  static constexpr Size memory_requirement(Size max_blocks) {
     return MaxSize * max_blocks;
   }
 
@@ -155,13 +158,13 @@ public:
   explicit Pool_allocator(Block block) noexcept
       : _impl{Stack_allocator<1>{block}} {}
 
-  Block alloc(std::size_t size) final { return _impl.alloc(size); }
+  Block alloc(Size size) final { return _impl.alloc(size); }
 
   void free(Block block) noexcept final { _impl.free(block); }
 
   Block block() const noexcept { return _impl.parent().block(); }
 
-  std::size_t max_blocks() const noexcept {
+  Size max_blocks() const noexcept {
     auto const blk = block();
     return ptrdiff(blk.end, blk.begin) / MaxSize;
   }
@@ -170,11 +173,9 @@ private:
   Free_list_allocator<Stack_allocator<1>, MinSize, MaxSize> _impl;
 };
 
-template <std::size_t MinSize,
-          std::size_t MaxSize = MinSize,
-          typename Allocator>
+template <Size MinSize, Size MaxSize = MinSize, typename Allocator>
 std::pair<Block, Pool_allocator<MinSize, MaxSize>>
-make_pool_allocator(Allocator &allocator, std::size_t max_blocks) {
+make_pool_allocator(Allocator &allocator, Size max_blocks) {
   auto const block = allocator.alloc(
       Pool_allocator<MinSize, MaxSize>::memory_requirement(max_blocks));
   return {block, Pool_allocator<MinSize, MaxSize>{block}};
@@ -184,7 +185,7 @@ class System_allocator : public Allocator {
 public:
   static System_allocator *instance() noexcept { return &_instance; }
 
-  Block alloc(std::size_t size) final {
+  Block alloc(Size size) final {
     auto const begin = std::malloc(size);
     if (!begin) {
       throw std::bad_alloc{};
@@ -206,7 +207,7 @@ public:
 
   Polymorphic_allocator(Allocator *allocator) : _allocator{allocator} {}
 
-  Block alloc(std::size_t size) final { return _allocator->alloc(size); }
+  Block alloc(Size size) final { return _allocator->alloc(size); }
 
   void free(Block block) noexcept final { _allocator->free(block); }
 
@@ -261,12 +262,12 @@ private:
 
 // DEPRECATED
 inline Unique_block
-make_unique_block(std::size_t size,
+make_unique_block(Size size,
                   Allocator *allocator = System_allocator::instance()) {
   return {allocator->alloc(size), allocator};
 }
 
-inline Unique_block Allocator::alloc_unique(std::size_t size) {
+inline Unique_block Allocator::alloc_unique(Size size) {
   return {alloc(size), this};
 }
 } // namespace util

@@ -327,7 +327,7 @@ public:
   }
 
   void post_physics() final {
-    // auto constexpr spacing = 0.61f;
+    auto constexpr spacing = 0.61f;
     _box_spawn_timer += physics_delta_time;
     if (_timer_started) {
       _timer += physics_delta_time;
@@ -337,15 +337,12 @@ public:
     } else if (_box_spawn_timer > 0.0f) {
       _box_spawn_timer -= 0.1f;
       auto const size = pyramid_layers - _box_spawn_layer;
-      if (_boxes.size() >= 2) {
-        return;
-      }
       _boxes.emplace_back(_box_manager->create({
-          // .position =
-              // math::Vec3f{spacing * _box_spawn_row - 0.5f * spacing * size,
-              //             spacing * _box_spawn_layer + 0.4f,
-              //             spacing * _box_spawn_col - 0.5f * spacing * size},
-          .position = math::Vec3f{0.0f, 0.4f + _box_spawn_col * 10.0f, 0.0f},
+          .position =
+              math::Vec3f{spacing * _box_spawn_row - 0.5f * spacing * size,
+                          spacing * _box_spawn_layer + 0.4f,
+                          spacing * _box_spawn_col - 0.5f * spacing * size},
+          // .position = math::Vec3f{0.0f, 0.4f + _box_spawn_col * 10.0f, 0.0f},
           .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
           .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
                                                  math::deg_to_rad(90.0f)),
@@ -488,7 +485,7 @@ public:
                 {
                     .static_friction_coefficient = 0.3f,
                     .dynamic_friction_coefficient = 0.2f,
-                    .restitution_coefficient = 0.0f,
+                    .restitution_coefficient = 0.1f,
                 },
         });
     // _red_ball_manager->create({.position = {-1.5f, 0.5f, -1.5f}});
@@ -499,7 +496,7 @@ public:
             {
                 .static_friction_coefficient = 0.3f,
                 .dynamic_friction_coefficient = 0.2f,
-                .restitution_coefficient = 0.0f,
+                .restitution_coefficient = 0.1f,
             },
         .position = {0.0f, -0.5f, 0.0f},
     });
@@ -519,7 +516,7 @@ public:
     _ring_phase = Ring_phase{_box_manager.get()};
     _pyramid_phase = Pyramid_phase{_box_manager.get()};
     _phases = {&_column_phase, &_pyramid_phase, &_ring_phase};
-    _phase_index = 0;
+    _phase_index = 2;
     _phases[_phase_index]->start();
   }
 

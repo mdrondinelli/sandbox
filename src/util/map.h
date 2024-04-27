@@ -43,48 +43,42 @@ public:
   using Const_iterator = typename decltype(_impl)::Const_iterator;
 
   template <typename Allocator>
-  static std::pair<Block, Map> make(Allocator &allocator,
-                                    std::size_t max_node_count) {
+  static std::pair<Block, Map> make(Allocator &allocator, Size max_node_count) {
     return make(allocator, max_node_count, max_node_count);
   }
 
   template <typename Allocator>
-  static std::pair<Block, Map> make(Allocator &allocator,
-                                    std::size_t max_node_count,
-                                    std::size_t max_bucket_count) {
+  static std::pair<Block, Map>
+  make(Allocator &allocator, Size max_node_count, Size max_bucket_count) {
     auto const block =
         allocator.alloc(memory_requirement(max_node_count, max_bucket_count));
     return {block, Map{block, max_node_count, max_bucket_count}};
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_node_count) noexcept {
+  static constexpr Size memory_requirement(Size max_node_count) noexcept {
     return memory_requirement(max_node_count, max_node_count);
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_node_count,
-                     std::size_t max_bucket_count) noexcept {
+  static constexpr Size memory_requirement(Size max_node_count,
+                                           Size max_bucket_count) noexcept {
     return decltype(_impl)::memory_requirement(max_node_count,
                                                max_bucket_count);
   }
 
   constexpr Map() noexcept = default;
 
-  explicit Map(Block block, std::size_t max_node_count) noexcept
+  explicit Map(Block block, Size max_node_count) noexcept
       : _impl{block, max_node_count} {}
 
-  explicit Map(Block block,
-               std::size_t max_node_count,
-               std::size_t max_bucket_count)
+  explicit Map(Block block, Size max_node_count, Size max_bucket_count)
       : _impl{block, max_node_count, max_bucket_count} {}
 
-  explicit Map(void *block_begin, std::size_t max_node_count) noexcept
+  explicit Map(void *block_begin, Size max_node_count) noexcept
       : _impl{block_begin, max_node_count} {}
 
   explicit Map(void *block_begin,
-               std::size_t max_node_count,
-               std::size_t max_bucket_count) noexcept
+               Size max_node_count,
+               Size max_bucket_count) noexcept
       : _impl{block_begin, max_node_count, max_bucket_count} {}
 
   void const *data() const noexcept { return _impl.data(); }
@@ -103,9 +97,9 @@ public:
 
   Const_iterator cend() const noexcept { return _impl.cend(); }
 
-  std::size_t size() const noexcept { return _impl.size(); }
+  Size size() const noexcept { return _impl.size(); }
 
-  std::size_t max_size() const noexcept { return _impl.max_size(); }
+  Size max_size() const noexcept { return _impl.max_size(); }
 
   void clear() noexcept { _impl.clear(); }
 
@@ -122,7 +116,7 @@ public:
 
   Iterator erase(Const_iterator pos) noexcept { return _impl.erase(pos); }
 
-  template <typename T> std::size_t erase(T const &x) noexcept {
+  template <typename T> Size erase(T const &x) noexcept {
     return _impl.erase(x);
   }
 
@@ -140,11 +134,9 @@ public:
     return find(k)->second;
   }
 
-  std::size_t bucket_count() const noexcept { return _impl.bucket_count(); }
+  Size bucket_count() const noexcept { return _impl.bucket_count(); }
 
-  std::size_t max_bucket_count() const noexcept {
-    return _impl.max_bucket_count();
-  }
+  Size max_bucket_count() const noexcept { return _impl.max_bucket_count(); }
 
   float load_factor() const noexcept { return _impl.load_factor(); }
 
@@ -152,7 +144,7 @@ public:
 
   void max_load_factor(float ml) noexcept { _impl.max_load_factor(ml); }
 
-  void rehash(std::size_t count) noexcept { _impl.rehash(count); }
+  void rehash(Size count) noexcept { _impl.rehash(count); }
 };
 } // namespace util
 } // namespace marlon

@@ -51,13 +51,13 @@ class Rigid_body_storage {
 public:
   template <typename Allocator>
   static std::pair<util::Block, Rigid_body_storage>
-  make(Allocator &allocator, std::size_t max_rigid_bodies) {
+  make(Allocator &allocator, util::Size max_rigid_bodies) {
     auto const block = allocator.alloc(memory_requirement(max_rigid_bodies));
     return {block, Rigid_body_storage{block, max_rigid_bodies}};
   }
 
-  static constexpr std::size_t
-  memory_requirement(std::size_t max_rigid_bodies) noexcept {
+  static constexpr util::Size
+  memory_requirement(util::Size max_rigid_bodies) noexcept {
     return Allocator::memory_requirement({
         decltype(_data)::memory_requirement(max_rigid_bodies),
         decltype(_available_handles)::memory_requirement(max_rigid_bodies),
@@ -68,19 +68,19 @@ public:
   constexpr Rigid_body_storage() = default;
 
   explicit Rigid_body_storage(util::Block block,
-                              std::size_t max_rigid_bodies) noexcept
+                              util::Size max_rigid_bodies) noexcept
       : Rigid_body_storage{block.begin, max_rigid_bodies} {}
 
   explicit Rigid_body_storage(void *block,
-                              std::size_t max_rigid_bodies) noexcept {
-    auto allocator =
-        Allocator{util::make_block(block, memory_requirement(max_rigid_bodies))};
+                              util::Size max_rigid_bodies) noexcept {
+    auto allocator = Allocator{
+        util::make_block(block, memory_requirement(max_rigid_bodies))};
     _data = decltype(_data)::make(allocator, max_rigid_bodies).second;
     _data.resize(max_rigid_bodies);
     _available_handles =
         decltype(_available_handles)::make(allocator, max_rigid_bodies).second;
     _available_handles.resize(max_rigid_bodies);
-    for (auto i = std::size_t{}; i != max_rigid_bodies; ++i) {
+    for (auto i = util::Size{}; i != max_rigid_bodies; ++i) {
       _available_handles[i] = Rigid_body_handle{
           static_cast<Object_handle>(max_rigid_bodies - i - 1)};
     }
@@ -90,7 +90,8 @@ public:
 
   Rigid_body_handle create(Rigid_body_data const &data) {
     if (_available_handles.empty()) {
-      throw util::Capacity_error{"Capacity_error in Rigid_body_storage::create"};
+      throw util::Capacity_error{
+          "Capacity_error in Rigid_body_storage::create"};
     }
     auto const result = _available_handles.back();
     _available_handles.pop_back();
@@ -115,8 +116,8 @@ public:
   template <typename F> void for_each(F &&f) {
     auto const n = _data.size();
     auto const m = _data.size() - _available_handles.size();
-    auto k = std::size_t{};
-    for (auto i = std::size_t{}; i != n && k != m; ++i) {
+    auto k = util::Size{};
+    for (auto i = util::Size{}; i != n && k != m; ++i) {
       if (_occupancy_bits.get(i)) {
         f(Rigid_body_handle{static_cast<Object_handle>(i)});
         ++k;

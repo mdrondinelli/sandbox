@@ -16,20 +16,26 @@ class Task {
 public:
   virtual ~Task() {}
 
-  virtual void run(unsigned thread_index) = 0;
+  virtual void run(Size thread_index) = 0;
 };
 
 class Thread_pool {
 public:
   explicit Thread_pool(
-      unsigned thread_count,
+      Size thread_count,
       Scheduling_policy scheduling_policy = Scheduling_policy::block);
 
   ~Thread_pool();
 
-  std::size_t size() const noexcept;
+  bool empty() const noexcept;
 
-  void push(Task *task);
+  Size size() const noexcept;
+
+  Size push_notify(Task *task);
+
+  Size push_silent(Task *task);
+
+  void notify();
 
   // CANNOT be called from inside the thread pool
   void set_scheduling_policy(Scheduling_policy policy);
@@ -38,8 +44,8 @@ private:
   class Thread {
   public:
     explicit Thread(Thread *threads,
-                    unsigned thread_count,
-                    unsigned index,
+                    Size thread_count,
+                    Size index,
                     Scheduling_policy scheduling_policy);
 
     ~Thread();
@@ -48,12 +54,14 @@ private:
 
     bool try_push(Task *task);
 
+    void notify();
+
     void set_scheduling_policy(Scheduling_policy scheduling_policy);
 
   private:
     Thread *const _threads;
-    unsigned const _thread_count;
-    unsigned const _index;
+    Size const _thread_count;
+    Size const _index;
     Scheduling_policy _scheduling_policy;
     Allocating_queue<Task *> _queue;
     std::mutex _mutex;
@@ -62,7 +70,7 @@ private:
   };
 
   List<Thread> _threads;
-  std::atomic<std::size_t> _push_index;
+  std::atomic<Size> _push_index;
 };
 } // namespace util
 } // namespace marlon

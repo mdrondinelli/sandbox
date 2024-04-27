@@ -28,26 +28,27 @@ public:
 
   void update(std::array<math::Vec3f, 2> const &object_positions,
               std::array<math::Quatf, 2> const &object_orientations) noexcept {
+    using namespace math;
     auto constexpr max_position_distance = 0.01f;
     auto constexpr min_orientation_abs_dot = 0.001f;
-    auto const object_rotations = std::array<math::Mat3x3f, 2>{
-        math::Mat3x3f::rotation(object_orientations[0]),
-        math::Mat3x3f::rotation(object_orientations[1]),
+    auto const object_rotations = std::array<Mat3x3f, 2>{
+        Mat3x3f::rotation(object_orientations[0]),
+        Mat3x3f::rotation(object_orientations[1]),
     };
     for (auto i = std::size_t{}; i != _size;) {
       auto const &cached_contact = contacts()[i];
       auto const keep = [&] {
-        if (std::abs(dot(object_orientations[0],
-                         cached_contact.initial_object_orientations[0])) <
+        if (abs(dot(object_orientations[0],
+                    cached_contact.initial_object_orientations[0])) <
             min_orientation_abs_dot) {
           return false;
         }
-        if (std::abs(dot(object_orientations[1],
-                         cached_contact.initial_object_orientations[1])) <
+        if (abs(dot(object_orientations[1],
+                    cached_contact.initial_object_orientations[1])) <
             min_orientation_abs_dot) {
           return false;
         }
-        auto const global_positions = std::array<math::Vec3f, 2>{
+        auto const global_positions = std::array<Vec3f, 2>{
             object_positions[0] +
                 object_rotations[0] * cached_contact.contact.local_positions[0],
             object_positions[1] +
