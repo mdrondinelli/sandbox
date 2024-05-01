@@ -45,17 +45,16 @@ public:
 
   void destroy(Dynamic_prop_handle handle);
 
-  physics::Rigid_body_handle
-  get_rigid_body(Dynamic_prop_handle prop) const noexcept;
+  physics::Rigid_body get_rigid_body(Dynamic_prop_handle prop) const noexcept;
 
 private:
   struct Entity : public physics::Rigid_body_motion_callback {
     Dynamic_prop_manager *manager;
     graphics::Surface *surface;
-    physics::Rigid_body_handle body;
+    physics::Rigid_body body;
 
     void on_rigid_body_motion(physics::World const &world,
-                              physics::Rigid_body_handle rigid_body) final;
+                              physics::Rigid_body rigid_body) final;
   };
 
   graphics::Scene *_scene;

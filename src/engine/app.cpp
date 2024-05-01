@@ -31,9 +31,9 @@ public:
   explicit Runtime(physics::World_create_info const &world_create_info,
                    Window_create_info const &window_create_info,
                    Camera_create_info const &camera_create_info)
-      : 
-      // _threads{std::max(
-      //       std::max(std::thread::hardware_concurrency() / 2, 1u) - 1, 1u)},
+      : // _threads{std::max(
+        //       std::max(std::thread::hardware_concurrency() / 2, 1u) - 1,
+        //       1u)},
         _world{world_create_info},
         _window{window_create_info},
         _camera{camera_create_info},
@@ -121,6 +121,11 @@ int App::run() {
 
 physics::World *App::get_world() noexcept { return _runtime->get_world(); }
 
+physics::World_simulate_result const &
+App::get_world_simulate_result() const noexcept {
+  return _world_simulate_result;
+}
+
 Window *App::get_window() noexcept { return _runtime->get_window(); }
 
 Camera *App::get_camera() noexcept { return _runtime->get_camera(); }
@@ -137,10 +142,6 @@ void App::stop_looping() noexcept { _looping = false; }
 
 double App::get_loop_iteration_wall_time() const noexcept {
   return _loop_iteration_wall_time;
-}
-
-double App::get_physics_simulation_wall_time() const noexcept {
-  return _physics_simulation_wall_time;
 }
 
 void App::loop() {
@@ -164,13 +165,8 @@ void App::loop() {
     if (accumulated_time >= _world_simulate_info.delta_time) {
       accumulated_time -= _world_simulate_info.delta_time;
       pre_physics();
-      auto const physics_begin_time = clock::now();
-      auto world_simulate_info = _world_simulate_info;
-      _runtime->get_world()->simulate(world_simulate_info);
-      auto const physics_end_time = clock::now();
-      _physics_simulation_wall_time = std::chrono::duration_cast<duration>(
-                                          physics_end_time - physics_begin_time)
-                                          .count();
+      _world_simulate_result =
+          _runtime->get_world()->simulate(_world_simulate_info);
       post_physics();
     }
     _runtime->render();

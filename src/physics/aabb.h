@@ -23,17 +23,21 @@ inline float volume(Aabb const &box) noexcept {
   return d.x * d.y * d.z;
 }
 
+inline Aabb expand(Aabb const &box, math::Vec3f const &amount) noexcept {
+  return {box.min - amount, box.max + amount};
+}
+
 inline Aabb expand(Aabb const &box, float amount) noexcept {
-  return {box.min - math::Vec3f::all(amount),
-          box.max + math::Vec3f::all(amount)};
+  return expand(box, math::Vec3f::all(amount));
 }
 
 inline Aabb merge(Aabb const &first, Aabb const &second) noexcept {
-  return {
-      {std::min(first.min.x, second.min.x), std::min(first.min.y, second.min.y),
-       std::min(first.min.z, second.min.z)},
-      {std::max(first.max.x, second.max.x), std::max(first.max.y, second.max.y),
-       std::max(first.max.z, second.max.z)}};
+  return {{std::min(first.min.x, second.min.x),
+           std::min(first.min.y, second.min.y),
+           std::min(first.min.z, second.min.z)},
+          {std::max(first.max.x, second.max.x),
+           std::max(first.max.y, second.max.y),
+           std::max(first.max.z, second.max.z)}};
 }
 
 inline bool overlaps(Aabb const &first, Aabb const &second) noexcept {

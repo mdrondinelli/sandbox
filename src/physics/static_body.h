@@ -1,7 +1,7 @@
 #ifndef MARLON_PHYSICS_STATIC_BODY_H
 #define MARLON_PHYSICS_STATIC_BODY_H
 
-#include <cstdint>
+#include <bitset>
 
 #include "../math/math.h"
 #include "material.h"
@@ -10,12 +10,37 @@
 
 namespace marlon {
 namespace physics {
-struct Static_body_data {
-  Aabb_tree<Object_handle>::Node *aabb_tree_node;
-  Shape shape;
-  Material material;
-  math::Vec3f position;
-  math::Quatf orientation;
+class Static_body_data {
+public:
+  explicit Static_body_data(Broadphase_bvh::Node *bvh_node,
+                            math::Vec3f const &position,
+                            math::Quatf const &orientation,
+                            Shape const &shape,
+                            Material const &material) noexcept
+      : _bvh_node{bvh_node},
+        _position{position},
+        _orientation{orientation},
+        _shape{shape},
+        _material{material} {}
+
+  Broadphase_bvh::Node const *bvh_node() const noexcept { return _bvh_node; }
+
+  Broadphase_bvh::Node *bvh_node() noexcept { return _bvh_node; }
+
+  math::Vec3f const &position() const noexcept { return _position; }
+
+  math::Quatf const &orientation() const noexcept { return _orientation; }
+
+  Shape const &shape() const noexcept { return _shape; }
+
+  Material const &material() const noexcept { return _material; }
+
+private:
+  Broadphase_bvh::Node *_bvh_node;
+  math::Vec3f _position;
+  math::Quatf _orientation;
+  Shape _shape;
+  Material _material;
 };
 
 class Static_body_storage {
@@ -54,34 +79,34 @@ public:
         decltype(_available_handles)::make(allocator, max_static_bodies).second;
     _available_handles.resize(max_static_bodies);
     for (auto i = util::Size{}; i != max_static_bodies; ++i) {
-      _available_handles[i] = Static_body_handle{
-          static_cast<Object_handle>(max_static_bodies - i - 1)};
+      _available_handles[i] =
+          Static_body{static_cast<int>(max_static_bodies - i - 1)};
     }
     _occupancy_bits = util::Bit_list::make(allocator, max_static_bodies).second;
     _occupancy_bits.resize(max_static_bodies);
   }
 
-  Static_body_handle create(Static_body_data const &data) {
+  template <typename... Args> Static_body create(Args &&...args) {
     if (_available_handles.empty()) {
       throw util::Capacity_error{"Out of space for static rigid bodies"};
     }
     auto const result = _available_handles.back();
     _available_handles.pop_back();
-    _data[result.index()].construct(data);
+    _data[result.index()].construct(std::forward<Args>(args)...);
     _occupancy_bits.set(result.index());
     return result;
   }
 
-  void destroy(Static_body_handle static_body) {
+  void destroy(Static_body static_body) {
     _available_handles.emplace_back(static_body);
     _occupancy_bits.reset(static_body.index());
   }
 
-  Static_body_data const *data(Static_body_handle static_body) const noexcept {
+  Static_body_data const *data(Static_body static_body) const noexcept {
     return _data[static_body.index()].get();
   }
 
-  Static_body_data *data(Static_body_handle static_body) noexcept {
+  Static_body_data *data(Static_body static_body) noexcept {
     return _data[static_body.index()].get();
   }
 
@@ -89,20 +114,17 @@ public:
     auto const n = _occupancy_bits.size();
     auto const m = _occupancy_bits.size() - _free_indices.size();
     auto k = util::Size{};
-    for (auto i = util::Size{}; i != n; ++i) {
+    for (auto i = util::Size{}; i != n && k != m; ++i) {
       if (_occupancy_bits[i]) {
-        auto const handle = Static_body_handle{static_cast<std::uint32_t>(i)};
-        f(handle, data(handle));
-        if (++k == m) {
-          return;
-        }
+        f(Static_body{i});
+        ++k;
       }
     }
   }
 
 private:
   util::List<util::Lifetime_box<Static_body_data>> _data;
-  util::List<Static_body_handle> _available_handles;
+  util::List<Static_body> _available_handles;
   util::Bit_list _occupancy_bits;
 };
 } // namespace physics

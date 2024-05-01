@@ -39,7 +39,7 @@ Static_prop_manager::create(Static_prop_create_info const &create_info) {
 void Static_prop_manager::destroy(Static_prop_handle handle) {
   auto const it = _entities.find(handle.value);
   auto &value = it->second;
-  _space->destroy_rigid_body(value.body);
+  _space->destroy_static_body(value.body);
   _scene->destroy_surface(value.surface);
   // _graphics->destroy_surface(value.surface);
   _entities.erase(it);

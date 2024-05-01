@@ -434,6 +434,7 @@ public:
       : App{{
             .world_create_info =
                 {
+                    .worker_thread_count = 7,
                     .gravitational_acceleration = {0.0f, -9.8f, 0.0f},
                 },
             .world_simulate_info = {.delta_time = physics_delta_time,
@@ -571,24 +572,29 @@ public:
   }
 
   void post_physics() final {
+    auto const &simulate_result = get_world_simulate_result();
     _max_physics_wall_time =
-        std::max(_max_physics_wall_time, get_physics_simulation_wall_time());
-    _total_physics_wall_time += get_physics_simulation_wall_time();
+        std::max(_max_physics_wall_time, simulate_result.total_wall_time);
+    _total_physics_wall_time += simulate_result.total_wall_time;
     _total_physics_simulated_time += physics_delta_time;
+    _total_narrowphase_wall_time += simulate_result.narrowphase_wall_time;
     if (_phases[_phase_index]->is_running()) {
       _phases[_phase_index]->post_physics();
       if (!_phases[_phase_index]->is_running()) {
-        std::cout << "max physics wall time: " << _max_physics_wall_time
+        std::cout << "physics narrowphase wall time: "
+                  << _total_narrowphase_wall_time << "\n";
+        std::cout << "physics total wall time: " << _total_physics_wall_time
                   << "\n";
-        std::cout << "total physics wall time: " << _total_physics_wall_time
+        std::cout << "physics max wall time: " << _max_physics_wall_time
                   << "\n";
-        std::cout << "total physics simulated time: "
+        std::cout << "physics simulated time: "
                   << _total_physics_simulated_time << "\n";
       }
     } else {
       _max_physics_wall_time = 0.0;
       _total_physics_wall_time = 0.0;
       _total_physics_simulated_time = 0.0;
+      _total_narrowphase_wall_time = 0.0;
       _phase_index = (_phase_index + 1) % _phases.size();
       _phases[_phase_index]->start();
     }
@@ -601,16 +607,16 @@ public:
       }
       auto const rigid_body = _box_manager->get_rigid_body(*_selection);
       auto const transform =
-          math::Mat3x4f::trs(get_world()->get_position(rigid_body),
-                             get_world()->get_orientation(rigid_body),
+          math::Mat3x4f::trs(get_world()->data(rigid_body)->position(),
+                             get_world()->data(rigid_body)->orientation(),
                              0.3f);
       _selection_wireframe->set_transform(transform);
     } else if (_selection_wireframe) {
       _selection_wireframe = nullptr;
     }
-    if (get_physics_simulation_wall_time() > physics_delta_time) {
+    if (simulate_result.total_wall_time > physics_delta_time) {
       std::cout << "SLOWER THAN REAL TIME: "
-                << get_physics_simulation_wall_time() * 1000.0 << " ms\n";
+                << simulate_result.total_wall_time * 1000.0 << " ms\n";
     }
   }
 
@@ -637,6 +643,7 @@ private:
   double _max_physics_wall_time{0.0};
   double _total_physics_wall_time{0.0};
   double _total_physics_simulated_time{0.0};
+  double _total_narrowphase_wall_time{0.0};
 };
 
 int main() { return Client{}.run(); }

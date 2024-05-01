@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include <chrono>
 #include <iostream>
 #include <latch>
 
@@ -10,7 +11,7 @@
 #include "../util/lifetime_box.h"
 #include "../util/list.h"
 #include "../util/map.h"
-#include "aabb_tree.h"
+#include "broadphase.h"
 #include "contact.h"
 #include "narrowphase.h"
 
@@ -29,23 +30,21 @@ class Neighbor_group_storage {
 
 public:
   struct Group {
-    std::uint32_t objects_begin;
-    std::uint32_t objects_end;
+    Size objects_begin;
+    Size objects_end;
   };
 
   template <typename Allocator>
   static std::pair<Block, Neighbor_group_storage>
-  make(Allocator &allocator,
-       util::Size max_object_count,
-       util::Size max_group_count) {
+  make(Allocator &allocator, Size max_object_count, Size max_group_count) {
     auto const block =
         allocator.alloc(memory_requirement(max_object_count, max_group_count));
     return {block,
             Neighbor_group_storage{block, max_object_count, max_group_count}};
   }
 
-  static constexpr util::Size memory_requirement(util::Size max_object_count,
-                                                 util::Size max_group_count) {
+  static constexpr Size memory_requirement(Size max_object_count,
+                                           Size max_group_count) {
     return Allocator::memory_requirement({
         decltype(_objects)::memory_requirement(max_object_count),
         decltype(_groups)::memory_requirement(max_group_count),
@@ -55,27 +54,41 @@ public:
   constexpr Neighbor_group_storage() noexcept = default;
 
   Neighbor_group_storage(Block block,
-                         util::Size max_object_count,
-                         util::Size max_group_count)
+                         Size max_object_count,
+                         Size max_group_count)
       : Neighbor_group_storage{block.begin, max_object_count, max_group_count} {
   }
 
   Neighbor_group_storage(void *block_begin,
-                         util::Size max_object_count,
-                         util::Size max_group_count) {
+                         Size max_object_count,
+                         Size max_group_count) {
     auto allocator = Allocator{make_block(
         block_begin, memory_requirement(max_object_count, max_group_count))};
     _objects = decltype(_objects)::make(allocator, max_object_count).second;
     _groups = decltype(_groups)::make(allocator, max_group_count).second;
   }
 
-  util::Size object_count() const noexcept { return _objects.size(); }
+  Size object_count() const noexcept { return _objects.size(); }
 
-  Object_handle object(util::Size object_index) const noexcept {
-    return _objects[object_index];
+  std::variant<Particle, Rigid_body>
+  object_specific(Size index) const noexcept {
+    return std::visit(
+        [&](auto const object) -> std::variant<Particle, Rigid_body> {
+          using T = std::decay_t<decltype(object)>;
+          if constexpr (std::is_same_v<T, Particle> ||
+                        std::is_same_v<T, Rigid_body>) {
+            return object;
+          } else {
+            unreachable();
+            throw;
+          }
+        },
+        object_generic(index).specific());
   }
 
-  util::Size group_count() const noexcept { return _groups.size(); }
+  Object object_generic(Size index) const noexcept { return _objects[index]; }
+
+  Size group_count() const noexcept { return _groups.size(); }
 
   Group const &group(util::Size group_index) const noexcept {
     return _groups[group_index];
@@ -87,25 +100,25 @@ public:
   }
 
   void begin_group() {
-    auto const objects_index = static_cast<std::uint32_t>(_objects.size());
+    auto const objects_index = _objects.size();
     _groups.push_back({
         .objects_begin = objects_index,
         .objects_end = objects_index,
     });
   }
 
-  void add_to_group(Particle_handle particle) {
-    _objects.push_back(particle.value());
+  void add_to_group(Particle object) {
+    _objects.push_back(object.generic());
     ++_groups.back().objects_end;
   }
 
-  void add_to_group(Rigid_body_handle rigid_body) {
-    _objects.push_back(rigid_body.value());
+  void add_to_group(Rigid_body object) {
+    _objects.push_back(object.generic());
     ++_groups.back().objects_end;
   }
 
 private:
-  List<Object_handle> _objects;
+  List<Object> _objects;
   List<Group> _groups;
 };
 
@@ -201,25 +214,26 @@ public:
 
   explicit Narrowphase_task(
       Intrinsic_state const *intrinsic_state,
-      Map<std::uint64_t, Contact_manifold>::Iterator first,
-      Map<std::uint64_t, Contact_manifold>::Iterator last) noexcept
-      : _intrinsic_state{intrinsic_state}, _first{first}, _last{last} {}
+      std::span<std::pair<Object_pair, Contact_manifold> *const> items) noexcept
+      : _intrinsic_state{intrinsic_state}, _items{items} {}
 
   void run(Size) final {
-    for (auto it = _first; it != _last; ++it) {
-      auto const objects = Object_pair{it->first};
+    for (auto const &p : _items) {
+      auto const objects = p->first;
+      auto &contact_manifold = p->second;
+      // auto const objects = Object_handle_pair{it->first};
       if (auto const contact = find_contact(objects)) {
         auto object_derived_data = std::array<Object_derived_data, 2>{};
-        visit(
+        std::visit(
             [&](auto &&first_object) {
               object_derived_data[0] = derived_data(data(first_object));
             },
-            objects.first());
-        visit(
+            objects.first_specific());
+        std::visit(
             [&](auto &&second_object) {
               object_derived_data[1] = derived_data(data(second_object));
             },
-            objects.second());
+            objects.second_specific());
         auto const object_positions = std::array<Vec3f, 2>{
             object_derived_data[0].position,
             object_derived_data[1].position,
@@ -228,13 +242,13 @@ public:
             object_derived_data[0].orientation,
             object_derived_data[1].orientation,
         };
-        it->second.update(object_positions, object_orientations);
-        it->second.insert({
+        contact_manifold.update(object_positions, object_orientations);
+        contact_manifold.insert({
             .contact = *contact,
             .initial_object_orientations = object_orientations,
         });
       } else {
-        it->second.clear();
+        contact_manifold.clear();
       }
     }
     if (auto const latch = _intrinsic_state->latch) {
@@ -243,70 +257,43 @@ public:
   }
 
 private:
-  static_assert(static_cast<int>(Object_type::particle) <
-                static_cast<int>(Object_type::rigid_body));
-  static_assert(static_cast<int>(Object_type::rigid_body) <
-                static_cast<int>(Object_type::static_body));
-  std::optional<Contact> find_contact(Object_pair objects) const noexcept {
+  std::optional<Contact> find_contact(Object_pair generic) const noexcept {
     auto result = std::optional<Contact>{};
-    visit(
-        [&](auto &&first_object) {
-          using T = std::decay_t<decltype(first_object)>;
-          if constexpr (std::is_same_v<T, Particle_handle>) {
-            visit(
-                [&](auto &&second_object) {
-                  result = object_object_contact(
-                      {data(first_object), data(second_object)});
-                },
-                objects.second());
-          } else if constexpr (std::is_same_v<T, Rigid_body_handle>) {
-            visit(
-                [&](auto &&second_object) {
-                  using U = std::decay_t<decltype(second_object)>;
-                  if constexpr (std::is_same_v<U, Rigid_body_handle> ||
-                                std::is_same_v<U, Static_body_handle>) {
-                    result = object_object_contact(
-                        {data(first_object), data(second_object)});
-                  } else {
-                    math::unreachable();
-                  }
-                },
-                objects.second());
-          } else {
-            math::unreachable();
-          }
+    std::visit(
+        [&](auto const specific) {
+          result = object_object_contact(*data(specific.first),
+                                         *data(specific.second));
         },
-        objects.first());
+        generic.specific());
     return result;
   }
 
-  Object_derived_data derived_data(Particle_data *data) const noexcept {
-    return {data->position, Quatf::identity()};
+  Object_derived_data derived_data(Particle_data const *data) const noexcept {
+    return {data->position(), Quatf::identity()};
   }
 
-  Object_derived_data derived_data(Rigid_body_data *data) const noexcept {
-    return {data->position, data->orientation};
+  Object_derived_data derived_data(Rigid_body_data const *data) const noexcept {
+    return {data->position(), data->orientation()};
   }
 
-  Object_derived_data derived_data(Static_body_data *data) {
-    return {data->position, data->orientation};
+  Object_derived_data derived_data(Static_body_data const *data) {
+    return {data->position(), data->orientation()};
   }
 
-  Particle_data *data(Particle_handle object) const noexcept {
+  Particle_data const *data(Particle object) const noexcept {
     return _intrinsic_state->particles->data(object);
   }
 
-  Rigid_body_data *data(Rigid_body_handle object) const noexcept {
+  Rigid_body_data const *data(Rigid_body object) const noexcept {
     return _intrinsic_state->rigid_bodies->data(object);
   }
 
-  Static_body_data *data(Static_body_handle object) const noexcept {
+  Static_body_data const *data(Static_body object) const noexcept {
     return _intrinsic_state->static_bodies->data(object);
   }
 
   Intrinsic_state const *_intrinsic_state;
-  Map<std::uint64_t, Contact_manifold>::Iterator _first;
-  Map<std::uint64_t, Contact_manifold>::Iterator _last;
+  std::span<std::pair<Object_pair, Contact_manifold> *const> _items;
 };
 
 float generalized_inverse_mass(float inverse_mass,
@@ -344,72 +331,67 @@ public:
 
   void run(Size /*thread_index*/) final {
     for (auto const &work_item : _work_items) {
-      visit(
-          [&](auto first_object) {
-            visit(
-                [&](auto second_object) {
-                  auto const object_data =
-                      std::pair{data(first_object), data(second_object)};
-                  auto const object_derived_data =
-                      std::array<Object_derived_data, 2>{
-                          derived_data(object_data.first),
-                          derived_data(object_data.second),
-                      };
-                  auto const contact_positions = std::array<Vec3f, 2>{
-                      object_derived_data[0].transform *
-                          Vec4f{work_item.contact->local_positions[0], 1.0f},
-                      object_derived_data[1].transform *
-                          Vec4f{work_item.contact->local_positions[1], 1.0f},
-                  };
-                  auto const relative_position =
-                      contact_positions[0] - contact_positions[1];
-                  auto const separation =
-                      dot(relative_position, work_item.contact->normal) +
-                      work_item.contact->separation_bias;
-                  if (separation >= 0.0f) {
-                    return;
-                  }
-                  auto const local_contact_normals = std::array<Vec3f, 2>{
-                      object_derived_data[0].inverse_transform *
-                          Vec4f{work_item.contact->normal, 0.0f},
-                      object_derived_data[1].inverse_transform *
-                          Vec4f{work_item.contact->normal, 0.0f},
-                  };
-                  auto const generalized_inverse_masses = std::array<float, 2>{
-                      generalized_inverse_mass(
-                          object_derived_data[0].inverse_mass,
-                          object_derived_data[0].inverse_inertia_tensor,
+      std::visit(
+          [&](auto const objects) {
+            auto const object_data =
+                std::pair{data(objects.first), data(objects.second)};
+            auto const object_derived_data = std::array<Object_derived_data, 2>{
+                derived_data(object_data.first),
+                derived_data(object_data.second),
+            };
+            auto const contact_positions = std::array<Vec3f, 2>{
+                object_derived_data[0].transform *
+                    Vec4f{work_item.contact->local_positions[0], 1.0f},
+                object_derived_data[1].transform *
+                    Vec4f{work_item.contact->local_positions[1], 1.0f},
+            };
+            auto const relative_position =
+                contact_positions[0] - contact_positions[1];
+            auto const separation =
+                dot(relative_position, work_item.contact->normal) +
+                work_item.contact->separation_bias;
+            if (separation >= 0.0f) {
+              return;
+            }
+            auto const local_contact_normals = std::array<Vec3f, 2>{
+                object_derived_data[0].inverse_transform *
+                    Vec4f{work_item.contact->normal, 0.0f},
+                object_derived_data[1].inverse_transform *
+                    Vec4f{work_item.contact->normal, 0.0f},
+            };
+            auto const generalized_inverse_masses = std::array<float, 2>{
+                generalized_inverse_mass(
+                    object_derived_data[0].inverse_mass,
+                    object_derived_data[0].inverse_inertia_tensor,
+                    work_item.contact->local_positions[0],
+                    local_contact_normals[0]),
+                generalized_inverse_mass(
+                    object_derived_data[1].inverse_mass,
+                    object_derived_data[1].inverse_inertia_tensor,
+                    work_item.contact->local_positions[1],
+                    local_contact_normals[1]),
+            };
+            auto const impulse_magnitude =
+                -separation /
+                (generalized_inverse_masses[0] + generalized_inverse_masses[1]);
+            auto const local_impulses = std::array<Vec3f, 2>{
+                impulse_magnitude * local_contact_normals[0],
+                -impulse_magnitude * local_contact_normals[1],
+            };
+            auto const global_impulse =
+                impulse_magnitude * work_item.contact->normal;
+            apply_impulse(object_data.first,
+                          object_derived_data[0],
                           work_item.contact->local_positions[0],
-                          local_contact_normals[0]),
-                      generalized_inverse_mass(
-                          object_derived_data[1].inverse_mass,
-                          object_derived_data[1].inverse_inertia_tensor,
+                          local_impulses[0],
+                          global_impulse);
+            apply_impulse(object_data.second,
+                          object_derived_data[1],
                           work_item.contact->local_positions[1],
-                          local_contact_normals[1]),
-                  };
-                  auto const impulse_magnitude =
-                      -separation / (generalized_inverse_masses[0] +
-                                     generalized_inverse_masses[1]);
-                  auto const local_impulses = std::array<Vec3f, 2>{
-                      impulse_magnitude * local_contact_normals[0],
-                      -impulse_magnitude * local_contact_normals[1],
-                  };
-                  auto const global_impulse =
-                      impulse_magnitude * work_item.contact->normal;
-                  apply_impulse(object_data.first,
-                                object_derived_data[0],
-                                work_item.contact->local_positions[0],
-                                local_impulses[0],
-                                global_impulse);
-                  apply_impulse(object_data.second,
-                                object_derived_data[1],
-                                work_item.contact->local_positions[1],
-                                local_impulses[1],
-                                -global_impulse);
-                },
-                work_item.objects.second());
+                          local_impulses[1],
+                          -global_impulse);
           },
-          work_item.objects.first());
+          work_item.objects.specific());
     }
     if (auto const latch = _intrinsic_state->latch) {
       latch->count_down();
@@ -422,7 +404,8 @@ private:
                      Vec3f const & /*local_position*/,
                      Vec3f const & /*local_impulse*/,
                      Vec3f const &global_impulse) const noexcept {
-    object_data->position += global_impulse * derived_data.inverse_mass;
+    object_data->position(object_data->position() +
+                          global_impulse * derived_data.inverse_mass);
   }
 
   void apply_impulse(Rigid_body_data *object_data,
@@ -441,13 +424,15 @@ private:
                                    derived_data.transform[2][2]}};
     auto const rotated_inverse_inertia_tensor =
         rotation * derived_data.inverse_inertia_tensor;
-    object_data->position += global_impulse * derived_data.inverse_mass;
-    object_data->orientation +=
+    object_data->position(object_data->position() +
+                          global_impulse * derived_data.inverse_mass);
+    object_data->orientation(
+        object_data->orientation() +
         0.5f *
-        Quatf{0.0f,
-              rotated_inverse_inertia_tensor *
-                  cross(local_position, local_impulse)} *
-        object_data->orientation;
+            Quatf{0.0f,
+                  rotated_inverse_inertia_tensor *
+                      cross(local_position, local_impulse)} *
+            object_data->orientation());
   }
 
   void apply_impulse(Static_body_data * /*object_data*/,
@@ -458,26 +443,28 @@ private:
 
   Object_derived_data derived_data(Particle_data const *data) const noexcept {
     return Object_derived_data{
-        .transform = Mat3x4f::translation(data->position),
-        .inverse_transform = Mat3x4f::translation(-data->position),
-        .inverse_mass = data->inverse_mass,
+        .transform = Mat3x4f::translation(data->position()),
+        .inverse_transform = Mat3x4f::translation(-data->position()),
+        .inverse_mass = data->inverse_mass(),
         .inverse_inertia_tensor = Mat3x3f::zero(),
     };
   }
 
   Object_derived_data derived_data(Rigid_body_data const *data) const noexcept {
-    auto const transform = Mat3x4f::rigid(data->position, data->orientation);
+    auto const transform =
+        Mat3x4f::rigid(data->position(), data->orientation());
     return Object_derived_data{
         .transform = transform,
         .inverse_transform = rigid_inverse(transform),
-        .inverse_mass = data->inverse_mass,
-        .inverse_inertia_tensor = data->inverse_inertia_tensor,
+        .inverse_mass = data->inverse_mass(),
+        .inverse_inertia_tensor = data->inverse_inertia_tensor(),
     };
   }
 
   Object_derived_data
   derived_data(Static_body_data const *data) const noexcept {
-    auto const transform = Mat3x4f::rigid(data->position, data->orientation);
+    auto const transform =
+        Mat3x4f::rigid(data->position(), data->orientation());
     return Object_derived_data{
         .transform = transform,
         .inverse_transform = rigid_inverse(transform),
@@ -486,15 +473,15 @@ private:
     };
   }
 
-  Particle_data *data(Particle_handle object) const noexcept {
+  Particle_data *data(Particle object) const noexcept {
     return _intrinsic_state->particles->data(object);
   }
 
-  Rigid_body_data *data(Rigid_body_handle object) const noexcept {
+  Rigid_body_data *data(Rigid_body object) const noexcept {
     return _intrinsic_state->rigid_bodies->data(object);
   }
 
-  Static_body_data *data(Static_body_handle object) const noexcept {
+  Static_body_data *data(Static_body object) const noexcept {
     return _intrinsic_state->static_bodies->data(object);
   }
 
@@ -507,7 +494,7 @@ class Velocity_solve_task : public util::Task {
     Vec3f velocity;
     Vec3f angular_velocity;
     Mat3x3f rotation;
-    Mat3x4f inverse_transform;
+    Mat3x3f inverse_rotation;
     float inverse_mass;
     Mat3x3f inverse_inertia_tensor;
     Material material;
@@ -533,151 +520,140 @@ public:
 
   void run(Size /*thread_index*/) final {
     for (auto const &work_item : _work_items) {
-      visit(
-          [&](auto first_object) {
-            visit(
-                [&](auto second_object) {
-                  auto const object_data =
-                      std::pair{data(first_object), data(second_object)};
-                  auto const object_derived_data =
-                      std::array<Object_derived_data, 2>{
-                          derived_data(object_data.first),
-                          derived_data(object_data.second),
-                      };
-                  auto const relative_contact_positions = std::array<Vec3f, 2>{
-                      object_derived_data[0].rotation *
+      std::visit(
+          [&](auto const objects) {
+            auto const object_data =
+                std::pair{data(objects.first), data(objects.second)};
+            auto const object_derived_data = std::array<Object_derived_data, 2>{
+                derived_data(*object_data.first),
+                derived_data(*object_data.second),
+            };
+            auto const relative_contact_positions = std::array<Vec3f, 2>{
+                object_derived_data[0].rotation *
+                    work_item.contact->local_positions[0],
+                object_derived_data[1].rotation *
+                    work_item.contact->local_positions[1],
+            };
+            auto const relative_velocity =
+                (object_derived_data[0].velocity +
+                 cross(object_derived_data[0].angular_velocity,
+                       relative_contact_positions[0])) -
+                (object_derived_data[1].velocity +
+                 cross(object_derived_data[1].angular_velocity,
+                       relative_contact_positions[1]));
+            auto const separating_velocity =
+                dot(relative_velocity, work_item.contact->normal);
+            if (separating_velocity >= 0.0f) {
+              return;
+            }
+            auto const local_contact_normals = std::array<Vec3f, 2>{
+                object_derived_data[0].inverse_rotation *
+                    work_item.contact->normal,
+                object_derived_data[1].inverse_rotation *
+                    work_item.contact->normal,
+            };
+            auto const normal_generalized_inverse_masses = std::array<float, 2>{
+                generalized_inverse_mass(
+                    object_derived_data[0].inverse_mass,
+                    object_derived_data[0].inverse_inertia_tensor,
+                    work_item.contact->local_positions[0],
+                    local_contact_normals[0]),
+                generalized_inverse_mass(
+                    object_derived_data[1].inverse_mass,
+                    object_derived_data[1].inverse_inertia_tensor,
+                    work_item.contact->local_positions[1],
+                    local_contact_normals[1]),
+            };
+            auto const restitution_coefficient =
+                -separating_velocity >
+                        _intrinsic_state
+                            ->restitution_separating_velocity_epsilon
+                    ? 0.5f * (object_derived_data[0]
+                                  .material.restitution_coefficient +
+                              object_derived_data[1]
+                                  .material.restitution_coefficient)
+                    : 0.0f;
+            auto const normal_impulse_magnitude =
+                (-separating_velocity * (1.0f + restitution_coefficient)) /
+                (normal_generalized_inverse_masses[0] +
+                 normal_generalized_inverse_masses[1]);
+            auto local_impulses = std::array<Vec3f, 2>{
+                normal_impulse_magnitude * local_contact_normals[0],
+                -normal_impulse_magnitude * local_contact_normals[1],
+            };
+            auto global_impulse =
+                normal_impulse_magnitude * work_item.contact->normal;
+            auto const tangential_velocity =
+                relative_velocity -
+                separating_velocity * work_item.contact->normal;
+            if (tangential_velocity != Vec3f::zero()) {
+              auto const tangential_speed = length(tangential_velocity);
+              auto const global_tangent =
+                  tangential_velocity / tangential_speed;
+              auto const local_tangents = std::array<Vec3f, 2>{
+                  object_derived_data[0].inverse_rotation * global_tangent,
+                  object_derived_data[1].inverse_rotation * global_tangent,
+              };
+              auto const tangential_generalized_inverse_masses =
+                  std::array<float, 2>{
+                      generalized_inverse_mass(
+                          object_derived_data[0].inverse_mass,
+                          object_derived_data[0].inverse_inertia_tensor,
                           work_item.contact->local_positions[0],
-                      object_derived_data[1].rotation *
+                          -local_tangents[0]),
+                      generalized_inverse_mass(
+                          object_derived_data[1].inverse_mass,
+                          object_derived_data[1].inverse_inertia_tensor,
                           work_item.contact->local_positions[1],
+                          -local_tangents[1]),
                   };
-                  auto const relative_velocity =
-                      (object_derived_data[0].velocity +
-                       cross(object_derived_data[0].angular_velocity,
-                             relative_contact_positions[0])) -
-                      (object_derived_data[1].velocity +
-                       cross(object_derived_data[1].angular_velocity,
-                             relative_contact_positions[1]));
-                  auto const separating_velocity =
-                      dot(relative_velocity, work_item.contact->normal);
-                  if (separating_velocity >= 0.0f) {
-                    return;
-                  }
-                  auto const local_contact_normals = std::array<Vec3f, 2>{
-                      object_derived_data[0].inverse_transform *
-                          Vec4f{work_item.contact->normal, 0.0f},
-                      object_derived_data[1].inverse_transform *
-                          Vec4f{work_item.contact->normal, 0.0f},
-                  };
-                  auto const normal_generalized_inverse_masses =
-                      std::array<float, 2>{
-                          generalized_inverse_mass(
-                              object_derived_data[0].inverse_mass,
-                              object_derived_data[0].inverse_inertia_tensor,
-                              work_item.contact->local_positions[0],
-                              local_contact_normals[0]),
-                          generalized_inverse_mass(
-                              object_derived_data[1].inverse_mass,
-                              object_derived_data[1].inverse_inertia_tensor,
-                              work_item.contact->local_positions[1],
-                              local_contact_normals[1]),
-                      };
-                  auto const restitution_coefficient =
-                      -separating_velocity >
-                              _intrinsic_state
-                                  ->restitution_separating_velocity_epsilon
-                          ? 0.5f * (object_derived_data[0]
-                                        .material.restitution_coefficient +
-                                    object_derived_data[1]
-                                        .material.restitution_coefficient)
-                          : 0.0f;
-                  auto const normal_impulse_magnitude =
-                      (-separating_velocity *
-                       (1.0f + restitution_coefficient)) /
-                      (normal_generalized_inverse_masses[0] +
-                       normal_generalized_inverse_masses[1]);
-                  auto local_impulses = std::array<Vec3f, 2>{
-                      normal_impulse_magnitude * local_contact_normals[0],
-                      -normal_impulse_magnitude * local_contact_normals[1],
-                  };
-                  auto global_impulse =
-                      normal_impulse_magnitude * work_item.contact->normal;
-                  auto const tangential_velocity =
-                      relative_velocity -
-                      separating_velocity * work_item.contact->normal;
-                  if (tangential_velocity != Vec3f::zero()) {
-                    auto const tangential_speed = length(tangential_velocity);
-                    auto const global_tangent =
-                        tangential_velocity / tangential_speed;
-                    auto const local_tangents = std::array<Vec3f, 2>{
-                        object_derived_data[0].inverse_transform *
-                            Vec4f{global_tangent, 0.0f},
-                        object_derived_data[1].inverse_transform *
-                            Vec4f{global_tangent, 0.0f},
-                    };
-                    auto const tangential_generalized_inverse_masses =
-                        std::array<float, 2>{
-                            generalized_inverse_mass(
-                                object_derived_data[0].inverse_mass,
-                                object_derived_data[0].inverse_inertia_tensor,
-                                work_item.contact->local_positions[0],
-                                -local_tangents[0]),
-                            generalized_inverse_mass(
-                                object_derived_data[1].inverse_mass,
-                                object_derived_data[1].inverse_inertia_tensor,
-                                work_item.contact->local_positions[1],
-                                -local_tangents[1]),
-                        };
-                    auto const inverse_sum_tangential_generalized_inverse_mass =
-                        1.0f / (tangential_generalized_inverse_masses[0] +
-                                tangential_generalized_inverse_masses[1]);
-                    auto const static_friction_impulse_magnitude =
-                        tangential_speed *
-                        inverse_sum_tangential_generalized_inverse_mass;
-                    auto const static_friction_coefficient =
-                        0.5f * (object_derived_data[0]
-                                    .material.static_friction_coefficient +
-                                object_derived_data[1]
-                                    .material.dynamic_friction_coefficient);
-                    if (static_friction_impulse_magnitude <=
-                        static_friction_coefficient *
-                            normal_impulse_magnitude) {
-                      local_impulses[0] -=
-                          static_friction_impulse_magnitude * local_tangents[0];
-                      local_impulses[1] +=
-                          static_friction_impulse_magnitude * local_tangents[1];
-                      global_impulse -=
-                          static_friction_impulse_magnitude * global_tangent;
-                    } else {
-                      auto const dynamic_friction_coefficient =
-                          0.5f * (object_derived_data[0]
-                                      .material.dynamic_friction_coefficient +
-                                  object_derived_data[1]
-                                      .material.dynamic_friction_coefficient);
-                      auto const dynamic_friction_impulse_magnitude =
-                          dynamic_friction_coefficient *
-                          normal_impulse_magnitude;
-                      local_impulses[0] -= dynamic_friction_impulse_magnitude *
-                                           local_tangents[0];
-                      local_impulses[1] += dynamic_friction_impulse_magnitude *
-                                           local_tangents[1];
-                      global_impulse -=
-                          dynamic_friction_impulse_magnitude * global_tangent;
-                    }
-                  }
-                  apply_impulse(object_data.first,
-                                object_derived_data[0],
-                                work_item.contact->local_positions[0],
-                                local_impulses[0],
-                                global_impulse);
-                  apply_impulse(object_data.second,
-                                object_derived_data[1],
-                                work_item.contact->local_positions[1],
-                                local_impulses[1],
-                                -global_impulse);
-                },
-                work_item.objects.second());
+              auto const inverse_sum_tangential_generalized_inverse_mass =
+                  1.0f / (tangential_generalized_inverse_masses[0] +
+                          tangential_generalized_inverse_masses[1]);
+              auto const static_friction_impulse_magnitude =
+                  tangential_speed *
+                  inverse_sum_tangential_generalized_inverse_mass;
+              auto const static_friction_coefficient =
+                  0.5f *
+                  (object_derived_data[0].material.static_friction_coefficient +
+                   object_derived_data[1]
+                       .material.dynamic_friction_coefficient);
+              if (static_friction_impulse_magnitude <=
+                  static_friction_coefficient * normal_impulse_magnitude) {
+                local_impulses[0] -=
+                    static_friction_impulse_magnitude * local_tangents[0];
+                local_impulses[1] +=
+                    static_friction_impulse_magnitude * local_tangents[1];
+                global_impulse -=
+                    static_friction_impulse_magnitude * global_tangent;
+              } else {
+                auto const dynamic_friction_coefficient =
+                    0.5f * (object_derived_data[0]
+                                .material.dynamic_friction_coefficient +
+                            object_derived_data[1]
+                                .material.dynamic_friction_coefficient);
+                auto const dynamic_friction_impulse_magnitude =
+                    dynamic_friction_coefficient * normal_impulse_magnitude;
+                local_impulses[0] -=
+                    dynamic_friction_impulse_magnitude * local_tangents[0];
+                local_impulses[1] +=
+                    dynamic_friction_impulse_magnitude * local_tangents[1];
+                global_impulse -=
+                    dynamic_friction_impulse_magnitude * global_tangent;
+              }
+            }
+            apply_impulse(object_data.first,
+                          object_derived_data[0],
+                          work_item.contact->local_positions[0],
+                          local_impulses[0],
+                          global_impulse);
+            apply_impulse(object_data.second,
+                          object_derived_data[1],
+                          work_item.contact->local_positions[1],
+                          local_impulses[1],
+                          -global_impulse);
           },
-          work_item.objects.first());
+          work_item.objects.specific());
     }
     if (auto const latch = _intrinsic_state->latch) {
       latch->count_down();
@@ -690,7 +666,8 @@ private:
                      Vec3f const & /*local_position*/,
                      Vec3f const & /*local_impulse*/,
                      Vec3f const &global_impulse) const noexcept {
-    object_data->velocity += global_impulse * derived_data.inverse_mass;
+    object_data->velocity(object_data->velocity() +
+                          derived_data.inverse_mass * global_impulse);
   }
 
   void apply_impulse(Rigid_body_data *object_data,
@@ -698,11 +675,12 @@ private:
                      Vec3f const &local_position,
                      Vec3f const &local_impulse,
                      Vec3f const &global_impulse) const noexcept {
-    auto const rotated_inverse_inertia_tensor =
-        derived_data.rotation * derived_data.inverse_inertia_tensor;
-    object_data->velocity += global_impulse * derived_data.inverse_mass;
-    object_data->angular_velocity +=
-        rotated_inverse_inertia_tensor * cross(local_position, local_impulse);
+    object_data->velocity(object_data->velocity() +
+                          derived_data.inverse_mass * global_impulse);
+    object_data->angular_velocity(object_data->angular_velocity() +
+                                  derived_data.rotation *
+                                      (derived_data.inverse_inertia_tensor *
+                                       cross(local_position, local_impulse)));
   }
 
   void apply_impulse(Static_body_data * /*object_data*/,
@@ -711,60 +689,54 @@ private:
                      Vec3f const & /*local_impulse*/,
                      Vec3f const & /*global_impulse*/) const noexcept {}
 
-  Object_derived_data derived_data(Particle_data const *data) const noexcept {
+  Object_derived_data derived_data(Particle_data const &data) const noexcept {
     return Object_derived_data{
-        .velocity = data->velocity,
+        .velocity = data.velocity(),
         .angular_velocity = Vec3f::zero(),
         .rotation = Mat3x3f::identity(),
-        .inverse_transform = Mat3x4f::translation(-data->position),
-        .inverse_mass = data->inverse_mass,
+        .inverse_rotation = Mat3x3f::identity(),
+        .inverse_mass = data.inverse_mass(),
         .inverse_inertia_tensor = Mat3x3f::zero(),
-        .material = data->material,
+        .material = data.material(),
     };
   }
 
-  Object_derived_data derived_data(Rigid_body_data const *data) const noexcept {
-    auto const transform = Mat3x4f::rigid(data->position, data->orientation);
+  Object_derived_data derived_data(Rigid_body_data const &data) const noexcept {
+    auto const rotation = Mat3x3f::rotation(data.orientation());
     return Object_derived_data{
-        .velocity = data->velocity,
-        .angular_velocity = data->angular_velocity,
-        .rotation =
-            Mat3x3f{{transform[0][0], transform[0][1], transform[0][2]},
-                    {transform[1][0], transform[1][1], transform[1][2]},
-                    {transform[2][0], transform[2][1], transform[2][2]}},
-        .inverse_transform = rigid_inverse(transform),
-        .inverse_mass = data->inverse_mass,
-        .inverse_inertia_tensor = data->inverse_inertia_tensor,
-        .material = data->material,
+        .velocity = data.velocity(),
+        .angular_velocity = data.angular_velocity(),
+        .rotation = rotation,
+        .inverse_rotation = transpose(rotation),
+        .inverse_mass = data.inverse_mass(),
+        .inverse_inertia_tensor = data.inverse_inertia_tensor(),
+        .material = data.material(),
     };
   }
 
   Object_derived_data
-  derived_data(Static_body_data const *data) const noexcept {
-    auto const transform = Mat3x4f::rigid(data->position, data->orientation);
+  derived_data(Static_body_data const &data) const noexcept {
+    auto const rotation = Mat3x3f::rotation(data.orientation());
     return Object_derived_data{
         .velocity = Vec3f::zero(),
         .angular_velocity = Vec3f::zero(),
-        .rotation =
-            Mat3x3f{{transform[0][0], transform[0][1], transform[0][2]},
-                    {transform[1][0], transform[1][1], transform[1][2]},
-                    {transform[2][0], transform[2][1], transform[2][2]}},
-        .inverse_transform = rigid_inverse(transform),
+        .rotation = rotation,
+        .inverse_rotation = transpose(rotation),
         .inverse_mass = 0.0f,
         .inverse_inertia_tensor = Mat3x3f::zero(),
-        .material = data->material,
+        .material = data.material(),
     };
   }
 
-  Particle_data *data(Particle_handle object) const noexcept {
+  Particle_data *data(Particle object) const noexcept {
     return _intrinsic_state->particles->data(object);
   }
 
-  Rigid_body_data *data(Rigid_body_handle object) const noexcept {
+  Rigid_body_data *data(Rigid_body object) const noexcept {
     return _intrinsic_state->rigid_bodies->data(object);
   }
 
-  Static_body_data *data(Static_body_handle object) const noexcept {
+  Static_body_data *data(Static_body object) const noexcept {
     return _intrinsic_state->static_bodies->data(object);
   }
 
@@ -774,11 +746,11 @@ private:
 
 // integration constants
 auto constexpr velocity_damping_factor = 0.99f;
-auto constexpr waking_motion_epsilon = 0.01f;
-auto constexpr waking_motion_initializer = 2.0f * waking_motion_epsilon;
-auto constexpr waking_motion_limit = 10.0f * waking_motion_epsilon;
-auto constexpr waking_motion_smoothing_factor = 0.8f;
-auto constexpr max_narrowphase_task_size = Size{16};
+auto constexpr motion_epsilon = 0.02f;
+auto constexpr motion_initializer = 2.0f * motion_epsilon;
+auto constexpr motion_limit = 10.0f * motion_epsilon;
+auto constexpr motion_smoothing_factor = 0.8f;
+auto constexpr max_narrowphase_task_size = Size{32};
 } // namespace
 
 class World::Impl {
@@ -793,18 +765,17 @@ public:
             create_info.max_rigid_bodies),
         decltype(_static_bodies)::memory_requirement(
             create_info.max_static_bodies),
-        decltype(_aabb_tree)::memory_requirement(
+        decltype(_bvh)::memory_requirement(
             create_info.max_aabb_tree_leaf_nodes,
             create_info.max_aabb_tree_internal_nodes),
         decltype(_neighbor_pairs)::memory_requirement(
             create_info.max_neighbor_pairs),
-        decltype(_neighbor_pair_ptrs)::memory_requirement(
+        decltype(_neighbors)::memory_requirement(
             2 * create_info.max_neighbor_pairs),
         decltype(_neighbor_groups)::memory_requirement(
             create_info.max_particles + create_info.max_rigid_bodies,
-            // create_info.max_neighbor_pairs,
             create_info.max_neighbor_groups),
-        decltype(_neighbor_group_awake_indices)::memory_requirement(
+        decltype(_awake_neighbor_group_indices)::memory_requirement(
             create_info.max_neighbor_groups),
         // decltype(_coloring_bits)::memory_requirement(max_colors),
         // decltype(_coloring_fringe)::memory_requirement(
@@ -812,6 +783,8 @@ public:
         // decltype(_color_groups)::memory_requirement(
         //     create_info.max_neighbor_pairs),
         decltype(_contact_manifolds)::memory_requirement(
+            create_info.max_neighbor_pairs),
+        decltype(_awake_contact_manifolds)::memory_requirement(
             create_info.max_neighbor_pairs),
         decltype(_narrowphase_tasks)::memory_requirement(
             (create_info.max_neighbor_pairs + max_narrowphase_task_size - 1) /
@@ -833,27 +806,24 @@ public:
     _static_bodies =
         Static_body_storage::make(allocator, create_info.max_static_bodies)
             .second;
-    _aabb_tree =
-        Aabb_tree<Object_handle>::make(allocator,
-                                       create_info.max_aabb_tree_leaf_nodes,
-                                       create_info.max_aabb_tree_internal_nodes)
-            .second;
+    _bvh = Broadphase_bvh::make(allocator,
+                                create_info.max_aabb_tree_leaf_nodes,
+                                create_info.max_aabb_tree_internal_nodes)
+               .second;
     _neighbor_pairs =
         List<Object_pair>::make(allocator, create_info.max_neighbor_pairs)
             .second;
-    _neighbor_pair_ptrs =
-        List<Object_pair *>::make(allocator, 2 * create_info.max_neighbor_pairs)
+    _neighbors =
+        List<Object>::make(allocator, 2 * create_info.max_neighbor_pairs)
             .second;
     _neighbor_groups =
         Neighbor_group_storage::make(allocator,
                                      create_info.max_particles +
                                          create_info.max_rigid_bodies,
-                                     //  create_info.max_neighbor_pairs,
                                      create_info.max_neighbor_groups)
             .second;
-    _neighbor_group_awake_indices =
-        List<std::uint32_t>::make(allocator, create_info.max_neighbor_groups)
-            .second;
+    _awake_neighbor_group_indices =
+        List<Size>::make(allocator, create_info.max_neighbor_groups).second;
     // _coloring_bits = Bit_list::make(allocator, max_colors).second;
     // _coloring_bits.resize(max_colors);
     // _coloring_fringe =
@@ -863,9 +833,15 @@ public:
     // _color_groups =
     //     Color_group_storage::make(allocator, create_info.max_neighbor_pairs)
     //         .second;
-    _contact_manifolds = Map<std::uint64_t, Contact_manifold>::make(
+    _contact_manifolds = decltype(_contact_manifolds)::make(
                              allocator, create_info.max_neighbor_pairs)
                              .second;
+    _awake_contact_manifolds = decltype(_awake_contact_manifolds)::make(
+                                   allocator, create_info.max_neighbor_pairs)
+                                   .second;
+    _narrowphase_task_intrinsic_state.particles = &_particles;
+    _narrowphase_task_intrinsic_state.rigid_bodies = &_rigid_bodies;
+    _narrowphase_task_intrinsic_state.static_bodies = &_static_bodies;
     _narrowphase_tasks =
         List<Narrowphase_task>::make(
             allocator,
@@ -875,142 +851,117 @@ public:
   }
 
   ~Impl() {
+    _narrowphase_tasks = {};
+    _awake_contact_manifolds = {};
     _contact_manifolds = {};
     // _color_groups = {};
     // _coloring_fringe = {};
     // _coloring_bits = {};
-    _neighbor_group_awake_indices = {};
+    _awake_neighbor_group_indices = {};
     _neighbor_groups = {};
-    _neighbor_pair_ptrs = {};
+    _neighbors = {};
     _neighbor_pairs = {};
-    _aabb_tree = {};
+    _bvh = {};
+    _static_bodies = {};
+    _rigid_bodies = {};
+    _particles = {};
     util::System_allocator::instance()->free(_block);
   }
 
-  Particle_handle create_particle(Particle_create_info const &create_info) {
-    auto const bounds =
-        Aabb{create_info.position - Vec3f::all(create_info.radius),
-             create_info.position + Vec3f::all(create_info.radius)};
-    auto const particle = _particles.create({
-        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Object_handle{}),
-        .motion_callback = create_info.motion_callback,
-        .radius = create_info.radius,
-        .inverse_mass = 1.0f / create_info.mass,
-        .material = create_info.material,
-        .previous_position = create_info.position,
-        .position = create_info.position,
-        .velocity = create_info.velocity,
-        .waking_motion = waking_motion_initializer,
-        .marked = false,
-        .awake = true,
-    });
-    _particles.data(particle)->aabb_tree_node->payload = particle.value();
-    return particle;
+  Particle create_particle(Particle_create_info const &create_info) {
+    auto const bvh_node = _bvh.create_leaf({}, {});
+    try {
+      auto const particle = _particles.create(bvh_node,
+                                              create_info.motion_callback,
+                                              create_info.position,
+                                              create_info.velocity,
+                                              motion_initializer,
+                                              1.0f / create_info.mass,
+                                              create_info.radius,
+                                              create_info.material);
+      bvh_node->payload = particle.generic();
+      return particle;
+    } catch (...) {
+      _bvh.destroy_leaf(bvh_node);
+      throw;
+    }
   }
 
-  void destroy_particle(Particle_handle particle) {
-    _aabb_tree.destroy_leaf(_particles.data(particle)->aabb_tree_node);
+  void destroy_particle(Particle particle) {
+    _bvh.destroy_leaf(data(particle)->bvh_node());
     _particles.destroy(particle);
   }
 
-  bool is_awake(Particle_handle particle) const noexcept {
-    return _particles.data(particle)->awake;
+  Rigid_body create_rigid_body(Rigid_body_create_info const &create_info) {
+    auto const bvh_node = _bvh.create_leaf({}, {});
+    try {
+      auto const rigid_body =
+          _rigid_bodies.create(bvh_node,
+                               create_info.motion_callback,
+                               create_info.position,
+                               create_info.velocity,
+                               create_info.orientation,
+                               create_info.angular_velocity,
+                               motion_initializer,
+                               1.0f / create_info.mass,
+                               inverse(create_info.inertia_tensor),
+                               create_info.shape,
+                               create_info.material);
+      bvh_node->payload = rigid_body.generic();
+      return rigid_body;
+    } catch (...) {
+      _bvh.destroy_leaf(bvh_node);
+      throw;
+    }
   }
 
-  float get_waking_motion(Particle_handle particle) const noexcept {
-    return _particles.data(particle)->waking_motion;
-  }
-
-  math::Vec3f get_position(Particle_handle particle) const noexcept {
-    return _particles.data(particle)->position;
-  }
-
-  Rigid_body_handle
-  create_rigid_body(Rigid_body_create_info const &create_info) {
-    auto const transform =
-        Mat3x4f::rigid(create_info.position, create_info.orientation);
-    auto const bounds = physics::bounds(create_info.shape, transform);
-    auto const rigid_body = _rigid_bodies.create({
-        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Object_handle{}),
-        .motion_callback = create_info.motion_callback,
-        .shape = create_info.shape,
-        .inverse_mass = 1.0f / create_info.mass,
-        .inverse_inertia_tensor = inverse(create_info.inertia_tensor),
-        .material = create_info.material,
-        .previous_position = create_info.position,
-        .position = create_info.position,
-        .velocity = create_info.velocity,
-        .previous_orientation = create_info.orientation,
-        .orientation = create_info.orientation,
-        .angular_velocity = create_info.angular_velocity,
-        .waking_motion = waking_motion_initializer,
-        .marked = false,
-        .awake = true,
-    });
-    _rigid_bodies.data(rigid_body)->aabb_tree_node->payload =
-        rigid_body.value();
-    return rigid_body;
-  }
-
-  void destroy_rigid_body(Rigid_body_handle rigid_body) {
-    _aabb_tree.destroy_leaf(_rigid_bodies.data(rigid_body)->aabb_tree_node);
+  void destroy_rigid_body(Rigid_body rigid_body) {
+    _bvh.destroy_leaf(data(rigid_body)->bvh_node());
     _rigid_bodies.destroy(rigid_body);
   }
 
-  bool is_awake(Rigid_body_handle rigid_body) const noexcept {
-    return _rigid_bodies.data(rigid_body)->awake;
-  }
-
-  float get_waking_motion(Rigid_body_handle rigid_body) const noexcept {
-    return _rigid_bodies.data(rigid_body)->waking_motion;
-  }
-
-  math::Vec3f get_position(Rigid_body_handle rigid_body) const noexcept {
-    return _rigid_bodies.data(rigid_body)->position;
-  }
-
-  math::Quatf get_orientation(Rigid_body_handle rigid_body) const noexcept {
-    return _rigid_bodies.data(rigid_body)->orientation;
-  }
-
-  Static_body_handle
-  create_static_body(Static_body_create_info const &create_info) {
-    auto const transform =
-        Mat3x4f::rigid(create_info.position, create_info.orientation);
-    // auto const transform_inverse = rigid_inverse(transform);
-    auto const bounds = physics::bounds(create_info.shape, transform);
-    auto const static_body = _static_bodies.create({
-        .aabb_tree_node = _aabb_tree.create_leaf(bounds, Object_handle{}),
-        .shape = create_info.shape,
-        .material = create_info.material,
-        .position = create_info.position,
-        .orientation = create_info.orientation,
-    });
-    _static_bodies.data(static_body)->aabb_tree_node->payload =
-        static_body.value();
-    return static_body;
-  }
-
-  void destroy_static_body(Static_body_handle handle) {
-    _aabb_tree.destroy_leaf(_static_bodies.data(handle)->aabb_tree_node);
-    _static_bodies.destroy(handle);
-  }
-
-  void simulate(World const &world, World_simulate_info const &simulate_info) {
-    // _threads.set_scheduling_policy(util::Scheduling_policy::spin);
-    build_aabb_tree(simulate_info.delta_time);
-    clear_neighbor_pairs();
-    find_neighbor_pairs();
-    assign_neighbor_pairs();
-    find_neighbor_groups();
-    _neighbor_group_awake_indices.clear();
-    // _color_groups.clear();
-    for (auto j = util::Size{}; j != _neighbor_groups.group_count(); ++j) {
-      if (update_neighbor_group_awake_states(j)) {
-        _neighbor_group_awake_indices.emplace_back(j);
-        // color_neighbor_group(j);
-      }
+  Static_body create_static_body(Static_body_create_info const &create_info) {
+    auto const bvh_node = _bvh.create_leaf(
+        bounds(create_info.shape,
+               Mat3x4f::rigid(create_info.position, create_info.orientation)),
+        {});
+    try {
+      auto const static_body = _static_bodies.create(bvh_node,
+                                                     create_info.position,
+                                                     create_info.orientation,
+                                                     create_info.shape,
+                                                     create_info.material);
+      bvh_node->payload = static_body.generic();
+      return static_body;
+    } catch (...) {
+      _bvh.destroy_leaf(bvh_node);
+      throw;
     }
+  }
+
+  void destroy_static_body(Static_body static_body) {
+    _bvh.destroy_leaf(data(static_body)->bvh_node());
+    _static_bodies.destroy(static_body);
+  }
+
+  World_simulate_result simulate(World const &world,
+                                 World_simulate_info const &simulate_info) {
+    using clock = std::chrono::system_clock;
+    using duration = std::chrono::duration<double>;
+    auto result = World_simulate_result{};
+    auto const broadphase_begin = clock::now();
+    build_aabb_tree(simulate_info.delta_time);
+    // clear_neighbors();
+    find_neighbors();
+    // assign_neighbors();
+    find_neighbor_groups();
+    find_awake_neighbor_groups();
+    find_awake_contact_manifolds();
+    make_narrowphase_tasks();
+    auto const broadphase_end = clock::now();
+    result.broadphase_wall_time =
+        std::chrono::duration_cast<duration>(broadphase_end - broadphase_begin)
+            .count();
     // _color_groups.reserve();
     // assign_color_groups();
     auto const h = simulate_info.delta_time / simulate_info.substep_count;
@@ -1038,19 +989,42 @@ public:
     auto const time_compensated_velocity_damping_factor =
         pow(velocity_damping_factor, h);
     auto const time_compensating_waking_motion_smoothing_factor =
-        1.0f - pow(1.0f - waking_motion_smoothing_factor, h);
+        1.0f - pow(1.0f - motion_smoothing_factor, h);
     auto const restitution_separating_velocity_epsilon =
         2.0f * h * length(_gravitational_acceleration);
     for (auto i = 0; i < simulate_info.substep_count; ++i) {
+      auto const integration_begin = clock::now();
       integrate(h,
                 time_compensated_velocity_damping_factor,
                 time_compensating_waking_motion_smoothing_factor);
-      find_contacts();
+      auto const integration_end = clock::now();
+      run_narrowphase_tasks();
+      auto const narrowphase_end = clock::now();
       solve_positions();
+      auto const position_solve_end = clock::now();
       solve_velocities(restitution_separating_velocity_epsilon);
+      auto const velocity_solve_end = clock::now();
+      result.integration_wall_time += std::chrono::duration_cast<duration>(
+                                          integration_end - integration_begin)
+                                          .count();
+      result.narrowphase_wall_time += std::chrono::duration_cast<duration>(
+                                          narrowphase_end - integration_end)
+                                          .count();
+      result.position_solve_wall_time +=
+          std::chrono::duration_cast<duration>(position_solve_end -
+                                               narrowphase_end)
+              .count();
+      result.velocity_solve_wall_time +=
+          std::chrono::duration_cast<duration>(velocity_solve_end -
+                                               position_solve_end)
+              .count();
     }
-    // _threads.set_scheduling_policy(util::Scheduling_policy::block);
+    auto const simulate_end = clock::now();
+    result.total_wall_time =
+        std::chrono::duration_cast<duration>(simulate_end - broadphase_begin)
+            .count();
     call_motion_callbacks(world);
+    return result;
   }
 
 private:
@@ -1061,69 +1035,66 @@ private:
     auto const gravity_safety_term = gravity_safety_factor *
                                      length(_gravitational_acceleration) *
                                      delta_time * delta_time;
-    _particles.for_each([&](Particle_handle object) {
-      auto const object_data = get_data(object);
-      auto const half_extents = Vec3f::all(
-          object_data->radius + constant_safety_term +
-          velocity_safety_factor * length(object_data->velocity) * delta_time +
-          gravity_safety_term);
-      object_data->aabb_tree_node->bounds = {
-          object_data->position - half_extents,
-          object_data->position + half_extents};
+    _particles.for_each([&](Particle object) {
+      auto const object_data = data(object);
+      auto const half_extent = object_data->radius() + constant_safety_term +
+                               velocity_safety_factor *
+                                   length(object_data->velocity()) *
+                                   delta_time +
+                               gravity_safety_term;
+      object_data->bvh_node()->bounds = expand(
+          {object_data->position(), object_data->position()}, half_extent);
     });
-    _rigid_bodies.for_each([&](Rigid_body_handle object) {
-      auto const object_data = get_data(object);
-      object_data->aabb_tree_node->bounds =
-          expand(bounds(object_data->shape,
-                        Mat3x4f::rigid(object_data->position,
-                                       object_data->orientation)),
+    _rigid_bodies.for_each([&](Rigid_body object) {
+      auto const object_data = data(object);
+      auto const transform =
+          Mat3x4f::rigid(object_data->position(), object_data->orientation());
+      object_data->bvh_node()->bounds =
+          expand(bounds(object_data->shape(), transform),
                  constant_safety_term +
-                     velocity_safety_factor * length(object_data->velocity) *
+                     velocity_safety_factor * length(object_data->velocity()) *
                          delta_time +
                      gravity_safety_term);
     });
-    _aabb_tree.build();
+    _bvh.build();
   }
 
-  void clear_neighbor_pairs() {
-    auto const reset_neighbor_count = [&](auto object) {
-      get_data(object)->neighbor_count = 0;
+  void find_neighbors() {
+    auto const reset_neighbors = [&](auto const object) {
+      data(object)->reset_neighbors();
     };
-    _particles.for_each(reset_neighbor_count);
-    _rigid_bodies.for_each(reset_neighbor_count);
-    _neighbor_pair_ptrs.clear();
+    _particles.for_each(reset_neighbors);
+    _rigid_bodies.for_each(reset_neighbors);
     _neighbor_pairs.clear();
+    _neighbors.clear();
     _neighbor_groups.clear();
-  }
-
-  void find_neighbor_pairs() {
-    _aabb_tree.for_each_overlapping_leaf_pair(
-        [this](Object_handle first_payload, Object_handle second_payload) {
-          visit(
-              [&](auto &&first_handle) {
-                visit(
-                    [&](auto &&second_handle) {
-                      using T = std::decay_t<decltype(first_handle)>;
-                      using U = std::decay_t<decltype(second_handle)>;
-                      if constexpr (!std::is_same_v<T, Static_body_handle> ||
-                                    !std::is_same_v<U, Static_body_handle>) {
-                        _neighbor_pairs.emplace_back(
-                            std::pair{first_payload, second_payload});
-                        auto const id = _neighbor_pairs.back().id();
-                        auto const it = _contact_manifolds
-                                            .emplace(std::piecewise_construct,
-                                                     std::tuple{id},
-                                                     std::tuple{})
-                                            .first;
-                        it->second.marked(true);
-                        increment_neighbor_count(get_data(first_handle));
-                        increment_neighbor_count(get_data(second_handle));
-                      }
-                    },
-                    second_payload);
-              },
-              first_payload);
-        });
+    _bvh.for_each_overlapping_leaf_pair([this](Object first_generic,
+                                               Object second_generic) {
+      visit(
+          [&](auto const first_specific, auto const second_specific) {
+            using T = std::decay_t<decltype(first_specific)>;
+            using U = std::decay_t<decltype(second_specific)>;
+            if constexpr (!std::is_same_v<T, Static_body> ||
+                          !std::is_same_v<U, Static_body>) {
+              auto const pair =
+                  _neighbor_pairs.emplace_back(first_specific, second_specific);
+              auto const it = _contact_manifolds
+                                  .emplace(std::piecewise_construct,
+                                           std::tuple{pair},
+                                           std::tuple{})
+                                  .first;
+              it->second.marked(true);
+              if constexpr (!std::is_same_v<T, Static_body>) {
+                data(first_specific)->count_neighbor();
+              }
+              if constexpr (!std::is_same_v<U, Static_body>) {
+                data(second_specific)->count_neighbor();
+              }
+            }
+          },
+          first_generic.specific(),
+          second_generic.specific());
+    });
     for (auto it = _contact_manifolds.begin();
          it != _contact_manifolds.end();) {
       if (it->second.marked()) {
@@ -1133,90 +1104,58 @@ private:
         it = _contact_manifolds.erase(it);
       }
     }
-  }
-
-  void increment_neighbor_count(Particle_data *data) noexcept {
-    ++data->neighbor_count;
-  }
-
-  void increment_neighbor_count(Rigid_body_data *data) noexcept {
-    ++data->neighbor_count;
-  }
-
-  void increment_neighbor_count(Static_body_data *) const noexcept {}
-
-  void assign_neighbor_pairs() {
-    auto const alloc_neighbor_pairs = [this](auto object) {
-      auto const object_data = get_data(object);
-      object_data->neighbor_pairs = _neighbor_pair_ptrs.end();
-      _neighbor_pair_ptrs.resize(_neighbor_pair_ptrs.size() +
-                                 object_data->neighbor_count);
-      object_data->neighbor_count = 0;
+    auto const reserve_neighbors = [this](auto const object) {
+      data(object)->reserve_neighbors(_neighbors);
     };
-    _particles.for_each(alloc_neighbor_pairs);
-    _rigid_bodies.for_each(alloc_neighbor_pairs);
+    _particles.for_each(reserve_neighbors);
+    _rigid_bodies.for_each(reserve_neighbors);
     for (auto &pair : _neighbor_pairs) {
-      visit(
-          [&](auto &&handle) { assign_neighbor_pair(get_data(handle), &pair); },
-          pair.first());
-      visit(
-          [&](auto &&handle) { assign_neighbor_pair(get_data(handle), &pair); },
-          pair.second());
+      std::visit(
+          [&](auto const object) {
+            data(object)->push_neighbor(pair.second_generic());
+          },
+          pair.first_specific());
+      std::visit(
+          [&](auto const object) {
+            using T = std::decay_t<decltype(object)>;
+            if constexpr (!std::is_same_v<T, Static_body>) {
+              data(object)->push_neighbor(pair.first_generic());
+            }
+          },
+          pair.second_specific());
     }
   }
 
-  void assign_neighbor_pair(Particle_data *data,
-                            Object_pair *neighbor_pair) noexcept {
-    data->neighbor_pairs[data->neighbor_count++] = neighbor_pair;
-  }
-
-  void assign_neighbor_pair(Rigid_body_data *data,
-                            Object_pair *neighbor_pair) noexcept {
-    data->neighbor_pairs[data->neighbor_count++] = neighbor_pair;
-  }
-
-  void assign_neighbor_pair(Static_body_data *, Object_pair *) const noexcept {}
-
   void find_neighbor_groups() {
-    auto const unmark = [&](auto object) { get_data(object)->marked = false; };
+    auto const unmark = [&](auto object) { data(object)->marked(false); };
     _particles.for_each(unmark);
     _rigid_bodies.for_each(unmark);
-    auto const visitor = [this](auto &&handle) {
-      using T = std::decay_t<decltype(handle)>;
-      if constexpr (!std::is_same_v<T, Static_body_handle>) {
-        for (auto const pair : get_neighbor_pairs(get_data(handle))) {
-          visit(
-              [&](auto &&neighbor_handle) {
-                using U = std::decay_t<decltype(neighbor_handle)>;
-                if constexpr (!std::is_same_v<U, Static_body_handle>) {
-                  auto const neighbor_data = get_data(neighbor_handle);
-                  if (!neighbor_data->marked) {
-                    neighbor_data->marked = true;
-                    _neighbor_groups.add_to_group(neighbor_handle);
-                  }
-                  // if (pair->color() == color_unmarked) {
-                  //   pair->color(color_marked);
-                  //   _neighbor_groups.add_to_group(pair);
-                  // }
-                } else {
-                  // _neighbor_groups.add_to_group(pair);
+    auto const visitor = [this](auto &&object) {
+      auto const object_data = data(object);
+      for (auto const generic_neighbor : object_data->neighbors()) {
+        std::visit(
+            [&](auto &&specific_neighbor) {
+              using U = std::decay_t<decltype(specific_neighbor)>;
+              if constexpr (!std::is_same_v<U, Static_body>) {
+                auto const neighbor_data = data(specific_neighbor);
+                if (!neighbor_data->marked()) {
+                  neighbor_data->marked(true);
+                  _neighbor_groups.add_to_group(specific_neighbor);
                 }
-              },
-              pair->other(handle.value()));
-        }
-      } else {
-        math::unreachable();
+              }
+            },
+            generic_neighbor.specific());
       }
     };
     auto fringe_index = util::Size{};
     auto const find_neighbor_group = [&, this](auto const seed_object) {
-      auto const seed_data = get_data(seed_object);
-      if (!seed_data->marked) {
-        seed_data->marked = true;
+      auto const seed_data = data(seed_object);
+      if (!seed_data->marked()) {
+        seed_data->marked(true);
         _neighbor_groups.begin_group();
         _neighbor_groups.add_to_group(seed_object);
         do {
-          visit(visitor, _neighbor_groups.object(fringe_index));
+          visit(visitor, _neighbor_groups.object_specific(fringe_index));
         } while (++fringe_index != _neighbor_groups.object_count());
       }
     };
@@ -1224,85 +1163,123 @@ private:
     _rigid_bodies.for_each(find_neighbor_group);
   }
 
-  bool update_neighbor_group_awake_states(util::Size group_index) {
-    auto const &group = _neighbor_groups.group(group_index);
-    auto contains_awake = false;
-    auto contains_sleeping = false;
-    auto sleepable = true;
-    for (auto i = group.objects_begin;
-         (sleepable || !contains_awake || !contains_sleeping) &&
-         i != group.objects_end;
-         ++i) {
-      visit(
-          [&](auto &&handle) {
-            using T = std::decay_t<decltype(handle)>;
-            if constexpr (!std::is_same_v<T, Static_body_handle>) {
-              auto const data = get_data(handle);
-              if (data->awake) {
+  void find_awake_neighbor_groups() {
+    _awake_neighbor_group_indices.clear();
+    auto const group_count = _neighbor_groups.group_count();
+    for (auto group_index = util::Size{}; group_index < group_count;
+         ++group_index) {
+      auto const &group = _neighbor_groups.group(group_index);
+      auto contains_awake = false;
+      auto contains_asleep = false;
+      auto sleepable = true;
+      for (auto i = group.objects_begin;
+           (sleepable || !contains_awake || !contains_asleep) &&
+           i != group.objects_end;
+           ++i) {
+        std::visit(
+            [&](auto &&object) {
+              auto const object_data = data(object);
+              if (object_data->asleep()) {
+                contains_asleep = true;
+              } else {
                 contains_awake = true;
-                if (data->waking_motion > waking_motion_epsilon) {
+                if (object_data->motion() > motion_epsilon) {
                   sleepable = false;
                 }
-              } else {
-                contains_sleeping = true;
               }
-            } else {
-              math::unreachable();
-            }
-          },
-          _neighbor_groups.object(i));
-    }
-    if (contains_awake) {
-      if (sleepable) {
-        for (auto i = group.objects_begin; i != group.objects_end; ++i) {
-          auto const object = _neighbor_groups.object(i);
-          visit(
-              [&](auto &&handle) {
-                using T = std::decay_t<decltype(handle)>;
-                if constexpr (!std::is_same_v<T, Static_body_handle>) {
-                  auto const data = get_data(handle);
-                  if (data->awake) {
-                    data->awake = false;
-                    freeze(data);
-                  }
-                } else {
-                  math::unreachable();
-                }
-              },
-              object);
-        }
-        return false;
-      } else {
-        if (contains_sleeping) {
+            },
+            _neighbor_groups.object_specific(i));
+      }
+      if (contains_awake) {
+        if (sleepable) {
           for (auto i = group.objects_begin; i != group.objects_end; ++i) {
-            visit(
-                [&](auto &&handle) {
-                  using T = std::decay_t<decltype(handle)>;
-                  if constexpr (!std::is_same_v<T, Static_body_handle>) {
-                    auto const data = get_data(handle);
-                    if (!data->awake) {
-                      data->awake = true;
-                      data->waking_motion = waking_motion_initializer;
-                    }
-                  } else {
-                    math::unreachable();
+            std::visit(
+                [&](auto &&object) {
+                  auto const object_data = data(object);
+                  if (object_data->awake()) {
+                    object_data->sleep();
                   }
                 },
-                _neighbor_groups.object(i));
+                _neighbor_groups.object_specific(i));
           }
+        } else {
+          if (contains_asleep) {
+            for (auto i = group.objects_begin; i != group.objects_end; ++i) {
+              std::visit(
+                  [&](auto &&object) {
+                    auto const object_data = data(object);
+                    if (object_data->asleep()) {
+                      object_data->wake(motion_initializer);
+                    }
+                  },
+                  _neighbor_groups.object_specific(i));
+            }
+          }
+          _awake_neighbor_group_indices.emplace_back(group_index);
         }
-        return true;
       }
-    } else {
-      return false;
     }
   }
 
-  void freeze(Particle_data *data) { data->velocity = Vec3f::zero(); }
+  void find_awake_contact_manifolds() {
+    _awake_contact_manifolds.clear();
+    for (auto const group_index : _awake_neighbor_group_indices) {
+      auto const group = _neighbor_groups.group(group_index);
+      for (auto object_index = group.objects_begin;
+           object_index != group.objects_end;
+           ++object_index) {
+        std::visit([&](auto const object) { data(object)->marked(false); },
+                   _neighbor_groups.object_specific(object_index));
+      }
+      for (auto object_index = group.objects_begin;
+           object_index != group.objects_end;
+           ++object_index) {
+        std::visit(
+            [&](auto const object) {
+              auto const object_data = data(object);
+              object_data->marked(true);
+              for (auto const neighbor_generic : object_data->neighbors()) {
+                std::visit(
+                    [&](auto const neighbor_specific) {
+                      using U = std::decay_t<decltype(neighbor_specific)>;
+                      if constexpr (std::is_same_v<U, Static_body>) {
+                        _awake_contact_manifolds.emplace_back(
+                            &*_contact_manifolds.find(
+                                Object_pair{object, neighbor_specific}));
+                      } else if (!data(neighbor_specific)->marked()) {
+                        _awake_contact_manifolds.emplace_back(
+                            &*_contact_manifolds.find(
+                                Object_pair{object, neighbor_specific}));
+                      }
+                    },
+                    neighbor_generic.specific());
+              }
+            },
+            _neighbor_groups.object_specific(object_index));
+      }
+    }
+    // std::ranges::sort(_awake_contact_manifolds);
+  }
 
-  void freeze(Rigid_body_data *data) {
-    data->velocity = Vec3f::zero();
-    data->angular_velocity = Vec3f::zero();
+  void make_narrowphase_tasks() noexcept {
+    auto const complete_task_count =
+        _awake_contact_manifolds.size() / max_narrowphase_task_size;
+    auto const partial_task_size =
+        _awake_contact_manifolds.size() % max_narrowphase_task_size;
+    _narrowphase_tasks.clear();
+    for (auto i = Size{}; i != complete_task_count; ++i) {
+      _narrowphase_tasks.emplace_back(
+          &_narrowphase_task_intrinsic_state,
+          std::span{&_awake_contact_manifolds[i * max_narrowphase_task_size],
+                    static_cast<std::size_t>(max_narrowphase_task_size)});
+    }
+    if (partial_task_size != 0) {
+      _narrowphase_tasks.emplace_back(
+          &_narrowphase_task_intrinsic_state,
+          std::span{&_awake_contact_manifolds[complete_task_count *
+                                              max_narrowphase_task_size],
+                    static_cast<std::size_t>(partial_task_size)});
+    }
   }
 
   // void color_neighbor_group(std::size_t group_index) {
@@ -1358,7 +1335,7 @@ private:
   // }
 
   // void assign_color_groups() {
-  //   for (auto const i : _neighbor_group_awake_indices) {
+  //   for (auto const i : _awake_neighbor_group_indices) {
   //     auto const &group = _neighbor_groups.group(i);
   //     auto const begin = group.neighbor_pairs_begin;
   //     auto const end = group.neighbor_pairs_end;
@@ -1371,7 +1348,7 @@ private:
   void integrate(float delta_time,
                  float velocity_damping_factor,
                  float waking_motion_smoothing_factor) noexcept {
-    for (auto const i : _neighbor_group_awake_indices) {
+    for (auto const i : _awake_neighbor_group_indices) {
       integrate_neighbor_group(i,
                                delta_time,
                                velocity_damping_factor,
@@ -1381,113 +1358,44 @@ private:
 
   void integrate_neighbor_group(util::Size group_index,
                                 float delta_time,
-                                float velocity_damping_factor,
-                                float waking_motion_smoothing_factor) {
+                                float damping_factor,
+                                float motion_smoothing_factor) {
     auto const &group = _neighbor_groups.group(group_index);
     for (auto i = group.objects_begin; i != group.objects_end; ++i) {
-      visit(
+      std::visit(
           [&](auto &&object) {
-            using T = std::decay_t<decltype(object)>;
-            if constexpr (!std::is_same_v<T, Static_body_handle>) {
-              integrate(get_data(object),
-                        delta_time,
-                        velocity_damping_factor,
-                        waking_motion_smoothing_factor);
-            } else {
-              math::unreachable();
-            }
+            data(object)->integrate({
+                .delta_velocity = delta_time * _gravitational_acceleration,
+                .delta_time = delta_time,
+                .damping_factor = damping_factor,
+                .motion_smoothing_factor = motion_smoothing_factor,
+                .motion_limit = motion_limit,
+            });
           },
-          _neighbor_groups.object(i));
+          _neighbor_groups.object_specific(i));
     }
   }
 
-  void integrate(Particle_data *particle,
-                 float delta_time,
-                 float velocity_damping_factor,
-                 float waking_motion_smoothing_factor) {
-    particle->previous_position = particle->position;
-    particle->velocity += delta_time * _gravitational_acceleration;
-    particle->velocity *= velocity_damping_factor;
-    particle->position += delta_time * particle->velocity;
-    particle->waking_motion = min(
-        (1.0f - waking_motion_smoothing_factor) * particle->waking_motion +
-            waking_motion_smoothing_factor * length_squared(particle->velocity),
-        waking_motion_limit);
-  }
-
-  void integrate(Rigid_body_data *rigid_body,
-                 float delta_time,
-                 float velocity_damping_factor,
-                 float waking_motion_smoothing_factor) {
-    rigid_body->previous_position = rigid_body->position;
-    rigid_body->previous_orientation = rigid_body->orientation;
-    rigid_body->velocity += delta_time * _gravitational_acceleration;
-    rigid_body->velocity *= velocity_damping_factor;
-    rigid_body->position += delta_time * rigid_body->velocity;
-    rigid_body->angular_velocity *= velocity_damping_factor;
-    rigid_body->orientation +=
-        Quatf{0.0f, 0.5f * delta_time * rigid_body->angular_velocity} *
-        rigid_body->orientation;
-    rigid_body->orientation = normalize(rigid_body->orientation);
-    rigid_body->waking_motion = min(
-        (1.0f - waking_motion_smoothing_factor) * rigid_body->waking_motion +
-            waking_motion_smoothing_factor *
-                (length_squared(rigid_body->velocity) +
-                 length_squared(rigid_body->angular_velocity)),
-        waking_motion_limit);
-  }
-
-  void find_contacts() {
-    auto const complete_task_count =
-        _contact_manifolds.size() / max_narrowphase_task_size;
-    auto const partial_task_size =
-        _contact_manifolds.size() % max_narrowphase_task_size;
-    auto latch =
-        std::latch{complete_task_count + (partial_task_size > 0 ? 1 : 0)};
-    auto const intrinsic_state = Narrowphase_task::Intrinsic_state{
-        .particles = &_particles,
-        .rigid_bodies = &_rigid_bodies,
-        .static_bodies = &_static_bodies,
-        .latch = !_threads.empty() ? &latch : nullptr,
-    };
-    _narrowphase_tasks.clear();
-    auto it = _contact_manifolds.begin();
-    for (auto i = Size{}; i < complete_task_count; ++i) {
-      auto const first = it;
-      for (auto j = Size{}; j < max_narrowphase_task_size; ++j) {
-        ++it;
-      }
-      auto const last = it;
-      auto &task =
-          _narrowphase_tasks.emplace_back(&intrinsic_state, first, last);
-      if (!_threads.empty()) {
-        _threads.push_silent(&task);
-      } else {
+  void run_narrowphase_tasks() {
+    if (_threads.empty()) {
+      _narrowphase_task_intrinsic_state.latch = nullptr;
+      for (auto &task : _narrowphase_tasks) {
         task.run({});
       }
-    }
-    if (partial_task_size > 0) {
-      auto const first = it;
-      for (auto i = Size{}; i < partial_task_size; ++i) {
-        ++it;
-      }
-      auto const last = it;
-      auto &task =
-          _narrowphase_tasks.emplace_back(&intrinsic_state, first, last);
-      if (!_threads.empty()) {
+    } else {
+      auto latch = std::latch{_narrowphase_tasks.size()};
+      _narrowphase_task_intrinsic_state.latch = &latch;
+      for (auto &task : _narrowphase_tasks) {
         _threads.push_silent(&task);
-      } else {
-        task.run({});
       }
-    }
-    if (!_threads.empty()) {
+      // _threads.set_scheduling_policy(Scheduling_policy::spin);
       _threads.notify();
       for (;;) {
         if (latch.try_wait()) {
           return;
         }
       }
-      // latch.wait();
+      // _threads.set_scheduling_policy(Scheduling_policy::block);
     }
   }
 
@@ -1499,10 +1407,11 @@ private:
         .latch = nullptr,
     };
     for (auto i = 0; i != 2; ++i) {
-      for (auto &[id, contact_manifold] : _contact_manifolds) {
+      for (auto const p : _awake_contact_manifolds) {
+        auto &[objects, contact_manifold] = *p;
         for (auto const &contact : contact_manifold.contacts()) {
           auto const work_item = Position_solve_task::Work_item{
-              .objects = Object_pair{id},
+              .objects = objects,
               .contact = &contact.contact,
           };
           Position_solve_task{&intrinsic_state, {&work_item, 1u}}.run({});
@@ -1521,10 +1430,11 @@ private:
             restitution_separating_velocity_epsilon,
     };
     for (auto i = 0; i != 2; ++i) {
-      for (auto &[id, contact_manifold] : _contact_manifolds) {
+      for (auto const p : _awake_contact_manifolds) {
+        auto &[objects, contact_manifold] = *p;
         for (auto const &contact : contact_manifold.contacts()) {
           auto const work_item = Velocity_solve_task::Work_item{
-              .objects = Object_pair{id},
+              .objects = objects,
               .contact = &contact.contact,
           };
           Velocity_solve_task{&intrinsic_state, {&work_item, 1u}}.run({});
@@ -1559,13 +1469,13 @@ private:
   void call_motion_callbacks(World const &world) {
     auto call_object_motion_callback = [&](auto object) {
       using T = decltype(object);
-      auto const object_data = get_data(object);
-      if (object_data->awake && object_data->motion_callback != nullptr) {
-        if constexpr (std::is_same_v<T, Particle_handle>) {
-          object_data->motion_callback->on_particle_motion(world, object);
+      auto const object_data = data(object);
+      if (object_data->awake() && object_data->motion_callback() != nullptr) {
+        if constexpr (std::is_same_v<T, Particle>) {
+          object_data->motion_callback()->on_particle_motion(world, object);
         } else {
-          static_assert(std::is_same_v<T, Rigid_body_handle>);
-          object_data->motion_callback->on_rigid_body_motion(world, object);
+          static_assert(std::is_same_v<T, Rigid_body>);
+          object_data->motion_callback()->on_rigid_body_motion(world, object);
         }
       }
     };
@@ -1573,68 +1483,28 @@ private:
     _rigid_bodies.for_each(call_object_motion_callback);
   }
 
-  bool is_marked(Particle_handle particle) const noexcept {
-    return _particles.data(particle)->marked;
+  Particle_data const *data(Particle object) const noexcept {
+    return _particles.data(object);
   }
 
-  bool is_marked(Rigid_body_handle rigid_body) const noexcept {
-    return _rigid_bodies.data(rigid_body)->marked;
+  Particle_data *data(Particle object) noexcept {
+    return _particles.data(object);
   }
 
-  void set_marked(Particle_handle particle, bool marked = true) noexcept {
-    _particles.data(particle)->marked = marked;
+  Rigid_body_data const *data(Rigid_body object) const noexcept {
+    return _rigid_bodies.data(object);
   }
 
-  void set_marked(Rigid_body_handle rigid_body, bool marked = true) noexcept {
-    _rigid_bodies.data(rigid_body)->marked = marked;
+  Rigid_body_data *data(Rigid_body object) noexcept {
+    return _rigid_bodies.data(object);
   }
 
-  void set_unmarked(Particle_handle particle) noexcept {
-    set_marked(particle, false);
+  Static_body_data const *data(Static_body object) const noexcept {
+    return _static_bodies.data(object);
   }
 
-  void set_unmarked(Rigid_body_handle rigid_body) noexcept {
-    set_marked(rigid_body, false);
-  }
-
-  std::span<Object_pair *const>
-  get_neighbor_pairs(Particle_data *particle) const noexcept {
-    return {particle->neighbor_pairs, particle->neighbor_count};
-  }
-
-  std::span<Object_pair *const>
-  get_neighbor_pairs(Rigid_body_data *rigid_body) const noexcept {
-    return {rigid_body->neighbor_pairs, rigid_body->neighbor_count};
-  }
-
-  std::span<Object_pair *const>
-  get_neighbor_pairs(Static_body_data *) const noexcept {
-    return {};
-  }
-
-  Particle_data const *get_data(Particle_handle particle) const noexcept {
-    return _particles.data(particle);
-  }
-
-  Particle_data *get_data(Particle_handle particle) noexcept {
-    return _particles.data(particle);
-  }
-
-  Rigid_body_data const *get_data(Rigid_body_handle rigid_body) const noexcept {
-    return _rigid_bodies.data(rigid_body);
-  }
-
-  Rigid_body_data *get_data(Rigid_body_handle rigid_body) noexcept {
-    return _rigid_bodies.data(rigid_body);
-  }
-
-  Static_body_data const *
-  get_data(Static_body_handle static_body) const noexcept {
-    return _static_bodies.data(static_body);
-  }
-
-  Static_body_data *get_data(Static_body_handle static_body) noexcept {
-    return _static_bodies.data(static_body);
+  Static_body_data *data(Static_body object) noexcept {
+    return _static_bodies.data(object);
   }
 
   Thread_pool _threads;
@@ -1642,16 +1512,18 @@ private:
   Particle_storage _particles;
   Static_body_storage _static_bodies;
   Rigid_body_storage _rigid_bodies;
-  Aabb_tree<Object_handle> _aabb_tree;
+  Broadphase_bvh _bvh;
   List<Object_pair> _neighbor_pairs;
-  List<Object_pair *> _neighbor_pair_ptrs;
+  List<Object> _neighbors;
   Neighbor_group_storage _neighbor_groups;
-  List<std::uint32_t> _neighbor_group_awake_indices;
+  List<Size> _awake_neighbor_group_indices;
   // Bit_list _coloring_bits;
   // Queue<Object_pair *> _coloring_fringe;
   // Color_group_storage _color_groups;
   // List<Contact> _contacts;
-  Map<std::uint64_t, Contact_manifold> _contact_manifolds;
+  Map<Object_pair, Contact_manifold> _contact_manifolds;
+  List<std::pair<Object_pair, Contact_manifold> *> _awake_contact_manifolds;
+  Narrowphase_task::Intrinsic_state _narrowphase_task_intrinsic_state;
   List<Narrowphase_task> _narrowphase_tasks;
   Vec3f _gravitational_acceleration;
 };
@@ -1661,63 +1533,57 @@ World::World(World_create_info const &create_info)
 
 World::~World() {}
 
-Particle_handle
-World::create_particle(Particle_create_info const &create_info) {
+Particle World::create_particle(Particle_create_info const &create_info) {
   return _impl->create_particle(create_info);
 }
 
-void World::destroy_particle(Particle_handle particle) {
+void World::destroy_particle(Particle particle) {
   _impl->destroy_particle(particle);
 }
 
-bool World::is_awake(Particle_handle particle) const noexcept {
-  return _impl->is_awake(particle);
-}
-
-float World::get_waking_motion(Particle_handle particle) const noexcept {
-  return _impl->get_waking_motion(particle);
-}
-
-math::Vec3f World::get_position(Particle_handle particle) const noexcept {
-  return _impl->get_position(particle);
-}
-
-Rigid_body_handle
-World::create_rigid_body(Rigid_body_create_info const &create_info) {
+Rigid_body World::create_rigid_body(Rigid_body_create_info const &create_info) {
   return _impl->create_rigid_body(create_info);
 }
 
-void World::destroy_rigid_body(Rigid_body_handle handle) {
+void World::destroy_rigid_body(Rigid_body handle) {
   _impl->destroy_rigid_body(handle);
 }
 
-bool World::is_awake(Rigid_body_handle rigid_body) const noexcept {
-  return _impl->is_awake(rigid_body);
-}
-
-float World::get_waking_motion(Rigid_body_handle rigid_body) const noexcept {
-  return _impl->get_waking_motion(rigid_body);
-}
-
-math::Vec3f World::get_position(Rigid_body_handle rigid_body) const noexcept {
-  return _impl->get_position(rigid_body);
-}
-
-math::Quatf
-World::get_orientation(Rigid_body_handle rigid_body) const noexcept {
-  return _impl->get_orientation(rigid_body);
-}
-
-Static_body_handle
+Static_body
 World::create_static_body(Static_body_create_info const &create_info) {
   return _impl->create_static_body(create_info);
 }
 
-void World::destroy_rigid_body(Static_body_handle static_rigid_body) {
+void World::destroy_static_body(Static_body static_rigid_body) {
   _impl->destroy_static_body(static_rigid_body);
 }
 
-void World::simulate(World_simulate_info const &simulate_info) {
+Particle_data const *World::data(Particle object) const noexcept {
+  return _impl->data(object);
+}
+
+Particle_data *World::data(Particle object) noexcept {
+  return _impl->data(object);
+}
+
+Rigid_body_data const *World::data(Rigid_body object) const noexcept {
+  return _impl->data(object);
+}
+
+Rigid_body_data *World::data(Rigid_body object) noexcept {
+  return _impl->data(object);
+}
+
+Static_body_data const *World::data(Static_body object) const noexcept {
+  return _impl->data(object);
+}
+
+Static_body_data *World::data(Static_body object) noexcept {
+  return _impl->data(object);
+}
+
+World_simulate_result
+World::simulate(World_simulate_info const &simulate_info) {
   return _impl->simulate(*this, simulate_info);
 }
 } // namespace physics

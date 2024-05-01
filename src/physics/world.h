@@ -16,11 +16,11 @@ struct World_create_info {
   util::Size worker_thread_count{math::max(
       static_cast<util::Size>(std::thread::hardware_concurrency() / 2 - 1),
       util::Size{0})};
-  util::Size max_aabb_tree_leaf_nodes{100000};
-  util::Size max_aabb_tree_internal_nodes{100000};
   int max_particles{10000};
   int max_rigid_bodies{10000};
   int max_static_bodies{100000};
+  util::Size max_aabb_tree_leaf_nodes{100000};
+  util::Size max_aabb_tree_internal_nodes{100000};
   util::Size max_neighbor_pairs{20000};
   util::Size max_neighbor_groups{10000};
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
@@ -59,41 +59,46 @@ struct World_simulate_info {
   int substep_count{10};
 };
 
+struct World_simulate_result {
+  double total_wall_time;
+  double broadphase_wall_time;
+  double integration_wall_time;
+  double narrowphase_wall_time;
+  double position_solve_wall_time;
+  double velocity_solve_wall_time;
+};
+
 class World {
 public:
   explicit World(World_create_info const &create_info);
 
   ~World();
 
-  Particle_handle create_particle(Particle_create_info const &create_info);
+  Particle create_particle(Particle_create_info const &create_info);
 
-  void destroy_particle(Particle_handle particle);
+  void destroy_particle(Particle particle);
 
-  bool is_awake(Particle_handle particle) const noexcept;
+  Rigid_body create_rigid_body(Rigid_body_create_info const &create_info);
 
-  float get_waking_motion(Particle_handle particle) const noexcept;
+  void destroy_rigid_body(Rigid_body rigid_body);
 
-  math::Vec3f get_position(Particle_handle particle) const noexcept;
+  Static_body create_static_body(Static_body_create_info const &create_info);
 
-  Rigid_body_handle
-  create_rigid_body(Rigid_body_create_info const &create_info);
+  void destroy_static_body(Static_body handle);
 
-  void destroy_rigid_body(Rigid_body_handle rigid_body);
+  Particle_data const *data(Particle object) const noexcept;
 
-  bool is_awake(Rigid_body_handle rigid_body) const noexcept;
+  Particle_data *data(Particle object) noexcept;
 
-  float get_waking_motion(Rigid_body_handle rigid_body) const noexcept;
+  Rigid_body_data const *data(Rigid_body object) const noexcept;
 
-  math::Vec3f get_position(Rigid_body_handle rigid_body) const noexcept;
+  Rigid_body_data *data(Rigid_body object) noexcept;
 
-  math::Quatf get_orientation(Rigid_body_handle rigid_body) const noexcept;
+  Static_body_data const *data(Static_body object) const noexcept;
 
-  Static_body_handle
-  create_static_body(Static_body_create_info const &create_info);
+  Static_body_data *data(Static_body object) noexcept;
 
-  void destroy_rigid_body(Static_body_handle handle);
-
-  void simulate(World_simulate_info const &simulate_info);
+  World_simulate_result simulate(World_simulate_info const &simulate_info);
 
 private:
   class Impl;

@@ -30,7 +30,7 @@ public:
               std::array<math::Quatf, 2> const &object_orientations) noexcept {
     using namespace math;
     auto constexpr max_position_distance = 0.01f;
-    auto constexpr min_orientation_abs_dot = 0.001f;
+    auto constexpr min_orientation_abs_dot = 0.99f;
     auto const object_rotations = std::array<Mat3x3f, 2>{
         Mat3x3f::rotation(object_orientations[0]),
         Mat3x3f::rotation(object_orientations[1]),
@@ -60,7 +60,7 @@ public:
       if (keep) {
         ++i;
       } else {
-        std::shift_left(&_contacts[i], &_contacts[_size--], 1);
+        std::shift_left(_contacts.data() + i, _contacts.data() + _size--, 1);
       }
     }
   }
