@@ -41,11 +41,9 @@ create_wireframe_cube_mesh(graphics::Graphics *graphics);
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
   retval.brick_base_color_texture = create_texture(
-      graphics,
-      "C:/Users/marlo/rendering-engine/res/BrickWall29_4K_BaseColor.ktx");
+      graphics, "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
   retval.striped_cotton_base_color_texture = create_texture(
-      graphics,
-      "C:/Users/marlo/rendering-engine/res/StripedCotton01_2K_BaseColor.ktx");
+      graphics, "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
   retval.brick_material = graphics->create_surface_material_unique(
       {.base_color_texture = retval.brick_base_color_texture.get()});
   retval.striped_cotton_material = graphics->create_surface_material_unique(
@@ -439,7 +437,7 @@ public:
                 },
             .world_simulate_info = {.delta_time = physics_delta_time,
                                     .substep_count = physics_substeps},
-            .window_extents = {1280, 720},
+            .window_extents = {1920, 1080},
         }} {}
 
   void pre_loop() final {
@@ -517,7 +515,7 @@ public:
     _ring_phase = Ring_phase{_box_manager.get()};
     _pyramid_phase = Pyramid_phase{_box_manager.get()};
     _phases = {&_column_phase, &_pyramid_phase, &_ring_phase};
-    _phase_index = 2;
+    _phase_index = 0;
     _phases[_phase_index]->start();
   }
 
@@ -587,8 +585,8 @@ public:
                   << "\n";
         std::cout << "physics max wall time: " << _max_physics_wall_time
                   << "\n";
-        std::cout << "physics simulated time: "
-                  << _total_physics_simulated_time << "\n";
+        std::cout << "physics simulated time: " << _total_physics_simulated_time
+                  << "\n";
       }
     } else {
       _max_physics_wall_time = 0.0;
