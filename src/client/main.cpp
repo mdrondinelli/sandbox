@@ -207,7 +207,7 @@ create_wireframe_cube_mesh(graphics::Graphics *graphics) {
 }
 
 constexpr float physics_delta_time = 1.0f / 64.0f;
-constexpr unsigned physics_substeps = 10;
+constexpr int physics_substeps = 10;
 
 class Phase {
 public:
