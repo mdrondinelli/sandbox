@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include <array>
+#include <iostream>
 #include <stdexcept>
 #include <vector>
 
@@ -32,17 +33,17 @@ layout(location = 1) in vec3 model_space_normal;
 layout(location = 2) in vec2 texcoord;
 
 out Vertex_data {
-  vec3 view_space_position;
-  vec3 view_space_normal;
+  vec3 world_space_position;
+  vec3 world_space_normal;
   vec2 texcoord;
 } vertex_data;
 
-layout(location = 0) uniform mat4 model_view_matrix;
+layout(location = 0) uniform mat4 model_matrix;
 layout(location = 1) uniform mat4 model_view_clip_matrix;
 
 void main() {
-  vertex_data.view_space_position = (model_view_matrix * vec4(model_space_position, 1.0)).xyz;
-  vertex_data.view_space_normal = (model_view_matrix * vec4(model_space_normal, 0.0)).xyz;
+  vertex_data.world_space_position = (model_matrix * vec4(model_space_position, 1.0)).xyz;
+  vertex_data.world_space_normal = mat3(model_matrix) * model_space_normal;
   vertex_data.texcoord = texcoord;
   gl_Position = model_view_clip_matrix * vec4(model_space_position, 1.0);
 }
@@ -52,15 +53,20 @@ constexpr auto surface_fragment_shader_source = R"(
 #version 460 core
 
 in Vertex_data {
-  vec3 view_space_position;
-  vec3 view_space_normal;
+  vec3 world_space_position;
+  vec3 world_space_normal;
   vec2 texcoord;
 } vertex_data;
 
 layout(location = 0) out vec4 out_color;
 
 layout(binding = 0) uniform sampler2D base_color_texture;
+
 layout(location = 2) uniform vec3 base_color_tint;
+layout(location = 3) uniform vec3 ambient_irradiance;
+layout(location = 4) uniform vec3 directional_light_irradiance;
+layout(location = 5) uniform vec3 directional_light_direction;
+layout(location = 6) uniform float exposure;
 
 float luminance(vec3 v) {
   return dot(v, vec3(0.2126, 0.7152, 0.0722));
@@ -74,9 +80,10 @@ vec3 tonemap(vec3 v) {
 
 void main() {
   vec3 base_color = texture(base_color_texture, vertex_data.texcoord).rgb * base_color_tint;
-  vec3 n = normalize(vertex_data.view_space_normal);
-  vec3 l = normalize(vec3(-1.0, 1.0, 1.0));
-  out_color = vec4(base_color * (max(dot(n, l), 0.0) * 0.9 + 0.1), 1.0);
+  vec3 n = normalize(vertex_data.world_space_normal);
+  vec3 l = directional_light_direction;
+  vec3 irradiance = ambient_irradiance + directional_light_irradiance * max(dot(n, l), 0.0);
+  out_color = vec4(tonemap(irradiance * base_color * exposure), 1.0);
 }
 )";
 
@@ -114,6 +121,7 @@ void compile_shader(GLuint shader) {
     std::vector<char> log;
     log.resize(log_size);
     glGetShaderInfoLog(shader, log_size, nullptr, log.data());
+    std::cerr << log.data() << std::endl;
     throw std::runtime_error{log.data()};
   }
 }
@@ -280,14 +288,16 @@ math::Mat4x4f calculate_clip_matrix(math::Vec2f const &zoom,
 } // namespace
 
 void Gl_graphics::render(Render_info const &info) {
-  auto const gl_source_scene = static_cast<Gl_scene *>(info.source);
+  auto const gl_scene = static_cast<Gl_scene const *>(info.scene);
   auto const gl_target = static_cast<Gl_render_target *>(info.target);
   auto const view_matrix_3x4 =
-      calculate_view_matrix(info.position, info.orientation);
+      calculate_view_matrix(info.camera->position, info.camera->orientation);
   auto const view_matrix_4x4 =
       math::Mat4x4f{view_matrix_3x4, {0.0f, 0.0f, 0.0f, 1.0f}};
-  auto const clip_matrix = calculate_clip_matrix(
-      info.zoom, info.near_plane_distance, info.far_plane_distance);
+  auto const clip_matrix =
+      calculate_clip_matrix(info.camera->zoom,
+                            info.camera->near_plane_distance,
+                            info.camera->far_plane_distance);
   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
   auto const viewport_extents = gl_target->get_extents();
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
@@ -295,18 +305,22 @@ void Gl_graphics::render(Render_info const &info) {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // glEnable(GL_POLYGON_OFFSET_FILL);
   // glPolygonOffset(1.0f, 1.0f);
+  glEnable(GL_CULL_FACE);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LESS);
   // glDisable(GL_BLEND);
   glEnable(GL_FRAMEBUFFER_SRGB);
-  glUseProgram(_surface_shader_program.get());
-  gl_source_scene->draw_surfaces(_surface_shader_program.get(),
-                                 _default_base_color_texture.get(),
-                                 0,
-                                 1,
-                                 2,
-                                 view_matrix_4x4,
-                                 clip_matrix * view_matrix_4x4);
+  gl_scene->draw_surfaces(_surface_shader_program.get(),
+                          _default_base_color_texture.get(),
+                          0,
+                          1,
+                          2,
+                          3,
+                          4,
+                          5,
+                          6,
+                          clip_matrix * view_matrix_4x4,
+                          info.camera->exposure);
   glEnable(GL_POLYGON_OFFSET_LINE);
   glPolygonOffset(-1.0f, -1.0f);
   glLineWidth(2.0f);
@@ -314,8 +328,7 @@ void Gl_graphics::render(Render_info const &info) {
   // glEnable(GL_BLEND);
   // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   // glEnable(GL_LINE_SMOOTH);
-  glUseProgram(_wireframe_shader_program.get());
-  gl_source_scene->draw_wireframes(
+  gl_scene->draw_wireframes(
       _wireframe_shader_program.get(), 0, 1, clip_matrix * view_matrix_4x4);
 }
 } // namespace graphics

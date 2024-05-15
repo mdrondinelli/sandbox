@@ -16,7 +16,6 @@
 #include <GLFW/glfw3.h>
 
 #include "../graphics/gl/graphics.h"
-#include "camera.h"
 #include "glfw_init_guard.h"
 #include "window.h"
 
@@ -29,14 +28,12 @@ namespace engine {
 class App::Runtime {
 public:
   explicit Runtime(physics::World_create_info const &world_create_info,
-                   Window_create_info const &window_create_info,
-                   Camera_create_info const &camera_create_info)
+                   Window_create_info const &window_create_info)
       : // _threads{std::max(
         //       std::max(std::thread::hardware_concurrency() / 2, 1u) - 1,
         //       1u)},
         _world{world_create_info},
         _window{window_create_info},
-        _camera{camera_create_info},
         _graphics{[&]() {
           glfwMakeContextCurrent(_window.get_glfw_window());
           glfwSwapInterval(0);
@@ -53,8 +50,6 @@ public:
 
   Window *get_window() noexcept { return &_window; }
 
-  Camera *get_camera() noexcept { return &_camera; }
-
   graphics::Graphics *get_graphics() noexcept { return &_graphics; }
 
   graphics::Render_target *get_render_target() noexcept {
@@ -63,15 +58,13 @@ public:
 
   graphics::Scene *get_scene() noexcept { return _scene.get(); }
 
+  graphics::Camera *get_camera() noexcept { return &_camera; }
+
   void render() {
     _graphics.render({
         .target = _graphics.get_default_render_target(),
-        .source = _scene.get(),
-        .position = _camera.get_position(),
-        .orientation = _camera.get_orientation(),
-        .zoom = _camera.get_zoom(),
-        .near_plane_distance = _camera.get_near_plane_distance(),
-        .far_plane_distance = _camera.get_far_plane_distance(),
+        .scene = _scene.get(),
+        .camera = &_camera,
     });
     glfwSwapBuffers(_window.get_glfw_window());
   }
@@ -81,17 +74,16 @@ private:
   physics::World _world;
   Glfw_init_guard _glfw_init_guard;
   Window _window;
-  Camera _camera;
   graphics::Gl_graphics _graphics;
-  graphics::Unique_scene_ptr _scene;
+  graphics::Unique_scene _scene;
+  graphics::Camera _camera;
 };
 
 App::App(App_create_info const &create_info)
     : _world_create_info{create_info.world_create_info},
       _world_simulate_info{create_info.world_simulate_info},
       _window_extents{create_info.window_extents},
-      _window_title{create_info.window_title},
-      _camera_create_info{create_info.camera_create_info} {}
+      _window_title{create_info.window_title} {}
 
 App::~App() {}
 
@@ -103,8 +95,7 @@ int App::run() {
                                        Window_create_info{
                                            .extents = _window_extents,
                                            .title = _window_title.c_str(),
-                                       },
-                                       _camera_create_info);
+                                       });
   pre_loop();
   loop();
   post_loop();
@@ -119,6 +110,10 @@ int App::run() {
   return result;
 }
 
+physics::World const *App::get_world() const noexcept {
+  return _runtime->get_world();
+}
+
 physics::World *App::get_world() noexcept { return _runtime->get_world(); }
 
 physics::World_simulate_result const &
@@ -126,15 +121,31 @@ App::get_world_simulate_result() const noexcept {
   return _world_simulate_result;
 }
 
+Window const *App::get_window() const noexcept {
+  return _runtime->get_window();
+}
+
 Window *App::get_window() noexcept { return _runtime->get_window(); }
 
-Camera *App::get_camera() noexcept { return _runtime->get_camera(); }
+graphics::Graphics const *App::get_graphics() const noexcept {
+  return _runtime->get_graphics();
+}
 
 graphics::Graphics *App::get_graphics() noexcept {
   return _runtime->get_graphics();
 }
 
+graphics::Scene const *App::get_scene() const noexcept {
+  return _runtime->get_scene();
+}
+
 graphics::Scene *App::get_scene() noexcept { return _runtime->get_scene(); }
+
+graphics::Camera const *App::get_camera() const noexcept {
+  return _runtime->get_camera();
+}
+
+graphics::Camera *App::get_camera() noexcept { return _runtime->get_camera(); }
 
 bool App::is_looping() const noexcept { return _looping; }
 

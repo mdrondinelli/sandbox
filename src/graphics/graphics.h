@@ -5,6 +5,7 @@
 
 #include "../math/quat.h"
 #include "../math/vec.h"
+#include "camera.h"
 #include "render_target.h"
 #include "rgb_spectrum.h"
 #include "scene.h"
@@ -19,12 +20,8 @@ class Graphics;
 
 struct Render_info {
   Render_target *target;
-  Scene *source;
-  math::Vec3f position{math::Vec3f::zero()};
-  math::Quatf orientation{math::Quatf::identity()};
-  math::Vec2f zoom{1.0f, 1.0f};
-  float near_plane_distance{0.01f};
-  float far_plane_distance{1000.0f};
+  Scene const *scene;
+  Camera const *camera;
 };
 
 class Scene_deleter {
@@ -78,18 +75,25 @@ private:
   Graphics *_owner;
 };
 
-using Unique_scene_ptr = std::unique_ptr<Scene, Scene_deleter>;
-using Unique_surface_material_ptr =
+using Unique_texture = std::unique_ptr<Texture, Texture_deleter>;
+using Unique_surface_material =
     std::unique_ptr<Surface_material, Surface_material_deleter>;
-using Unique_surface_mesh_ptr =
-    std::unique_ptr<Surface_mesh, Surface_mesh_deleter>;
-using Unique_texture_ptr = std::unique_ptr<Texture, Texture_deleter>;
-using Unique_wireframe_mesh_ptr =
+using Unique_surface_mesh = std::unique_ptr<Surface_mesh, Surface_mesh_deleter>;
+using Unique_wireframe_mesh =
     std::unique_ptr<Wireframe_mesh, Wireframe_mesh_deleter>;
+using Unique_scene = std::unique_ptr<Scene, Scene_deleter>;
 
 class Graphics {
 public:
   virtual ~Graphics() = default;
+
+  virtual Texture *create_texture(Texture_create_info const &create_info) = 0;
+
+  virtual void destroy_texture(Texture *texture) noexcept = 0;
+
+  Unique_texture create_texture_unique(Texture_create_info const &create_info) {
+    return Unique_texture{create_texture(create_info), this};
+  }
 
   virtual Surface_material *
   create_surface_material(Surface_material_create_info const &create_info) = 0;
@@ -97,10 +101,9 @@ public:
   virtual void
   destroy_surface_material(Surface_material *surface_material) noexcept = 0;
 
-  Unique_surface_material_ptr create_surface_material_unique(
+  Unique_surface_material create_surface_material_unique(
       Surface_material_create_info const &create_info) {
-    return Unique_surface_material_ptr{create_surface_material(create_info),
-                                       this};
+    return Unique_surface_material{create_surface_material(create_info), this};
   }
 
   virtual Surface_mesh *
@@ -108,9 +111,9 @@ public:
 
   virtual void destroy_surface_mesh(Surface_mesh *surface_mesh) noexcept = 0;
 
-  Unique_surface_mesh_ptr
+  Unique_surface_mesh
   create_surface_mesh_unique(Surface_mesh_create_info const &create_info) {
-    return Unique_surface_mesh_ptr{create_surface_mesh(create_info), this};
+    return Unique_surface_mesh{create_surface_mesh(create_info), this};
   }
 
   virtual Wireframe_mesh *
@@ -119,26 +122,17 @@ public:
   virtual void
   destroy_wireframe_mesh(Wireframe_mesh *wireframe_mesh) noexcept = 0;
 
-  Unique_wireframe_mesh_ptr
+  Unique_wireframe_mesh
   create_wireframe_mesh_unique(Wireframe_mesh_create_info const &create_info) {
-    return Unique_wireframe_mesh_ptr{create_wireframe_mesh(create_info), this};
-  }
-
-  virtual Texture *create_texture(Texture_create_info const &create_info) = 0;
-
-  virtual void destroy_texture(Texture *texture) noexcept = 0;
-
-  Unique_texture_ptr
-  create_texture_unique(Texture_create_info const &create_info) {
-    return Unique_texture_ptr{create_texture(create_info), this};
+    return Unique_wireframe_mesh{create_wireframe_mesh(create_info), this};
   }
 
   virtual Scene *create_scene(Scene_create_info const &create_info) = 0;
 
   virtual void destroy_scene(Scene *scene) noexcept = 0;
 
-  Unique_scene_ptr create_scene_unique(Scene_create_info const &create_info) {
-    return Unique_scene_ptr{create_scene(create_info), this};
+  Unique_scene create_scene_unique(Scene_create_info const &create_info) {
+    return Unique_scene{create_scene(create_info), this};
   }
 
   // Render_target creation is implementation-specific

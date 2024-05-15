@@ -2,7 +2,9 @@
 #define MARLON_GRAPHICS_SCENE_H
 
 #include <memory>
+#include <optional>
 
+#include "directional_light.h"
 #include "surface.h"
 #include "wireframe.h"
 
@@ -40,6 +42,17 @@ using Unique_wireframe_ptr = std::unique_ptr<Wireframe, Wireframe_deleter>;
 
 class Scene {
 public:
+  virtual Rgb_spectrum get_ambient_irradiance() const noexcept = 0;
+
+  virtual void
+  set_ambient_irradiance(Rgb_spectrum ambient_irradiance) noexcept = 0;
+
+  virtual std::optional<Directional_light> const &
+  get_directional_light() const noexcept = 0;
+
+  virtual void set_directional_light(
+      std::optional<Directional_light> const &directional_light) noexcept = 0;
+
   virtual Surface *create_surface(Surface_create_info const &create_info) = 0;
 
   virtual void destroy_surface(Surface *surface) noexcept = 0;

@@ -13,29 +13,28 @@ using enum engine::Key;
 using enum engine::Mouse_button;
 
 struct Resources {
-  graphics::Unique_texture_ptr brick_base_color_texture;
-  graphics::Unique_texture_ptr striped_cotton_base_color_texture;
-  graphics::Unique_surface_material_ptr brick_material;
-  graphics::Unique_surface_material_ptr striped_cotton_material;
-  graphics::Unique_surface_material_ptr red_material;
-  graphics::Unique_surface_material_ptr blue_material;
-  graphics::Unique_surface_material_ptr particle_material;
-  graphics::Unique_surface_mesh_ptr cube_mesh;
-  graphics::Unique_surface_mesh_ptr low_quality_sphere_mesh;
-  graphics::Unique_surface_mesh_ptr high_quality_sphere_mesh;
-  graphics::Unique_wireframe_mesh_ptr cube_wireframe_mesh;
+  graphics::Unique_texture brick_base_color_texture;
+  graphics::Unique_texture striped_cotton_base_color_texture;
+  graphics::Unique_surface_material brick_material;
+  graphics::Unique_surface_material striped_cotton_material;
+  graphics::Unique_surface_material red_material;
+  graphics::Unique_surface_material blue_material;
+  graphics::Unique_surface_material particle_material;
+  graphics::Unique_surface_mesh cube_mesh;
+  graphics::Unique_surface_mesh low_quality_sphere_mesh;
+  graphics::Unique_surface_mesh high_quality_sphere_mesh;
+  graphics::Unique_wireframe_mesh cube_wireframe_mesh;
 };
 
-graphics::Unique_texture_ptr create_texture(graphics::Graphics *graphics,
-                                            const char *path);
+graphics::Unique_texture create_texture(graphics::Graphics *graphics,
+                                        const char *path);
 
-graphics::Unique_surface_mesh_ptr
-create_cube_mesh(graphics::Graphics *graphics);
+graphics::Unique_surface_mesh create_cube_mesh(graphics::Graphics *graphics);
 
-graphics::Unique_surface_mesh_ptr
+graphics::Unique_surface_mesh
 create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions = 0);
 
-graphics::Unique_wireframe_mesh_ptr
+graphics::Unique_wireframe_mesh
 create_wireframe_cube_mesh(graphics::Graphics *graphics);
 
 Resources create_resources(graphics::Graphics *graphics) {
@@ -61,8 +60,8 @@ Resources create_resources(graphics::Graphics *graphics) {
   return retval;
 }
 
-graphics::Unique_texture_ptr create_texture(graphics::Graphics *graphics,
-                                            const char *path) {
+graphics::Unique_texture create_texture(graphics::Graphics *graphics,
+                                        const char *path) {
   std::ifstream in{path, std::ios_base::binary};
   if (in) {
     in.seekg(0, std::ios_base::end);
@@ -81,8 +80,7 @@ graphics::Unique_texture_ptr create_texture(graphics::Graphics *graphics,
   }
 }
 
-graphics::Unique_surface_mesh_ptr
-create_cube_mesh(graphics::Graphics *graphics) {
+graphics::Unique_surface_mesh create_cube_mesh(graphics::Graphics *graphics) {
   std::vector<graphics::Surface_vertex> const vertices{
       // -x face
       {{-1.0f, -1.0f, -1.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
@@ -121,7 +119,7 @@ create_cube_mesh(graphics::Graphics *graphics) {
       {.indices = indices, .vertices = vertices});
 }
 
-graphics::Unique_surface_mesh_ptr
+graphics::Unique_surface_mesh
 create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
   auto const phi = std::numbers::phi_v<float>;
   std::vector<graphics::Surface_vertex> vertices{
@@ -189,7 +187,7 @@ create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
   });
 }
 
-graphics::Unique_wireframe_mesh_ptr
+graphics::Unique_wireframe_mesh
 create_wireframe_cube_mesh(graphics::Graphics *graphics) {
   std::vector<math::Vec3f> const vertices{
       {1.0f, 1.0f, 1.0f},
@@ -438,10 +436,6 @@ public:
             .world_simulate_info = {.delta_time = physics_delta_time,
                                     .substep_count = physics_substeps},
             .window_extents = {1920, 1080},
-            .camera_create_info = {
-              .position = {-10.0f, 3.5f, 10.0f},
-              .zoom = 2.0f * math::Vec2f{9.0f / 16.0f, 1.0f},
-            },
         }} {}
 
   void pre_loop() final {
@@ -483,6 +477,11 @@ public:
             },
         .position = {0.0f, -0.5f, 0.0f},
     });
+    scene->set_ambient_irradiance(graphics::Rgb_spectrum{32.0f});
+    scene->set_directional_light(graphics::Directional_light{
+        .irradiance = graphics::Rgb_spectrum{481.5f},
+        .direction = normalize(math::Vec3f{1.0f, 2.0f, 0.5f}),
+    });
     _ground_surface = scene->create_surface_unique({
         .mesh = _resources.cube_mesh.get(),
         .material = _resources.blue_material.get(),
@@ -490,6 +489,8 @@ public:
                                    {0.0f, 0.5f, 0.0f, -0.5f},
                                    {0.0f, 0.0f, 100.0f, 0.0f}},
     });
+    get_camera()->position = {-10.0f, 3.5f, 10.0f};
+    get_camera()->zoom = 2.0f * math::Vec2f{9.0f / 16.0f, 1.0f};
     // srand(25);
     _column_phase = Column_phase{_box_manager.get(), &_selection};
     _ring_phase = Ring_phase{_box_manager.get()};
@@ -508,8 +509,7 @@ public:
     auto const camera = get_camera();
     if (window->is_mouse_button_pressed(mb_right)) {
       window->set_cursor_mode(engine::Cursor_mode::disabled);
-      auto const rotation_matrix =
-          math::Mat3x3f::rotation(camera->get_orientation());
+      auto const rotation_matrix = math::Mat3x3f::rotation(camera->orientation);
       auto const right_vector = column(rotation_matrix, 0);
       auto const forward_vector = -column(rotation_matrix, 2);
       auto movement = math::Vec3f::zero();
@@ -535,7 +535,7 @@ public:
         movement = 8.0f * normalize(movement);
       }
       auto const dt = static_cast<float>(get_loop_iteration_wall_time());
-      camera->set_position(camera->get_position() + movement * dt);
+      camera->position += movement * dt;
       _camera_yaw -= window->get_delta_cursor_position().x * 0.002f;
       _camera_pitch -= window->get_delta_cursor_position().y * 0.002f;
       _camera_pitch = std::clamp(_camera_pitch,
@@ -544,9 +544,9 @@ public:
     } else {
       window->set_cursor_mode(engine::Cursor_mode::normal);
     }
-    camera->set_orientation(
+    camera->orientation =
         math::Quatf::axis_angle(math::Vec3f::y_axis(), _camera_yaw) *
-        math::Quatf::axis_angle(math::Vec3f::x_axis(), _camera_pitch));
+        math::Quatf::axis_angle(math::Vec3f::x_axis(), _camera_pitch);
   }
 
   void post_physics() final {

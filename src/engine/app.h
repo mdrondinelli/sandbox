@@ -7,7 +7,6 @@
 #include "../graphics/graphics.h"
 #include "../physics/physics.h"
 #include "../util/thread_pool.h"
-#include "camera.h"
 #include "window.h"
 
 namespace marlon {
@@ -17,7 +16,6 @@ struct App_create_info {
   physics::World_simulate_info world_simulate_info;
   math::Vec2i window_extents{1280, 720};
   std::string_view window_title{"app"};
-  Camera_create_info camera_create_info;
 };
 
 class App {
@@ -29,18 +27,28 @@ public:
   int run();
 
 protected:
+  physics::World const *get_world() const noexcept;
+
   physics::World *get_world() noexcept;
 
   physics::World_simulate_result const &
   get_world_simulate_result() const noexcept;
 
+  Window const *get_window() const noexcept;
+
   Window *get_window() noexcept;
 
-  Camera *get_camera() noexcept;
+  graphics::Graphics const *get_graphics() const noexcept;
 
   graphics::Graphics *get_graphics() noexcept;
 
+  graphics::Scene const *get_scene() const noexcept;
+
   graphics::Scene *get_scene() noexcept;
+
+  graphics::Camera const *get_camera() const noexcept;
+
+  graphics::Camera *get_camera() noexcept;
 
   bool is_looping() const noexcept;
 
@@ -70,7 +78,6 @@ private:
   physics::World_simulate_result _world_simulate_result;
   math::Vec2i _window_extents;
   std::string _window_title;
-  Camera_create_info _camera_create_info;
   std::unique_ptr<Runtime> _runtime;
   bool _looping{false};
   double _loop_iteration_wall_time{0.0};

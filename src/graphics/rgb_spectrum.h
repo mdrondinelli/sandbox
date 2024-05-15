@@ -17,6 +17,10 @@ public:
   static constexpr Rgb_spectrum black() noexcept {
     return Rgb_spectrum{0.0f};
   }
+
+  static constexpr Rgb_spectrum white() noexcept {
+    return Rgb_spectrum{1.0f};
+  }
 };
 } // namespace graphics
 } // namespace marlon
