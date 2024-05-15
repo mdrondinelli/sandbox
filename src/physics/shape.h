@@ -205,7 +205,7 @@ particle_shape_contact(float particle_radius,
     return Contact{
         .normal = normal,
         .local_positions = {particle_local_position, ball_local_position},
-        .separation_bias = distance - contact_distance,
+        .separation = distance - contact_distance,
     };
   } else {
     return std::nullopt;
@@ -257,7 +257,7 @@ particle_shape_contact(float particle_radius,
         .normal = normal,
         .local_positions = {box_local_clamped_particle_position,
                             particle_local_position},
-        .separation_bias = separation,
+        .separation = separation,
     };
   } else {
     auto const face_distances = std::array<float, 6>{
@@ -287,7 +287,7 @@ particle_shape_contact(float particle_radius,
     return Contact{
         .normal = normal,
         .local_positions = {Vec3f::zero(), box_local_clamped_particle_position},
-        .separation_bias = separation,
+        .separation = separation,
     };
   }
 }
@@ -339,13 +339,13 @@ shape_shape_contact(Ball const &b1,
     return Contact{
         .normal = normal,
         .local_positions = {b1_local_position, b2_local_position},
-        .separation_bias = distance - contact_distance,
+        .separation = distance - contact_distance,
     };
   } else {
     return Contact{
         .normal = Vec3f::x_axis(),
         .local_positions = {Vec3f::zero(), Vec3f::zero()},
-        .separation_bias = -contact_distance,
+        .separation = -contact_distance,
     };
   }
 }
@@ -393,7 +393,7 @@ shape_shape_contact(Ball const &ball,
         .normal = normal,
         .local_positions = {ball_local_position,
                             box_local_clamped_ball_position},
-        .separation_bias = distance - ball.radius,
+        .separation = distance - ball.radius,
     };
   } else {
     auto const distances = box.half_extents - abs(box_local_ball_position);
@@ -409,7 +409,7 @@ shape_shape_contact(Ball const &ball,
     return Contact{
         .normal = normal,
         .local_positions = {Vec3f::zero(), box_local_ball_position},
-        .separation_bias = -distances[axis] - ball.radius,
+        .separation = -distances[axis] - ball.radius,
     };
   }
 }
@@ -612,7 +612,7 @@ shape_shape_contact(Box const &b1,
     return Contact{
         .normal = normal,
         .local_positions = {b1_local_position, b2_local_position},
-        .separation_bias = best_separation,
+        .separation = best_separation,
     };
   } else if (best_separating_axis_index < 6) {
     // vertex of box one on face of box two
@@ -630,7 +630,7 @@ shape_shape_contact(Box const &b1,
     return Contact{
         .normal = normal,
         .local_positions = {b1_local_position, b2_local_position},
-        .separation_bias = best_separation,
+        .separation = best_separation,
     };
   } else {
     auto const b1_axis_index = (best_separating_axis_index - 6) / 3;
@@ -678,7 +678,7 @@ shape_shape_contact(Box const &b1,
     return Contact{
         .normal = normal,
         .local_positions = {b1_local_position, b2_local_position},
-        .separation_bias = best_separation,
+        .separation = best_separation,
     };
   }
 }

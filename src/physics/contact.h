@@ -12,12 +12,13 @@ namespace physics {
 struct Contact {
   math::Vec3f normal;
   std::array<math::Vec3f, 2> local_positions;
-  float separation_bias;
+  float separation;
 };
 
 struct Cached_contact {
   Contact contact;
   std::array<math::Quatf, 2> initial_object_orientations;
+  float impulse;
 };
 
 class Contact_manifold {
@@ -36,7 +37,7 @@ public:
         Mat3x3f::rotation(object_orientations[1]),
     };
     for (auto i = std::size_t{}; i != _size;) {
-      auto const &cached_contact = contacts()[i];
+      auto &cached_contact = contacts()[i];
       auto const keep = [&] {
         if (abs(dot(object_orientations[0],
                     cached_contact.initial_object_orientations[0])) <
@@ -58,6 +59,7 @@ public:
                max_position_distance * max_position_distance;
       }();
       if (keep) {
+        cached_contact.impulse = 0.0f;
         ++i;
       } else {
         std::shift_left(_contacts.data() + i, _contacts.data() + _size--, 1);

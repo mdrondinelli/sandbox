@@ -38,7 +38,7 @@ object_object_contact(Particle_data const &first,
         .normal = normal,
         .local_positions = {position - first.position(),
                             position - second.position()},
-        .separation_bias = separation,
+        .separation = separation,
     };
   } else {
     return std::nullopt;

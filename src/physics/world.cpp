@@ -246,6 +246,7 @@ public:
         contact_manifold.insert({
             .contact = *contact,
             .initial_object_orientations = object_orientations,
+            .impulse = 0.0f,
         });
       } else {
         contact_manifold.clear();
@@ -322,7 +323,7 @@ public:
 
   struct Work_item {
     Object_pair objects;
-    Contact const *contact;
+    Cached_contact *contact;
   };
 
   explicit Position_solve_task(Intrinsic_state const *intrinsic_state,
@@ -341,53 +342,55 @@ public:
             };
             auto const contact_positions = std::array<Vec3f, 2>{
                 object_derived_data[0].transform *
-                    Vec4f{work_item.contact->local_positions[0], 1.0f},
+                    Vec4f{work_item.contact->contact.local_positions[0], 1.0f},
                 object_derived_data[1].transform *
-                    Vec4f{work_item.contact->local_positions[1], 1.0f},
+                    Vec4f{work_item.contact->contact.local_positions[1], 1.0f},
             };
             auto const relative_position =
                 contact_positions[0] - contact_positions[1];
             auto const separation =
-                dot(relative_position, work_item.contact->normal) +
-                work_item.contact->separation_bias;
-            if (separation >= 0.0f) {
-              return;
-            }
+                dot(relative_position, work_item.contact->contact.normal) +
+                work_item.contact->contact.separation;
+            // if (separation >= 0.0f) {
+            //   return;
+            // }
             auto const local_contact_normals = std::array<Vec3f, 2>{
                 object_derived_data[0].inverse_transform *
-                    Vec4f{work_item.contact->normal, 0.0f},
+                    Vec4f{work_item.contact->contact.normal, 0.0f},
                 object_derived_data[1].inverse_transform *
-                    Vec4f{work_item.contact->normal, 0.0f},
+                    Vec4f{work_item.contact->contact.normal, 0.0f},
             };
             auto const generalized_inverse_masses = std::array<float, 2>{
                 generalized_inverse_mass(
                     object_derived_data[0].inverse_mass,
                     object_derived_data[0].inverse_inertia_tensor,
-                    work_item.contact->local_positions[0],
+                    work_item.contact->contact.local_positions[0],
                     local_contact_normals[0]),
                 generalized_inverse_mass(
                     object_derived_data[1].inverse_mass,
                     object_derived_data[1].inverse_inertia_tensor,
-                    work_item.contact->local_positions[1],
+                    work_item.contact->contact.local_positions[1],
                     local_contact_normals[1]),
             };
-            auto const impulse_magnitude =
-                -separation /
-                (generalized_inverse_masses[0] + generalized_inverse_masses[1]);
+            auto const impulse_scalar =
+                max(-separation / (generalized_inverse_masses[0] +
+                                   generalized_inverse_masses[1]),
+                    -work_item.contact->impulse);
+            work_item.contact->impulse += impulse_scalar;
             auto const local_impulses = std::array<Vec3f, 2>{
-                impulse_magnitude * local_contact_normals[0],
-                -impulse_magnitude * local_contact_normals[1],
+                impulse_scalar * local_contact_normals[0],
+                -impulse_scalar * local_contact_normals[1],
             };
             auto const global_impulse =
-                impulse_magnitude * work_item.contact->normal;
+                impulse_scalar * work_item.contact->contact.normal;
             apply_impulse(object_data.first,
                           object_derived_data[0],
-                          work_item.contact->local_positions[0],
+                          work_item.contact->contact.local_positions[0],
                           local_impulses[0],
                           global_impulse);
             apply_impulse(object_data.second,
                           object_derived_data[1],
-                          work_item.contact->local_positions[1],
+                          work_item.contact->contact.local_positions[1],
                           local_impulses[1],
                           -global_impulse);
           },
@@ -1409,10 +1412,10 @@ private:
     for (auto i = 0; i != 2; ++i) {
       for (auto const p : _awake_contact_manifolds) {
         auto &[objects, contact_manifold] = *p;
-        for (auto const &contact : contact_manifold.contacts()) {
+        for (auto &contact : contact_manifold.contacts()) {
           auto const work_item = Position_solve_task::Work_item{
               .objects = objects,
-              .contact = &contact.contact,
+              .contact = &contact,
           };
           Position_solve_task{&intrinsic_state, {&work_item, 1u}}.run({});
         }
@@ -1429,7 +1432,7 @@ private:
         .restitution_separating_velocity_epsilon =
             restitution_separating_velocity_epsilon,
     };
-    for (auto i = 0; i != 2; ++i) {
+    for (auto i = 0; i != 1; ++i) {
       for (auto const p : _awake_contact_manifolds) {
         auto &[objects, contact_manifold] = *p;
         for (auto const &contact : contact_manifold.contacts()) {

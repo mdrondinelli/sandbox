@@ -515,7 +515,7 @@ public:
     _ring_phase = Ring_phase{_box_manager.get()};
     _pyramid_phase = Pyramid_phase{_box_manager.get()};
     _phases = {&_column_phase, &_pyramid_phase, &_ring_phase};
-    _phase_index = 0;
+    _phase_index = 2;
     _phases[_phase_index]->start();
   }
 
