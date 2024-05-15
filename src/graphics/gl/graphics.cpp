@@ -68,14 +68,19 @@ layout(location = 4) uniform vec3 directional_light_irradiance;
 layout(location = 5) uniform vec3 directional_light_direction;
 layout(location = 6) uniform float exposure;
 
-float luminance(vec3 v) {
-  return dot(v, vec3(0.2126, 0.7152, 0.0722));
-}
-
 vec3 tonemap(vec3 v) {
-  float l = luminance(v);
-  vec3 tv = v / (v + vec3(1.0));
-  return mix(v / (l + vec3(1.0)), tv, tv);
+  v = mat3(
+    vec3(0.59719, 0.07600, 0.02840),
+    vec3(0.35458, 0.90834, 0.13383),
+    vec3(0.04823, 0.01566, 0.83777)
+  ) * v;
+  v = (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.4329510) + 0.238081);
+  v = mat3(
+    vec3(1.60475, -0.10208, -0.00327),
+    vec3(-0.53108,  1.10813, -0.07276),
+    vec3(-0.07367, -0.00605,  1.07602)
+  ) * v;
+  return clamp(v, vec3(0.0), vec3(1.0));
 }
 
 void main() {
