@@ -141,6 +141,7 @@ void link_shader_program(GLuint shader_program) {
     std::vector<char> log;
     log.resize(log_size);
     glGetProgramInfoLog(shader_program, log_size, nullptr, log.data());
+    std::cerr << log.data() << std::endl;
     throw std::runtime_error{log.data()};
   }
 }
@@ -278,16 +279,10 @@ math::Mat3x4f calculate_view_matrix(math::Vec3f const &position,
 }
 
 math::Mat4x4f calculate_clip_matrix(math::Vec2f const &zoom,
-                                    float near_plane_distance,
-                                    float far_plane_distance) {
+                                    float near_plane_distance) {
   return math::Mat4x4f{{zoom.x, 0.0f, 0.0f, 0.0f},
                        {0.0f, zoom.y, 0.0f, 0.0f},
-                       {0.0f,
-                        0.0f,
-                        -(far_plane_distance + near_plane_distance) /
-                            (far_plane_distance - near_plane_distance),
-                        -2.0f * near_plane_distance * far_plane_distance /
-                            (far_plane_distance - near_plane_distance)},
+                       {0.0f, 0.0f, 0.0f, near_plane_distance},
                        {0.0f, 0.0f, -1.0f, 0.0f}};
 }
 } // namespace
@@ -299,20 +294,20 @@ void Gl_graphics::render(Render_info const &info) {
       calculate_view_matrix(info.camera->position, info.camera->orientation);
   auto const view_matrix_4x4 =
       math::Mat4x4f{view_matrix_3x4, {0.0f, 0.0f, 0.0f, 1.0f}};
-  auto const clip_matrix =
-      calculate_clip_matrix(info.camera->zoom,
-                            info.camera->near_plane_distance,
-                            info.camera->far_plane_distance);
+  auto const clip_matrix = calculate_clip_matrix(
+      info.camera->zoom, info.camera->near_plane_distance);
   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
-  auto const viewport_extents = gl_target->get_extents();
-  glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+  glClearDepth(0.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // glEnable(GL_POLYGON_OFFSET_FILL);
   // glPolygonOffset(1.0f, 1.0f);
+  glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
   glEnable(GL_CULL_FACE);
+  auto const viewport_extents = gl_target->get_extents();
+  glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   glEnable(GL_DEPTH_TEST);
-  glDepthFunc(GL_LESS);
+  glDepthFunc(GL_GREATER);
   // glDisable(GL_BLEND);
   glEnable(GL_FRAMEBUFFER_SRGB);
   gl_scene->draw_surfaces(_surface_shader_program.get(),

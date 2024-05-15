@@ -9,8 +9,7 @@ struct Camera {
   math::Vec3f position{math::Vec3f::zero()};
   math::Quatf orientation{math::Quatf::identity()};
   math::Vec2f zoom{math::Vec2f::all(1.0f)};
-  float near_plane_distance{0.01f};
-  float far_plane_distance{1000.0f};
+  float near_plane_distance{0.1f};
   float exposure{0.01f};
 };
 } // namespace graphics
