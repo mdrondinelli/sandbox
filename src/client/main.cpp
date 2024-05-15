@@ -438,34 +438,20 @@ public:
             .world_simulate_info = {.delta_time = physics_delta_time,
                                     .substep_count = physics_substeps},
             .window_extents = {1920, 1080},
+            .camera_create_info = {
+              .position = {-10.0f, 3.5f, 10.0f},
+              .zoom = 2.0f * math::Vec2f{9.0f / 16.0f, 1.0f},
+            },
         }} {}
 
   void pre_loop() final {
     auto const world = get_world();
     auto const graphics = get_graphics();
     auto const scene = get_scene();
-    auto const camera = get_camera();
-    _resources = create_resources(graphics);
-    _red_ball_manager = std::make_unique<client::Static_prop_manager>(
-        client::Static_prop_manager_create_info{
-            .scene = scene,
-            .surface_mesh = _resources.high_quality_sphere_mesh.get(),
-            .surface_material = _resources.red_material.get(),
-            .surface_pretransform = math::Mat3x4f{{0.5f, 0.0f, 0.0f, 0.0f},
-                                                  {0.0f, 0.5f, 0.0f, 0.0f},
-                                                  {0.0f, 0.0f, 0.5f, 0.0f}},
-            .space = world,
-            .body_shape = physics::Ball{0.5f},
-            .body_material =
-                {
-                    .static_friction_coefficient = 0.2f,
-                    .dynamic_friction_coefficient = 0.1f,
-                    .restitution_coefficient = 0.3f,
-                },
-        });
     auto const box_mass = 216.0f;
     auto const box_radius = 0.3f;
     auto const box_shape = physics::Box{{box_radius, box_radius, box_radius}};
+    _resources = create_resources(graphics);
     _box_manager = std::make_unique<client::Dynamic_prop_manager>(
         client::Dynamic_prop_manager_create_info{
             .scene = scene,
@@ -487,8 +473,6 @@ public:
                     .restitution_coefficient = 0.1f,
                 },
         });
-    // _red_ball_manager->create({.position = {-1.5f, 0.5f, -1.5f}});
-    // _red_ball_manager->create({.position = {1.5f, 0.5f, 1.5f}});
     world->create_static_body({
         .shape = physics::Box{{100.0f, 0.5f, 100.0f}},
         .material =
@@ -506,10 +490,6 @@ public:
                                    {0.0f, 0.5f, 0.0f, -0.5f},
                                    {0.0f, 0.0f, 100.0f, 0.0f}},
     });
-    camera->set_position({-10.0f, 3.5f, 10.0f});
-    camera->set_zoom(math::Vec2f{9.0f / 16.0f, 1.0f} * 2.0f);
-    // _boxes = util::Allocating_list<client::Dynamic_prop_handle>{
-    //     util::System_allocator::instance()};
     // srand(25);
     _column_phase = Column_phase{_box_manager.get(), &_selection};
     _ring_phase = Ring_phase{_box_manager.get()};
@@ -625,12 +605,10 @@ public:
 
 private:
   Resources _resources;
-  std::unique_ptr<client::Static_prop_manager> _red_ball_manager;
   std::unique_ptr<client::Dynamic_prop_manager> _box_manager;
   graphics::Unique_surface_ptr _ground_surface;
   graphics::Unique_wireframe_ptr _selection_wireframe;
   std::optional<client::Dynamic_prop_handle> _selection;
-  // util::Allocating_list<client::Dynamic_prop_handle> _boxes;
   float _camera_yaw{math::deg_to_rad(-45.0f)};
   float _camera_pitch{0.0f};
   Column_phase _column_phase;
