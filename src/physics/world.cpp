@@ -1409,7 +1409,7 @@ private:
         .static_bodies = &_static_bodies,
         .latch = nullptr,
     };
-    for (auto i = 0; i != 2; ++i) {
+    for (auto i = 0; i != 4; ++i) {
       for (auto const p : _awake_contact_manifolds) {
         auto &[objects, contact_manifold] = *p;
         for (auto &contact : contact_manifold.contacts()) {
