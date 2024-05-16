@@ -2,12 +2,9 @@
 #define MARLON_GRAPHICS_GL_SCENE_H
 
 #include <math/mat.h>
-#include <util/pool.h>
 #include <util/set.h>
 
 #include "../scene.h"
-#include "surface.h"
-#include "wireframe.h"
 
 namespace marlon {
 namespace graphics {
@@ -28,13 +25,13 @@ public:
   void set_directional_light(
       std::optional<Directional_light> const &directional_light) noexcept final;
 
-  Surface *create_surface(Surface_create_info const &create_info) final;
+  void add_surface(Surface const *surface) final;
 
-  void destroy_surface(graphics::Surface *surface) noexcept final;
+  void remove_surface(Surface const *surface) noexcept final;
 
-  Wireframe *create_wireframe(Wireframe_create_info const &create_info) final;
+  void add_wireframe(Wireframe const *wireframe) final;
 
-  void destroy_wireframe(graphics::Wireframe *wireframe) noexcept final;
+  void remove_wireframe(Wireframe const *wireframe) noexcept final;
 
   void draw_surfaces(std::uint32_t shader_program,
                      std::uint32_t default_base_color_texture,
@@ -57,10 +54,8 @@ private:
   Rgb_spectrum _ambient_irradiance{Rgb_spectrum::black()};
   std::optional<Directional_light> _directional_light;
   util::Block _memory;
-  util::Pool<Surface> _surface_pool;
-  util::Pool<Wireframe> _wireframe_pool;
-  util::Set<Surface *> _surfaces;
-  util::Set<Wireframe *> _wireframes;
+  util::Set<Surface const *> _surfaces;
+  util::Set<Wireframe const *> _wireframes;
 };
 }
 } // namespace graphics

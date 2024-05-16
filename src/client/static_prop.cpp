@@ -24,15 +24,23 @@ Static_prop_manager::create(Static_prop_create_info const &create_info) {
   auto const surface_transform_3x4 = math::Mat3x4f{surface_transform_4x4[0],
                                                    surface_transform_4x4[1],
                                                    surface_transform_4x4[2]};
-  value.surface = _scene->create_surface({.mesh = _surface_mesh,
-                                          .material = _surface_material,
-                                          .transform = surface_transform_3x4});
-  value.body = _space->create_static_body({
-      .shape = _body_shape,
-      .material = _body_material,
-      .position = create_info.position,
-      .orientation = create_info.orientation,
-  });
+  value.surface = {
+      .mesh = _surface_mesh,
+      .material = _surface_material,
+      .transform = surface_transform_3x4,
+  };
+  _scene->add_surface(&value.surface);
+  try {
+    value.body = _space->create_static_body({
+        .shape = _body_shape,
+        .material = _body_material,
+        .position = create_info.position,
+        .orientation = create_info.orientation,
+    });
+  } catch (...) {
+    _scene->remove_surface(&value.surface);
+    throw;
+  }
   return {_next_entity_handle_value++};
 }
 
@@ -40,7 +48,7 @@ void Static_prop_manager::destroy(Static_prop_handle handle) {
   auto const it = _entities.find(handle.value);
   auto &value = it->second;
   _space->destroy_static_body(value.body);
-  _scene->destroy_surface(value.surface);
+  _scene->remove_surface(&value.surface);
   // _graphics->destroy_surface(value.surface);
   _entities.erase(it);
 }

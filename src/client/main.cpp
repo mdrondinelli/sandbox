@@ -482,13 +482,20 @@ public:
         .irradiance = graphics::Rgb_spectrum{481.5f},
         .direction = normalize(math::Vec3f{1.0f, 2.0f, 0.5f}),
     });
-    _ground_surface = scene->create_surface_unique({
+    _ground_surface = {
         .mesh = _resources.cube_mesh.get(),
         .material = _resources.blue_material,
         .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
                                    {0.0f, 0.5f, 0.0f, -0.5f},
                                    {0.0f, 0.0f, 100.0f, 0.0f}},
-    });
+    };
+    scene->add_surface(&_ground_surface);
+    _selection_wireframe = {
+        .mesh = _resources.cube_wireframe_mesh.get(),
+        .color = {1.0f, 0.5f, 0.0f},
+        .visible = false,
+    };
+    scene->add_wireframe(&_selection_wireframe);
     get_camera()->position = {-10.0f, 3.5f, 10.0f};
     get_camera()->zoom = 2.0f * math::Vec2f{9.0f / 16.0f, 1.0f};
     // srand(25);
@@ -577,20 +584,14 @@ public:
       _phases[_phase_index]->start();
     }
     if (_selection) {
-      if (!_selection_wireframe) {
-        _selection_wireframe = get_scene()->create_wireframe_unique({
-            .mesh = _resources.cube_wireframe_mesh.get(),
-            .color = {1.0f, 0.5f, 0.0f},
-        });
-      }
       auto const rigid_body = _box_manager->get_rigid_body(*_selection);
-      auto const transform =
+      _selection_wireframe.transform =
           math::Mat3x4f::trs(get_world()->data(rigid_body)->position(),
                              get_world()->data(rigid_body)->orientation(),
                              0.3f);
-      _selection_wireframe->set_transform(transform);
-    } else if (_selection_wireframe) {
-      _selection_wireframe = nullptr;
+      _selection_wireframe.visible = true;
+    } else {
+      _selection_wireframe.visible = false;
     }
     if (simulate_result.total_wall_time > physics_delta_time) {
       std::cout << "SLOWER THAN REAL TIME: "
@@ -598,16 +599,11 @@ public:
     }
   }
 
-  void post_loop() {
-    _ground_surface = {};
-    _selection_wireframe = {};
-  }
-
 private:
   Resources _resources;
   std::unique_ptr<client::Dynamic_prop_manager> _box_manager;
-  graphics::Unique_surface_ptr _ground_surface;
-  graphics::Unique_wireframe_ptr _selection_wireframe;
+  graphics::Surface _ground_surface;
+  graphics::Wireframe _selection_wireframe;
   std::optional<client::Dynamic_prop_handle> _selection;
   float _camera_yaw{math::deg_to_rad(-45.0f)};
   float _camera_pitch{0.0f};
