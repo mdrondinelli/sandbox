@@ -224,6 +224,15 @@ public:
     return result;
   }
 
+  static constexpr auto orthographic(T l, T r, T b, T t, T n, T f) noexcept {
+    static_assert(M == 4);
+    return Mat<T, 3, 4>{
+        {T(2) / (r - l), T(0), T(0), -(r + l) / (r - l)},
+        {T(0), T(-2) / (t - b), T(0), (t + b) / (t - b)},
+        {T(0), T(0), T(1) / (n - f), -f / (n - f)},
+    };
+  }
+
   Mat() = default;
 
   constexpr Mat(Rvec<T, M> const &row0,
@@ -295,6 +304,16 @@ public:
   static constexpr auto trs(Vec3<T> const &t, Quat<T> const &r, T s) noexcept {
     static_assert(M == 4);
     return Mat<T, 4, 4>{Mat<T, 3, 4>::trs(t, r, s), {T(0), T(0), T(0), T(1)}};
+  }
+
+  static constexpr auto orthographic(T l, T r, T b, T t, T n, T f) noexcept {
+    static_assert(M == 4);
+    return Mat<T, 4, 4>{
+        {T(2) / (r - l), T(0), T(0), -(r + l) / (r - l)},
+        {T(0), T(-2) / (t - b), T(0), (t + b) / (t - b)},
+        {T(0), T(0), T(1) / (n - f), -f / (n - f)},
+        {T(0), T(0), T(0), T(1)},
+    };
   }
 
   Mat() = default;
