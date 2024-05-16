@@ -26,10 +26,6 @@ using namespace marlon::math;
 
 namespace marlon {
 namespace graphics {
-namespace {
-
-} // namespace
-
 Gl_graphics::Gl_graphics(Gl_graphics_create_info const &create_info) {
   if (gladLoadGL(create_info.function_loader) == 0) {
     throw std::runtime_error{"Failed to load OpenGL functions."};
@@ -38,19 +34,14 @@ Gl_graphics::Gl_graphics(Gl_graphics_create_info const &create_info) {
       .window = create_info.window,
   }};
   _render_stream_intrinsic_state = Gl_render_stream::Intrinsic_state{{}};
-  // _surface_shader_program = make_shader_program(surface_vertex_shader_source,
-  //                                               surface_fragment_shader_source);
-  // _wireframe_shader_program = make_shader_program(
-  //     wireframe_vertex_shader_source, wireframe_fragment_shader_source);
-  // _default_base_color_texture = make_default_base_color_texture();
 }
 
 Render_target *Gl_graphics::get_default_render_target() noexcept {
   return &_default_render_target;
 }
 
-void Gl_graphics::destroy_render_target(Render_target *) noexcept {
-  // delete static_cast<Gl_render_target *>(target);
+void Gl_graphics::destroy_render_target(Render_target *render_target) noexcept {
+  delete static_cast<Gl_render_target *>(render_target);
 }
 
 Render_stream *Gl_graphics::create_render_stream(
