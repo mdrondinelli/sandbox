@@ -38,6 +38,7 @@ add_library(
   graphics
   "src/graphics/gl/default_render_target.cpp"
   "src/graphics/gl/graphics.cpp"
+  "src/graphics/gl/render_stream.cpp"
   "src/graphics/gl/scene.cpp"
   "src/graphics/gl/surface_material.cpp"
   "src/graphics/gl/surface_mesh.cpp"
@@ -64,7 +65,7 @@ add_executable(
   "src/client/main.cpp"
 )
 set_target_properties(math_tests util util_tests graphics physics engine client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-target_include_directories(graphics PRIVATE include)
+target_include_directories(graphics PRIVATE include src)
 target_include_directories(engine PRIVATE include)
 target_include_directories(client PRIVATE include)
 target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)

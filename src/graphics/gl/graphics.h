@@ -5,8 +5,7 @@
 
 #include "../graphics.h"
 #include "default_render_target.h"
-#include "unique_shader_program_handle.h"
-#include "unique_texture_handle.h"
+#include "render_stream.h"
 #include "window.h"
 
 namespace marlon {
@@ -20,7 +19,7 @@ struct Gl_graphics_create_info {
   Gl_window const *window;
 };
 
-class Gl_graphics : public Graphics {
+class Gl_graphics final : public Graphics {
 public:
   explicit Gl_graphics(Gl_graphics_create_info const &create_info);
 
@@ -28,13 +27,9 @@ public:
 
   Gl_graphics &operator=(Gl_graphics const &other) = delete;
 
-  Render_target *get_default_render_target() noexcept;
+  Texture *create_texture(Texture_create_info const &create_info) final;
 
-  void destroy_render_target(Render_target *target) noexcept final;
-
-  Scene *create_scene(Scene_create_info const &create_info) final;
-
-  void destroy_scene(Scene *scene) noexcept final;
+  void destroy_texture(Texture *texture) noexcept final;
 
   Surface_material *create_surface_material(
       Surface_material_create_info const &create_info) final;
@@ -52,17 +47,22 @@ public:
 
   void destroy_wireframe_mesh(Wireframe_mesh *wireframe_mesh) noexcept final;
 
-  Texture *create_texture(Texture_create_info const &create_info) final;
+  Scene *create_scene(Scene_create_info const &create_info) final;
 
-  void destroy_texture(Texture *texture) noexcept final;
+  void destroy_scene(Scene *scene) noexcept final;
 
-  void render(Render_info const &info) final;
+  Render_target *get_default_render_target() noexcept;
+
+  void destroy_render_target(Render_target *target) noexcept final;
+
+  Render_stream *
+  create_render_stream(Render_stream_create_info const &create_info) final;
+
+  void destroy_render_stream(Render_stream *render_stream) noexcept final;
 
 private:
-  std::unique_ptr<Gl_default_render_target> _default_render_target;
-  Gl_unique_shader_program_handle _surface_shader_program;
-  Gl_unique_shader_program_handle _wireframe_shader_program;
-  Gl_unique_texture_handle _default_base_color_texture;
+  Gl_default_render_target _default_render_target;
+  Gl_render_stream::Intrinsic_state _render_stream_intrinsic_state;
 };
 } // namespace graphics
 } // namespace marlon

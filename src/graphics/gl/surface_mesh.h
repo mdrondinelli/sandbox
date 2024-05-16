@@ -9,7 +9,7 @@
 
 namespace marlon {
 namespace graphics {
-class Gl_surface_mesh : public Surface_mesh {
+class Gl_surface_mesh final : public Surface_mesh {
 public:
   explicit Gl_surface_mesh(Surface_mesh_create_info const &create_info);
 

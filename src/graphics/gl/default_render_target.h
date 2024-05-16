@@ -12,6 +12,8 @@ struct Gl_default_render_target_create_info {
 
 class Gl_default_render_target : public Gl_render_target {
 public:
+  Gl_default_render_target() noexcept = default;
+
   explicit Gl_default_render_target(
       Gl_default_render_target_create_info const &create_info) noexcept;
 
@@ -20,7 +22,7 @@ public:
   std::uint32_t get_framebuffer() const noexcept final;
 
 private:
-  Gl_window const *_window;
+  Gl_window const *_window{nullptr};
 };
 } // namespace graphics
 } // namespace marlon

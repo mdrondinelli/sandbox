@@ -6,7 +6,7 @@
 
 namespace marlon {
 namespace graphics {
-class Gl_surface_material : public Surface_material {
+class Gl_surface_material final : public Surface_material {
   friend class Gl_scene;
 
 public:

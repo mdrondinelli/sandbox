@@ -9,7 +9,7 @@ namespace marlon {
 namespace graphics {
 class Gl_unique_texture_handle {
 public:
-  Gl_unique_texture_handle() noexcept : _handle{} {}
+  constexpr Gl_unique_texture_handle() noexcept : _handle{} {}
 
   explicit Gl_unique_texture_handle(std::uint32_t handle) noexcept
       : _handle{handle} {}

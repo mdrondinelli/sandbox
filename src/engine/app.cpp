@@ -42,7 +42,12 @@ public:
               .window = &_window,
           }};
         }()},
-        _scene{_graphics.create_scene_unique({})} {}
+        _scene{_graphics.create_scene_unique({})},
+        _render_stream{_graphics.create_render_stream({
+            .target = _graphics.get_default_render_target(),
+            .scene = _scene.get(),
+            .camera = &_camera,
+        })} {}
 
   // Thread_pool *get_threads() noexcept { return &_threads; }
 
@@ -61,11 +66,7 @@ public:
   graphics::Camera *get_camera() noexcept { return &_camera; }
 
   void render() {
-    _graphics.render({
-        .target = _graphics.get_default_render_target(),
-        .scene = _scene.get(),
-        .camera = &_camera,
-    });
+    _render_stream->render();
     glfwSwapBuffers(_window.get_glfw_window());
   }
 
@@ -77,6 +78,7 @@ private:
   graphics::Gl_graphics _graphics;
   graphics::Unique_scene _scene;
   graphics::Camera _camera;
+  graphics::Unique_render_stream _render_stream;
 };
 
 App::App(App_create_info const &create_info)
