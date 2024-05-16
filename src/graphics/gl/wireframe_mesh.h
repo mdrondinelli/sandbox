@@ -9,9 +9,10 @@
 
 namespace marlon {
 namespace graphics {
-class Gl_wireframe_mesh : public Wireframe_mesh {
+namespace gl {
+class Wireframe_mesh final : public graphics::Wireframe_mesh {
 public:
-  explicit Gl_wireframe_mesh(Wireframe_mesh_create_info const &create_info);
+  explicit Wireframe_mesh(Wireframe_mesh_create_info const &create_info);
 
   void bind_vertex_array() const noexcept;
 
@@ -19,10 +20,11 @@ public:
 
 private:
   std::uint32_t _index_count;
-  Gl_unique_buffer_handle _index_buffer;
-  Gl_unique_buffer_handle _vertex_buffer;
-  Gl_unique_vertex_array_handle _vertex_array;
+  Unique_buffer_handle _index_buffer;
+  Unique_buffer_handle _vertex_buffer;
+  Unique_vertex_array_handle _vertex_array;
 };
+}
 } // namespace graphics
 } // namespace marlon
 

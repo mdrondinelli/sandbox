@@ -9,20 +9,22 @@
 
 namespace marlon {
 namespace graphics {
-class Gl_surface_mesh final : public Surface_mesh {
-public:
-  explicit Gl_surface_mesh(Surface_mesh_create_info const &create_info);
+namespace gl {
+  class Surface_mesh final : public graphics::Surface_mesh {
+  public:
+    explicit Surface_mesh(Surface_mesh_create_info const &create_info);
 
-  void bind_vertex_array() const noexcept;
+    void bind_vertex_array() const noexcept;
 
-  void draw() const noexcept;
+    void draw() const noexcept;
 
-private:
-  std::uint32_t _index_count;
-  Gl_unique_buffer_handle _index_buffer;
-  Gl_unique_buffer_handle _vertex_buffer;
-  Gl_unique_vertex_array_handle _vertex_array;
-};
+  private:
+    std::uint32_t _index_count;
+    Unique_buffer_handle _index_buffer;
+    Unique_buffer_handle _vertex_buffer;
+    Unique_vertex_array_handle _vertex_array;
+  };
+}
 } // namespace graphics
 } // namespace marlon
 

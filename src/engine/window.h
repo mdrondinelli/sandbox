@@ -157,7 +157,7 @@ struct Window_create_info {
 };
 
 // Member functions, including constructor, must be called from the main thread
-class Window : public graphics::Gl_window {
+class Window : public graphics::gl::Window {
 public:
   explicit Window(Window_create_info const &create_info);
 

@@ -14,7 +14,7 @@ struct Static_prop_manager_create_info {
   // graphics::Graphics *graphics{};
   graphics::Scene *scene{};
   graphics::Surface_mesh *surface_mesh{};
-  graphics::Surface_material *surface_material{};
+  graphics::Surface_material surface_material{};
   math::Mat3x4f surface_pretransform{math::Mat3x4f::identity()};
   physics::World *space;
   physics::Shape body_shape;
@@ -44,7 +44,7 @@ private:
   // graphics::Graphics *_graphics;
   graphics::Scene *_scene;
   graphics::Surface_mesh *_surface_mesh;
-  graphics::Surface_material *_surface_material;
+  graphics::Surface_material _surface_material;
   math::Mat3x4f _surface_pretransform_3x4;
   physics::World *_space;
   physics::Shape _body_shape;

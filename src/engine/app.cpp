@@ -37,8 +37,8 @@ public:
         _graphics{[&]() {
           glfwMakeContextCurrent(_window.get_glfw_window());
           glfwSwapInterval(0);
-          return graphics::Gl_graphics{{
-              .function_loader = glfwGetProcAddress,
+          return graphics::gl::Graphics{{
+              .loader = glfwGetProcAddress,
               .window = &_window,
           }};
         }()},
@@ -75,7 +75,7 @@ private:
   physics::World _world;
   Glfw_init_guard _glfw_init_guard;
   Window _window;
-  graphics::Gl_graphics _graphics;
+  graphics::gl::Graphics _graphics;
   graphics::Unique_scene _scene;
   graphics::Camera _camera;
   graphics::Unique_render_stream _render_stream;

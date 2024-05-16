@@ -11,12 +11,13 @@
 
 namespace marlon {
 namespace graphics {
-Gl_wireframe_mesh::Gl_wireframe_mesh(
+namespace gl {
+Wireframe_mesh::Wireframe_mesh(
     Wireframe_mesh_create_info const &create_info)
     : _index_count{static_cast<std::uint32_t>(create_info.indices.size())},
-      _index_buffer{gl_make_unique_buffer()},
-      _vertex_buffer{gl_make_unique_buffer()},
-      _vertex_array{gl_make_unique_vertex_array()} {
+      _index_buffer{make_unique_buffer()},
+      _vertex_buffer{make_unique_buffer()},
+      _vertex_array{make_unique_vertex_array()} {
   glNamedBufferStorage(_index_buffer.get(),
                        create_info.indices.size_bytes(),
                        create_info.indices.data(),
@@ -37,12 +38,13 @@ Gl_wireframe_mesh::Gl_wireframe_mesh(
   glVertexArrayAttribBinding(_vertex_array.get(), 0, 0);
 }
 
-void Gl_wireframe_mesh::bind_vertex_array() const noexcept {
+void Wireframe_mesh::bind_vertex_array() const noexcept {
   glBindVertexArray(_vertex_array.get());
 }
 
-void Gl_wireframe_mesh::draw() const noexcept {
+void Wireframe_mesh::draw() const noexcept {
   glDrawElements(GL_LINES, _index_count, GL_UNSIGNED_SHORT, nullptr);
+}
 }
 } // namespace graphics
 } // namespace marlon

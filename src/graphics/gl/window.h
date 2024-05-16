@@ -5,12 +5,14 @@
 
 namespace marlon {
 namespace graphics {
-class Gl_window {
+namespace gl {
+class Window {
 public:
-  virtual ~Gl_window() {}
+  virtual ~Window() {}
 
   virtual math::Vec2i get_framebuffer_extents() const noexcept = 0;
 };
+}
 } // namespace graphics
 } // namespace marlon
 

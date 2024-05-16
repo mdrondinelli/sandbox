@@ -15,11 +15,11 @@ using enum engine::Mouse_button;
 struct Resources {
   graphics::Unique_texture brick_base_color_texture;
   graphics::Unique_texture striped_cotton_base_color_texture;
-  graphics::Unique_surface_material brick_material;
-  graphics::Unique_surface_material striped_cotton_material;
-  graphics::Unique_surface_material red_material;
-  graphics::Unique_surface_material blue_material;
-  graphics::Unique_surface_material particle_material;
+  graphics::Surface_material brick_material;
+  graphics::Surface_material striped_cotton_material;
+  graphics::Surface_material red_material;
+  graphics::Surface_material blue_material;
+  graphics::Surface_material particle_material;
   graphics::Unique_surface_mesh cube_mesh;
   graphics::Unique_surface_mesh low_quality_sphere_mesh;
   graphics::Unique_surface_mesh high_quality_sphere_mesh;
@@ -43,16 +43,16 @@ Resources create_resources(graphics::Graphics *graphics) {
       graphics, "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
   retval.striped_cotton_base_color_texture = create_texture(
       graphics, "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
-  retval.brick_material = graphics->create_surface_material_unique(
-      {.base_color_texture = retval.brick_base_color_texture.get()});
-  retval.striped_cotton_material = graphics->create_surface_material_unique(
-      {.base_color_texture = retval.striped_cotton_base_color_texture.get()});
-  retval.red_material = graphics->create_surface_material_unique(
-      {.base_color_tint = {0.1f, 0.0f, 0.0f}});
-  retval.blue_material = graphics->create_surface_material_unique(
-      {.base_color_tint = {0.00f, 0.005f, 0.02f}});
-  retval.particle_material = graphics->create_surface_material_unique(
-      {.base_color_tint = {0.25f, 0.5f, 1.0f}});
+  retval.brick_material = graphics::Surface_material{
+      .base_color_texture = retval.brick_base_color_texture.get()};
+  retval.striped_cotton_material = graphics::Surface_material{
+      .base_color_texture = retval.striped_cotton_base_color_texture.get()};
+  retval.red_material =
+      graphics::Surface_material{.base_color_tint = {0.1f, 0.0f, 0.0f}};
+  retval.blue_material =
+      graphics::Surface_material{.base_color_tint = {0.00f, 0.005f, 0.02f}};
+  retval.particle_material =
+      graphics::Surface_material{.base_color_tint = {0.25f, 0.5f, 1.0f}};
   retval.cube_mesh = create_cube_mesh(graphics);
   retval.low_quality_sphere_mesh = create_icosphere_mesh(graphics, 1);
   retval.high_quality_sphere_mesh = create_icosphere_mesh(graphics, 3);
@@ -450,7 +450,7 @@ public:
         client::Dynamic_prop_manager_create_info{
             .scene = scene,
             .surface_mesh = _resources.cube_mesh.get(),
-            .surface_material = _resources.striped_cotton_material.get(),
+            .surface_material = _resources.striped_cotton_material,
             .surface_pretransform =
                 math::Mat3x4f{{box_radius, 0.0f, 0.0f, 0.0f},
                               {0.0f, box_radius, 0.0f, 0.0f},
@@ -484,7 +484,7 @@ public:
     });
     _ground_surface = scene->create_surface_unique({
         .mesh = _resources.cube_mesh.get(),
-        .material = _resources.blue_material.get(),
+        .material = _resources.blue_material,
         .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
                                    {0.0f, 0.5f, 0.0f, -0.5f},
                                    {0.0f, 0.0f, 100.0f, 0.0f}},

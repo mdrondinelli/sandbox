@@ -6,24 +6,26 @@
 
 namespace marlon {
 namespace graphics {
-struct Gl_default_render_target_create_info {
-  Gl_window const *window;
+namespace gl {
+struct Default_render_target_create_info {
+  Window const *window;
 };
 
-class Gl_default_render_target : public Gl_render_target {
+class Default_render_target final : public Render_target {
 public:
-  Gl_default_render_target() noexcept = default;
+  Default_render_target() noexcept = default;
 
-  explicit Gl_default_render_target(
-      Gl_default_render_target_create_info const &create_info) noexcept;
+  explicit Default_render_target(
+      Default_render_target_create_info const &create_info) noexcept;
 
   math::Vec2i get_extents() const noexcept final;
 
   std::uint32_t get_framebuffer() const noexcept final;
 
 private:
-  Gl_window const *_window{nullptr};
+  Window const *_window{nullptr};
 };
+}
 } // namespace graphics
 } // namespace marlon
 

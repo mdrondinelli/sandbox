@@ -17,6 +17,7 @@
 
 namespace marlon {
 namespace graphics {
+namespace gl {
 namespace {
 ktxTexture2 *create_ktx_texture(Texture_create_info const &create_info) {
   ktxTexture2 *retval{};
@@ -49,7 +50,7 @@ ktxTexture2 *create_ktx_texture(Texture_create_info const &create_info) {
 }
 } // namespace
 
-Gl_texture::Gl_texture(Texture_create_info const &create_info) {
+Texture::Texture(Texture_create_info const &create_info) {
   auto const ktx_texture = create_ktx_texture(create_info);
   // TODO: handle errors here
   GLuint handle{};
@@ -62,7 +63,8 @@ Gl_texture::Gl_texture(Texture_create_info const &create_info) {
   }
   glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glTextureParameterf(handle, GL_TEXTURE_MAX_ANISOTROPY, 16.0f);
-  _handle = Gl_unique_texture_handle{handle};
+  _handle = Unique_texture_handle{handle};
+}
 }
 } // namespace graphics
 } // namespace marlon

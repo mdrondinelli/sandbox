@@ -1,20 +1,22 @@
 #ifndef MARLON_GRAPHICS_GL_SCENE_H
 #define MARLON_GRAPHICS_GL_SCENE_H
 
-#include "../../math/mat.h"
-#include "../../util/pool.h"
-#include "../../util/set.h"
+#include <math/mat.h>
+#include <util/pool.h>
+#include <util/set.h>
+
 #include "../scene.h"
 #include "surface.h"
 #include "wireframe.h"
 
 namespace marlon {
 namespace graphics {
-class Gl_scene final : public Scene {
+namespace gl {
+class Scene final : public graphics::Scene {
 public:
-  explicit Gl_scene(Scene_create_info const &create_info) noexcept;
+  explicit Scene(Scene_create_info const &create_info) noexcept;
 
-  ~Gl_scene();
+  ~Scene();
 
   Rgb_spectrum get_ambient_irradiance() const noexcept final;
 
@@ -28,11 +30,11 @@ public:
 
   Surface *create_surface(Surface_create_info const &create_info) final;
 
-  void destroy_surface(Surface *surface) noexcept final;
+  void destroy_surface(graphics::Surface *surface) noexcept final;
 
   Wireframe *create_wireframe(Wireframe_create_info const &create_info) final;
 
-  void destroy_wireframe(Wireframe *wireframe) noexcept final;
+  void destroy_wireframe(graphics::Wireframe *wireframe) noexcept final;
 
   void draw_surfaces(std::uint32_t shader_program,
                      std::uint32_t default_base_color_texture,
@@ -55,12 +57,12 @@ private:
   Rgb_spectrum _ambient_irradiance{Rgb_spectrum::black()};
   std::optional<Directional_light> _directional_light;
   util::Block _memory;
-  util::Pool<Gl_surface> _surface_pool;
-  util::Pool<Gl_wireframe> _wireframe_pool;
-  util::Set<Gl_surface *> _surfaces;
-  util::Set<Gl_wireframe *> _wireframes;
-  // std::unique_ptr<Impl> _impl;
+  util::Pool<Surface> _surface_pool;
+  util::Pool<Wireframe> _wireframe_pool;
+  util::Set<Surface *> _surfaces;
+  util::Set<Wireframe *> _wireframes;
 };
+}
 } // namespace graphics
 } // namespace marlon
 

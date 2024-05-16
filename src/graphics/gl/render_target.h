@@ -3,19 +3,22 @@
 
 #include <cstdint>
 
-#include "../../math/vec.h"
+#include <math/vec.h>
+
 #include "../render_target.h"
 
 namespace marlon {
 namespace graphics {
-class Gl_render_target : public Render_target {
+namespace gl {
+class Render_target : public graphics::Render_target {
 public:
-  virtual ~Gl_render_target() = default;
+  virtual ~Render_target() = default;
 
   virtual math::Vec2i get_extents() const noexcept = 0;
 
   virtual std::uint32_t get_framebuffer() const noexcept = 0;
 };
+}
 } // namespace graphics
 } // namespace marlon
 

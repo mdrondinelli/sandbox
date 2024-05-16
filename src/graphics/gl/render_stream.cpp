@@ -19,6 +19,7 @@
 
 namespace marlon {
 namespace graphics {
+namespace gl {
 using namespace math;
 
 namespace {
@@ -143,16 +144,16 @@ void link_shader_program(GLuint shader_program) {
   }
 }
 
-Gl_unique_shader_program_handle
+Unique_shader_program_handle
 make_shader_program(char const *vertex_shader_source,
                     char const *fragment_shader_source) {
-  auto const vertex_shader{gl_make_unique_shader(GL_VERTEX_SHADER)};
+  auto const vertex_shader{make_unique_shader(GL_VERTEX_SHADER)};
   glShaderSource(vertex_shader.get(), 1, &vertex_shader_source, nullptr);
   compile_shader(vertex_shader.get());
-  auto const fragment_shader{gl_make_unique_shader(GL_FRAGMENT_SHADER)};
+  auto const fragment_shader{make_unique_shader(GL_FRAGMENT_SHADER)};
   glShaderSource(fragment_shader.get(), 1, &fragment_shader_source, nullptr);
   compile_shader(fragment_shader.get());
-  auto result = gl_make_unique_shader_program();
+  auto result = make_unique_shader_program();
   glAttachShader(result.get(), vertex_shader.get());
   glAttachShader(result.get(), fragment_shader.get());
   link_shader_program(result.get());
@@ -161,8 +162,8 @@ make_shader_program(char const *vertex_shader_source,
   return result;
 }
 
-Gl_unique_texture_handle make_default_base_color_texture() {
-  auto result = gl_make_unique_texture(GL_TEXTURE_2D);
+Unique_texture_handle make_default_base_color_texture() {
+  auto result = make_unique_texture(GL_TEXTURE_2D);
   auto const pixels = std::array<std::uint8_t, 4>{0xFF, 0xFF, 0xFF, 0xFF};
   glTextureStorage2D(result.get(), 1, GL_RGBA8, 1, 1);
   glTextureSubImage2D(
@@ -222,7 +223,7 @@ Mat4x4f calculate_clip_matrix(Vec2f const &zoom, float near_plane_distance) {
 //       _wireframe_shader_program.get(), 0, 1, clip_matrix * view_matrix);
 // }
 
-Gl_render_stream::Intrinsic_state::Intrinsic_state(
+Render_stream::Intrinsic_state::Intrinsic_state(
     Intrinsic_state_create_info const &)
     : _surface_shader_program{make_shader_program(
           surface_vertex_shader_source, surface_fragment_shader_source)},
@@ -237,7 +238,7 @@ Gl_render_stream::Intrinsic_state::Intrinsic_state(
   // _default_base_color_texture = make_default_base_color_texture();
 }
 
-void Gl_render_stream::render() {
+void Render_stream::render() {
   auto const view_matrix =
       rigid_inverse(Mat4x4f::rigid(_camera->position, _camera->orientation));
   auto const clip_matrix =
@@ -279,6 +280,7 @@ void Gl_render_stream::render() {
                           0,
                           1,
                           clip_matrix * view_matrix);
+}
 }
 } // namespace graphics
 } // namespace marlon

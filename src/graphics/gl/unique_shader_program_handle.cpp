@@ -11,12 +11,14 @@
 
 namespace marlon {
 namespace graphics {
-Gl_unique_shader_program_handle::~Gl_unique_shader_program_handle() {
+namespace gl {
+Unique_shader_program_handle::~Unique_shader_program_handle() {
   glDeleteProgram(_handle);
 }
 
-Gl_unique_shader_program_handle gl_make_unique_shader_program() {
-  return Gl_unique_shader_program_handle{glCreateProgram()};
+Unique_shader_program_handle make_unique_shader_program() {
+  return Unique_shader_program_handle{glCreateProgram()};
+}
 }
 } // namespace graphics
 } // namespace marlon

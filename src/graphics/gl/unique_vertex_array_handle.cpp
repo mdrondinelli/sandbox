@@ -11,14 +11,16 @@
 
 namespace marlon {
 namespace graphics {
-Gl_unique_vertex_array_handle::~Gl_unique_vertex_array_handle() {
+namespace gl {
+Unique_vertex_array_handle::~Unique_vertex_array_handle() {
   glDeleteVertexArrays(1, &_handle);
 }
 
-Gl_unique_vertex_array_handle gl_make_unique_vertex_array() {
+Unique_vertex_array_handle make_unique_vertex_array() {
   GLuint handle;
   glCreateVertexArrays(1, &handle);
-  return Gl_unique_vertex_array_handle{handle};
+  return Unique_vertex_array_handle{handle};
+}
 }
 } // namespace graphics
 } // namespace marlon

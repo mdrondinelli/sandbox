@@ -7,35 +7,37 @@
 
 namespace marlon {
 namespace graphics {
-class Gl_unique_buffer_handle {
-public:
-  constexpr Gl_unique_buffer_handle() noexcept : _handle{0} {}
+namespace gl {
+  class Unique_buffer_handle {
+  public:
+    constexpr Unique_buffer_handle() noexcept : _handle{0} {}
 
-  constexpr explicit Gl_unique_buffer_handle(std::uint32_t handle) noexcept
-      : _handle{handle} {}
+    constexpr explicit Unique_buffer_handle(std::uint32_t handle) noexcept
+        : _handle{handle} {}
 
-  ~Gl_unique_buffer_handle();
+    ~Unique_buffer_handle();
 
-  Gl_unique_buffer_handle(Gl_unique_buffer_handle &&other) noexcept
-      : _handle{std::exchange(other._handle, 0)} {}
+    Unique_buffer_handle(Unique_buffer_handle &&other) noexcept
+        : _handle{std::exchange(other._handle, 0)} {}
 
-  Gl_unique_buffer_handle &operator=(Gl_unique_buffer_handle &&other) noexcept {
-    auto temp{std::move(other)};
-    swap(temp);
-    return *this;
-  }
+    Unique_buffer_handle &operator=(Unique_buffer_handle &&other) noexcept {
+      auto temp{std::move(other)};
+      swap(temp);
+      return *this;
+    }
 
-  std::uint32_t get() const noexcept { return _handle; }
+    std::uint32_t get() const noexcept { return _handle; }
 
-private:
-  void swap(Gl_unique_buffer_handle &other) noexcept {
-    std::swap(_handle, other._handle);
-  }
+  private:
+    void swap(Unique_buffer_handle &other) noexcept {
+      std::swap(_handle, other._handle);
+    }
 
-  std::uint32_t _handle;
-};
+    std::uint32_t _handle;
+  };
 
-Gl_unique_buffer_handle gl_make_unique_buffer();
+Unique_buffer_handle make_unique_buffer();
+}
 } // namespace graphics
 } // namespace marlon
 
