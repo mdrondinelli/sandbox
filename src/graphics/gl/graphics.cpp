@@ -22,6 +22,8 @@
 #include "texture.h"
 #include "unique_shader_handle.h"
 
+using namespace marlon::math;
+
 namespace marlon {
 namespace graphics {
 namespace {
@@ -243,57 +245,19 @@ void Gl_graphics::destroy_texture(Texture *texture) noexcept {
 }
 
 namespace {
-math::Mat3x4f calculate_view_matrix(math::Vec3f const &position,
-                                    math::Quatf const &orientation) {
-  auto const upper_left_inv =
-      math::Mat3x3f{{(1.0f - 2.0f * orientation.v.y * orientation.v.y -
-                      2.0f * orientation.v.z * orientation.v.z),
-                     (2.0f * orientation.v.x * orientation.v.y +
-                      2.0f * orientation.w * orientation.v.z),
-                     (2.0f * orientation.v.x * orientation.v.z -
-                      2.0f * orientation.w * orientation.v.y)},
-                    {(2.0f * orientation.v.x * orientation.v.y -
-                      2.0f * orientation.w * orientation.v.z),
-                     (1.0f - 2.0f * orientation.v.x * orientation.v.x -
-                      2.0f * orientation.v.z * orientation.v.z),
-                     (2.0f * orientation.v.y * orientation.v.z +
-                      2.0f * orientation.w * orientation.v.x)},
-                    {(2.0f * orientation.v.x * orientation.v.z +
-                      2.0f * orientation.w * orientation.v.y),
-                     (2.0f * orientation.v.y * orientation.v.z -
-                      2.0f * orientation.w * orientation.v.x),
-                     (1.0f - 2.0f * orientation.v.x * orientation.v.x -
-                      2.0f * orientation.v.y * orientation.v.y)}};
-  return math::Mat3x4f{{upper_left_inv[0][0],
-                        upper_left_inv[0][1],
-                        upper_left_inv[0][2],
-                        -(upper_left_inv[0] * position)},
-                       {upper_left_inv[1][0],
-                        upper_left_inv[1][1],
-                        upper_left_inv[1][2],
-                        -(upper_left_inv[1] * position)},
-                       {upper_left_inv[2][0],
-                        upper_left_inv[2][1],
-                        upper_left_inv[2][2],
-                        -(upper_left_inv[2] * position)}};
-}
-
-math::Mat4x4f calculate_clip_matrix(math::Vec2f const &zoom,
-                                    float near_plane_distance) {
-  return math::Mat4x4f{{zoom.x, 0.0f, 0.0f, 0.0f},
-                       {0.0f, zoom.y, 0.0f, 0.0f},
-                       {0.0f, 0.0f, 0.0f, near_plane_distance},
-                       {0.0f, 0.0f, -1.0f, 0.0f}};
+Mat4x4f calculate_clip_matrix(Vec2f const &zoom, float near_plane_distance) {
+  return Mat4x4f{{zoom.x, 0.0f, 0.0f, 0.0f},
+                 {0.0f, -zoom.y, 0.0f, 0.0f},
+                 {0.0f, 0.0f, 0.0f, near_plane_distance},
+                 {0.0f, 0.0f, -1.0f, 0.0f}};
 }
 } // namespace
 
 void Gl_graphics::render(Render_info const &info) {
   auto const gl_scene = static_cast<Gl_scene const *>(info.scene);
   auto const gl_target = static_cast<Gl_render_target *>(info.target);
-  auto const view_matrix_3x4 =
-      calculate_view_matrix(info.camera->position, info.camera->orientation);
-  auto const view_matrix_4x4 =
-      math::Mat4x4f{view_matrix_3x4, {0.0f, 0.0f, 0.0f, 1.0f}};
+  auto const view_matrix = rigid_inverse(
+      Mat4x4f::rigid(info.camera->position, info.camera->orientation));
   auto const clip_matrix = calculate_clip_matrix(
       info.camera->zoom, info.camera->near_plane_distance);
   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
@@ -302,8 +266,9 @@ void Gl_graphics::render(Render_info const &info) {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // glEnable(GL_POLYGON_OFFSET_FILL);
   // glPolygonOffset(1.0f, 1.0f);
-  glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+  glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
   glEnable(GL_CULL_FACE);
+  glFrontFace(GL_CW);
   auto const viewport_extents = gl_target->get_extents();
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   glEnable(GL_DEPTH_TEST);
@@ -319,7 +284,7 @@ void Gl_graphics::render(Render_info const &info) {
                           4,
                           5,
                           6,
-                          clip_matrix * view_matrix_4x4,
+                          clip_matrix * view_matrix,
                           info.camera->exposure);
   glEnable(GL_POLYGON_OFFSET_LINE);
   glPolygonOffset(-1.0f, -1.0f);
@@ -329,7 +294,7 @@ void Gl_graphics::render(Render_info const &info) {
   // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   // glEnable(GL_LINE_SMOOTH);
   gl_scene->draw_wireframes(
-      _wireframe_shader_program.get(), 0, 1, clip_matrix * view_matrix_4x4);
+      _wireframe_shader_program.get(), 0, 1, clip_matrix * view_matrix);
 }
 } // namespace graphics
 } // namespace marlon
