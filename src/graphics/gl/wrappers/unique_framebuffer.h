@@ -33,6 +33,8 @@ private:
 
   std::uint32_t _handle{};
 };
+
+Unique_framebuffer make_unique_framebuffer();
 } // namespace marlon::graphics::gl::wrappers
 
 #endif

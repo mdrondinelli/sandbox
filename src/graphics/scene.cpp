@@ -16,7 +16,7 @@ constexpr std::size_t memory_requirement(std::size_t max_surfaces,
 } // namespace
 
 Scene::Scene(Scene_create_info const &create_info) noexcept
-    : _memory{System_allocator::instance()->alloc(memory_requirement(
+    : _memory{System_allocator{}.alloc(memory_requirement(
           create_info.max_surfaces, create_info.max_wireframes))} {
   auto allocator = Stack_allocator<>{_memory};
   _surfaces =
@@ -28,7 +28,7 @@ Scene::Scene(Scene_create_info const &create_info) noexcept
 Scene::~Scene() {
   _wireframes = {};
   _surfaces = {};
-  System_allocator::instance()->free(_memory);
+  System_allocator{}.free(_memory);
 }
-}
-}
+} // namespace graphics
+} // namespace marlon

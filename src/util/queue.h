@@ -266,7 +266,7 @@ private:
   Size _tail{};
 };
 
-template <typename T, class Allocator = Polymorphic_allocator>
+template <typename T, class Allocator = System_allocator>
 class Allocating_queue {
 public:
   using Iterator = typename Queue<T>::Iterator;

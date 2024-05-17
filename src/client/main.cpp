@@ -243,8 +243,7 @@ public:
   explicit Column_phase(client::Dynamic_prop_manager *box_manager,
                         std::optional<client::Dynamic_prop_handle> *selection)
       : _box_manager{box_manager},
-        _selection{selection},
-        _boxes{util::System_allocator::instance()} {
+        _selection{selection} {
     _boxes.reserve(768);
   }
 
@@ -309,7 +308,7 @@ public:
   Pyramid_phase() = default;
 
   explicit Pyramid_phase(client::Dynamic_prop_manager *box_manager)
-      : _box_manager{box_manager}, _boxes{util::System_allocator::instance()} {}
+      : _box_manager{box_manager} {}
 
   void on_start() final {
     _box_spawn_timer = 0.0f;
@@ -378,7 +377,7 @@ public:
   Ring_phase() = default;
 
   explicit Ring_phase(client::Dynamic_prop_manager *box_manager)
-      : _box_manager{box_manager}, _boxes{util::System_allocator::instance()} {
+      : _box_manager{box_manager}, _boxes{} {
     _boxes.reserve(768);
   }
 

@@ -61,6 +61,7 @@ private:
   Render_target *_target;
   Scene const *_scene;
   Camera const *_camera;
+  
 };
 } // namespace gl
 } // namespace graphics

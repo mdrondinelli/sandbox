@@ -152,24 +152,24 @@ private:
   T *_buffer_end;
 };
 
-template <typename T, typename Allocator = Polymorphic_allocator>
-class Allocating_list {
+template <typename T, typename Allocator = System_allocator>
+class Allocating_list : Allocator {
 public:
   using Iterator = typename List<T>::Iterator;
   using Const_iterator = typename List<T>::Const_iterator;
 
-  Allocating_list() : _allocator{} { _impl.construct(); }
+  Allocating_list() { _impl.construct(); }
 
-  explicit Allocating_list(Allocator const &allocator) : _allocator{allocator} {
+  explicit Allocating_list(Allocator const &allocator) : Allocator{allocator} {
     _impl.construct();
   }
 
-  Allocating_list(Allocating_list<T, Allocator> &&other) noexcept
-      : _allocator{std::move(other._allocator)} {
+  Allocating_list(Allocating_list &&other) noexcept
+      : Allocator{std::move(static_cast<Allocator &>(other))} {
     _impl.construct(std::move(*other._impl));
   }
 
-  Allocating_list &operator=(Allocating_list<T, Allocator> &&other) noexcept {
+  Allocating_list &operator=(Allocating_list &&other) noexcept {
     auto temp{std::move(other)};
     swap(temp);
     return *this;
@@ -180,7 +180,7 @@ public:
       auto const block =
           make_block(_impl->data(), _impl->data() + _impl->max_size());
       _impl.destruct();
-      _allocator.free(block);
+      Allocator::free(block);
     }
   }
 
@@ -222,7 +222,8 @@ public:
 
   void reserve(Size capacity) {
     if (capacity > _impl->capacity()) {
-      auto temp = List<T>::make(_allocator, capacity).second;
+      auto temp =
+          List<T>::make(static_cast<Allocator &>(*this), capacity).second;
       for (auto &object : *_impl) {
         temp.emplace_back(std::move(object));
       }
@@ -230,7 +231,7 @@ public:
         auto const block =
             make_block(_impl->data(), _impl->data() + _impl->max_size());
         *_impl = std::move(temp);
-        _allocator.free(block);
+        Allocator::free(block);
       } else {
         *_impl = std::move(temp);
       }
@@ -267,13 +268,13 @@ public:
   }
 
 private:
-  void swap(Allocating_list<T, Allocator> &other) noexcept {
+  void swap(Allocating_list &other) noexcept {
     using std::swap;
-    swap(_allocator, other._allocator);
+    swap(static_cast<Allocator &>(*this), static_cast<Allocator &>(other));
     swap(*_impl, *other._impl);
   }
 
-  Allocator _allocator;
+  // Allocator _allocator;
   Lifetime_box<List<T>> _impl;
 };
 } // namespace util

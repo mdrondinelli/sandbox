@@ -9,9 +9,10 @@ namespace util {
 Thread_pool::Thread_pool(Size thread_count, Scheduling_policy scheduling_policy)
     : _push_index{Size{}} {
   if (thread_count > 0) {
+    auto allocator = System_allocator{};
     auto block = Block{};
     std::tie(block, _threads) =
-        List<Thread>::make(*System_allocator::instance(), thread_count);
+        List<Thread>::make(allocator, thread_count);
     try {
       for (int i = 0; i != thread_count; ++i) {
         _threads.emplace_back(
@@ -19,7 +20,7 @@ Thread_pool::Thread_pool(Size thread_count, Scheduling_policy scheduling_policy)
       }
     } catch (...) {
       _threads = {};
-      System_allocator::instance()->free(block);
+      allocator.free(block);
       throw;
     }
   }
@@ -30,7 +31,7 @@ Thread_pool::~Thread_pool() {
     auto const block = make_block(
         _threads.data(), List<Thread>::memory_requirement(_threads.max_size()));
     _threads = {};
-    System_allocator::instance()->free(block);
+    System_allocator{}.free(block);
   }
 }
 
@@ -81,7 +82,6 @@ Thread_pool::Thread::Thread(Thread *threads,
       _thread_count{thread_count},
       _index{index},
       _scheduling_policy{scheduling_policy},
-      _queue{System_allocator::instance()},
       _thread{[this](std::stop_token stop_token) {
         {
           auto const lock = std::scoped_lock{_mutex};

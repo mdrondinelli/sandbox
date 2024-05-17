@@ -637,7 +637,7 @@ private:
 template <typename T,
           typename Hash = Hash<T>,
           typename Equal = Equal<T>,
-          typename Allocator = Polymorphic_allocator>
+          typename Allocator = System_allocator>
 class Allocating_set {
 public:
   using Iterator = typename Set<T, Hash, Equal>::Iterator;

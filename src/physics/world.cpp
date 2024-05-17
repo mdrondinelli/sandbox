@@ -797,8 +797,7 @@ public:
 
   explicit Impl(World_create_info const &create_info)
       : _threads{create_info.worker_thread_count},
-        _block{util::System_allocator::instance()->alloc(
-            memory_requirement(create_info))},
+        _block{util::System_allocator{}.alloc(memory_requirement(create_info))},
         _gravitational_acceleration{create_info.gravitational_acceleration} {
     auto allocator = Stack_allocator<>{_block};
     _particles =
@@ -868,7 +867,7 @@ public:
     _static_bodies = {};
     _rigid_bodies = {};
     _particles = {};
-    util::System_allocator::instance()->free(_block);
+    util::System_allocator{}.free(_block);
   }
 
   Particle create_particle(Particle_create_info const &create_info) {

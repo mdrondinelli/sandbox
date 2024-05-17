@@ -2,6 +2,6 @@
 
 namespace marlon {
 namespace util {
-System_allocator System_allocator::_instance;
+// System_allocator System_allocator::_instance;
 }
 } // namespace marlon
