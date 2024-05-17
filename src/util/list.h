@@ -274,7 +274,6 @@ private:
     swap(*_impl, *other._impl);
   }
 
-  // Allocator _allocator;
   Lifetime_box<List<T>> _impl;
 };
 } // namespace util
