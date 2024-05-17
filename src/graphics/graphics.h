@@ -55,16 +55,6 @@ private:
   Graphics *_owner;
 };
 
-class Scene_deleter {
-public:
-  Scene_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
-
-  void operator()(Scene *scene) const noexcept;
-
-private:
-  Graphics *_owner;
-};
-
 class Render_target_deleter {
 public:
   Render_target_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
@@ -89,7 +79,6 @@ using Unique_texture = std::unique_ptr<Texture, Texture_deleter>;
 using Unique_surface_mesh = std::unique_ptr<Surface_mesh, Surface_mesh_deleter>;
 using Unique_wireframe_mesh =
     std::unique_ptr<Wireframe_mesh, Wireframe_mesh_deleter>;
-using Unique_scene = std::unique_ptr<Scene, Scene_deleter>;
 using Unique_render_target =
     std::unique_ptr<Render_target, Render_target_deleter>;
 using Unique_render_stream =
@@ -99,12 +88,17 @@ class Graphics {
 public:
   virtual ~Graphics() = default;
 
+  Unique_texture create_texture_unique(Texture_create_info const &create_info) {
+    return Unique_texture{create_texture(create_info), this};
+  }
+
   virtual Texture *create_texture(Texture_create_info const &create_info) = 0;
 
   virtual void destroy_texture(Texture *texture) noexcept = 0;
 
-  Unique_texture create_texture_unique(Texture_create_info const &create_info) {
-    return Unique_texture{create_texture(create_info), this};
+  Unique_surface_mesh
+  create_surface_mesh_unique(Surface_mesh_create_info const &create_info) {
+    return Unique_surface_mesh{create_surface_mesh(create_info), this};
   }
 
   virtual Surface_mesh *
@@ -112,9 +106,9 @@ public:
 
   virtual void destroy_surface_mesh(Surface_mesh *surface_mesh) noexcept = 0;
 
-  Unique_surface_mesh
-  create_surface_mesh_unique(Surface_mesh_create_info const &create_info) {
-    return Unique_surface_mesh{create_surface_mesh(create_info), this};
+  Unique_wireframe_mesh
+  create_wireframe_mesh_unique(Wireframe_mesh_create_info const &create_info) {
+    return Unique_wireframe_mesh{create_wireframe_mesh(create_info), this};
   }
 
   virtual Wireframe_mesh *
@@ -123,32 +117,19 @@ public:
   virtual void
   destroy_wireframe_mesh(Wireframe_mesh *wireframe_mesh) noexcept = 0;
 
-  Unique_wireframe_mesh
-  create_wireframe_mesh_unique(Wireframe_mesh_create_info const &create_info) {
-    return Unique_wireframe_mesh{create_wireframe_mesh(create_info), this};
-  }
-
-  virtual Scene *create_scene(Scene_create_info const &create_info) = 0;
-
-  virtual void destroy_scene(Scene *scene) noexcept = 0;
-
-  Unique_scene create_scene_unique(Scene_create_info const &create_info) {
-    return Unique_scene{create_scene(create_info), this};
-  }
-
   // Render_target creation is implementation-specific
 
   virtual void destroy_render_target(Render_target *target) noexcept = 0;
-
-  virtual Render_stream *
-  create_render_stream(Render_stream_create_info const &create_info) = 0;
-
-  virtual void destroy_render_stream(Render_stream *render_stream) = 0;
 
   Unique_render_stream
   create_render_stream_unique(Render_stream_create_info const &create_info) {
     return Unique_render_stream{create_render_stream(create_info), this};
   }
+
+  virtual Render_stream *
+  create_render_stream(Render_stream_create_info const &create_info) = 0;
+
+  virtual void destroy_render_stream(Render_stream *render_stream) = 0;
 
   // virtual void render(Render_info const &info) = 0;
 
@@ -173,12 +154,6 @@ inline void Wireframe_mesh_deleter::operator()(
     Wireframe_mesh *wireframe_mesh) const noexcept {
   if (_owner) {
     _owner->destroy_wireframe_mesh(wireframe_mesh);
-  }
-}
-
-inline void Scene_deleter::operator()(Scene *scene) const noexcept {
-  if (_owner) {
-    _owner->destroy_scene(scene);
   }
 }
 

@@ -477,8 +477,8 @@ public:
             },
         .position = {0.0f, -0.5f, 0.0f},
     });
-    scene->set_ambient_irradiance(graphics::Rgb_spectrum{32.0f});
-    scene->set_directional_light(graphics::Directional_light{
+    scene->ambient_irradiance(graphics::Rgb_spectrum{32.0f});
+    scene->directional_light(graphics::Directional_light{
         .irradiance = graphics::Rgb_spectrum{481.5f},
         .direction = normalize(math::Vec3f{1.0f, 2.0f, 0.5f}),
     });
@@ -489,13 +489,13 @@ public:
                                    {0.0f, 0.5f, 0.0f, -0.5f},
                                    {0.0f, 0.0f, 100.0f, 0.0f}},
     };
-    scene->add_surface(&_ground_surface);
+    scene->emplace_surface(&_ground_surface);
     _selection_wireframe = {
         .mesh = _resources.cube_wireframe_mesh.get(),
         .color = {1.0f, 0.5f, 0.0f},
         .visible = false,
     };
-    scene->add_wireframe(&_selection_wireframe);
+    scene->emplace_wireframe(&_selection_wireframe);
     get_camera()->position = {-10.0f, 3.5f, 10.0f};
     get_camera()->zoom = 2.0f * math::Vec2f{9.0f / 16.0f, 1.0f};
     // srand(25);

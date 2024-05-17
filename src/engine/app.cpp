@@ -42,10 +42,10 @@ public:
               .window = &_window,
           }};
         }()},
-        _scene{_graphics.create_scene_unique({})},
+        _scene{{}},
         _render_stream{_graphics.create_render_stream({
             .target = _graphics.get_default_render_target(),
-            .scene = _scene.get(),
+            .scene = &_scene,
             .camera = &_camera,
         })} {}
 
@@ -61,7 +61,7 @@ public:
     return _graphics.get_default_render_target();
   }
 
-  graphics::Scene *get_scene() noexcept { return _scene.get(); }
+  graphics::Scene *get_scene() noexcept { return &_scene; }
 
   graphics::Camera *get_camera() noexcept { return &_camera; }
 
@@ -76,7 +76,7 @@ private:
   Glfw_init_guard _glfw_init_guard;
   Window _window;
   graphics::gl::Graphics _graphics;
-  graphics::Unique_scene _scene;
+  graphics::Scene _scene;
   graphics::Camera _camera;
   graphics::Unique_render_stream _render_stream;
 };

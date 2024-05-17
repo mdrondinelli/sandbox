@@ -3,7 +3,6 @@
 
 #include "../render_stream.h"
 #include "render_target.h"
-#include "scene.h"
 #include "unique_shader_program_handle.h"
 #include "unique_texture_handle.h"
 
@@ -20,15 +19,15 @@ namespace gl {
 
       Intrinsic_state(Intrinsic_state_create_info const &);
 
-      constexpr std::uint32_t get_surface_shader_program() const noexcept {
+      constexpr std::uint32_t surface_shader_program() const noexcept {
         return _surface_shader_program.get();
       }
 
-      constexpr std::uint32_t get_wireframe_shader_program() const noexcept {
+      constexpr std::uint32_t wireframe_shader_program() const noexcept {
         return _wireframe_shader_program.get();
       }
 
-      constexpr std::uint32_t get_default_base_color_texture() const noexcept {
+      constexpr std::uint32_t default_base_color_texture() const noexcept {
         return _default_base_color_texture.get();
       }
 
@@ -55,6 +54,10 @@ namespace gl {
     Camera const *get_camera() const noexcept final { return _camera; }
 
   private:
+    void draw_surfaces(math::Mat4x4f const &view_clip_matrix);
+
+    void draw_wireframes(math::Mat4x4f const &view_clip_matrix);
+
     Intrinsic_state const *_intrinsic_state;
     Render_target *_target;
     Scene const *_scene;

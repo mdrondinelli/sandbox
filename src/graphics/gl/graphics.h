@@ -10,7 +10,6 @@
 #include "texture.h"
 #include "surface_mesh.h"
 #include "wireframe_mesh.h"
-#include "scene.h"
 
 namespace marlon {
 namespace graphics {
@@ -44,10 +43,6 @@ public:
   create_wireframe_mesh(Wireframe_mesh_create_info const &create_info) final;
 
   void destroy_wireframe_mesh(graphics::Wireframe_mesh *wireframe_mesh) noexcept final;
-
-  Scene *create_scene(Scene_create_info const &create_info) final;
-
-  void destroy_scene(graphics::Scene *scene) noexcept final;
 
   Render_target *get_default_render_target() noexcept;
 

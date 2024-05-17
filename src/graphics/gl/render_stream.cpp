@@ -14,8 +14,10 @@
 #include <math/math.h>
 
 #include "render_target.h"
-#include "scene.h"
+#include "surface_mesh.h"
+#include "texture.h"
 #include "unique_shader_handle.h"
+#include "wireframe_mesh.h"
 
 namespace marlon {
 namespace graphics {
@@ -179,70 +181,20 @@ Mat4x4f calculate_clip_matrix(Vec2f const &zoom, float near_plane_distance) {
 }
 } // namespace
 
-// void Gl_graphics::render(Render_info const &info) {
-//   auto const gl_scene = static_cast<Gl_scene const *>(info.scene);
-//   auto const gl_target = static_cast<Gl_render_target *>(info.target);
-//   auto const view_matrix = rigid_inverse(
-//       Mat4x4f::rigid(info.camera->position, info.camera->orientation));
-//   auto const clip_matrix = calculate_clip_matrix(
-//       info.camera->zoom, info.camera->near_plane_distance);
-//   glBindFramebuffer(GL_FRAMEBUFFER, gl_target->get_framebuffer());
-//   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-//   glClearDepth(0.0f);
-//   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-//   // glEnable(GL_POLYGON_OFFSET_FILL);
-//   // glPolygonOffset(1.0f, 1.0f);
-//   glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
-//   glEnable(GL_CULL_FACE);
-//   glFrontFace(GL_CW);
-//   auto const viewport_extents = gl_target->get_extents();
-//   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
-//   glEnable(GL_DEPTH_TEST);
-//   glDepthFunc(GL_GREATER);
-//   // glDisable(GL_BLEND);
-//   glEnable(GL_FRAMEBUFFER_SRGB);
-//   gl_scene->draw_surfaces(_surface_shader_program.get(),
-//                           _default_base_color_texture.get(),
-//                           0,
-//                           1,
-//                           2,
-//                           3,
-//                           4,
-//                           5,
-//                           6,
-//                           clip_matrix * view_matrix,
-//                           info.camera->exposure);
-//   glEnable(GL_POLYGON_OFFSET_LINE);
-//   glPolygonOffset(-1.0f, -1.0f);
-//   glLineWidth(2.0f);
-//   glDepthFunc(GL_LEQUAL);
-//   // glEnable(GL_BLEND);
-//   // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//   // glEnable(GL_LINE_SMOOTH);
-//   gl_scene->draw_wireframes(
-//       _wireframe_shader_program.get(), 0, 1, clip_matrix * view_matrix);
-// }
-
 Render_stream::Intrinsic_state::Intrinsic_state(
     Intrinsic_state_create_info const &)
     : _surface_shader_program{make_shader_program(
           surface_vertex_shader_source, surface_fragment_shader_source)},
       _wireframe_shader_program{make_shader_program(
           wireframe_vertex_shader_source, wireframe_fragment_shader_source)},
-      _default_base_color_texture{make_default_base_color_texture()} {
-
-  // _surface_shader_program = make_shader_program(surface_vertex_shader_source,
-  //                                               surface_fragment_shader_source);
-  // _wireframe_shader_program = make_shader_program(
-  //     wireframe_vertex_shader_source, wireframe_fragment_shader_source);
-  // _default_base_color_texture = make_default_base_color_texture();
-}
+      _default_base_color_texture{make_default_base_color_texture()} {}
 
 void Render_stream::render() {
   auto const view_matrix =
       rigid_inverse(Mat4x4f::rigid(_camera->position, _camera->orientation));
   auto const clip_matrix =
       calculate_clip_matrix(_camera->zoom, _camera->near_plane_distance);
+  auto const view_clip_matrix = clip_matrix * view_matrix;
   glBindFramebuffer(GL_FRAMEBUFFER, _target->get_framebuffer());
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClearDepth(0.0f);
@@ -258,17 +210,7 @@ void Render_stream::render() {
   glDepthFunc(GL_GREATER);
   // glDisable(GL_BLEND);
   glEnable(GL_FRAMEBUFFER_SRGB);
-  _scene->draw_surfaces(_intrinsic_state->get_surface_shader_program(),
-                        _intrinsic_state->get_default_base_color_texture(),
-                        0,
-                        1,
-                        2,
-                        3,
-                        4,
-                        5,
-                        6,
-                        clip_matrix * view_matrix,
-                        _camera->exposure);
+  draw_surfaces(view_clip_matrix);
   glEnable(GL_POLYGON_OFFSET_LINE);
   glPolygonOffset(-1.0f, -1.0f);
   glLineWidth(2.0f);
@@ -276,11 +218,107 @@ void Render_stream::render() {
   // glEnable(GL_BLEND);
   // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   // glEnable(GL_LINE_SMOOTH);
-  _scene->draw_wireframes(_intrinsic_state->get_wireframe_shader_program(),
-                          0,
-                          1,
-                          clip_matrix * view_matrix);
+  draw_wireframes(view_clip_matrix);
 }
+
+void Render_stream::draw_surfaces(Mat4x4f const &view_clip_matrix) {
+  auto constexpr model_matrix_location = 0;
+  auto constexpr model_view_clip_matrix_location = 1;
+  auto constexpr base_color_tint_location = 2;
+  auto constexpr ambient_irradiance_location = 3;
+  auto constexpr directional_light_irradiance_location = 4;
+  auto constexpr directional_light_direction_location = 5;
+  auto constexpr exposure_location = 6;
+  auto const shader_program = _intrinsic_state->surface_shader_program();
+  auto const ambient_irradiance = _scene->ambient_irradiance();
+  auto const &directional_light = _scene->directional_light();
+  auto const exposure = _camera->exposure;
+  glUseProgram(shader_program);
+  glProgramUniform3f(shader_program,
+                     ambient_irradiance_location,
+                     ambient_irradiance.r,
+                     ambient_irradiance.g,
+                     ambient_irradiance.b);
+  if (directional_light) {
+    glProgramUniform3f(shader_program,
+                       directional_light_irradiance_location,
+                       directional_light->irradiance.r,
+                       directional_light->irradiance.g,
+                       directional_light->irradiance.b);
+    glProgramUniform3f(shader_program,
+                       directional_light_direction_location,
+                       directional_light->direction.x,
+                       directional_light->direction.y,
+                       directional_light->direction.z);
+  } else {
+    glProgramUniform3f(shader_program,
+                       directional_light_irradiance_location,
+                       0.0f,
+                       0.0f,
+                       0.0f);
+    glProgramUniform3f(
+        shader_program, directional_light_direction_location, 1.0f, 0.0f, 0.0f);
+  }
+  glProgramUniform1f(shader_program, exposure_location, exposure);
+  for (auto const surface : _scene->surfaces()) {
+    if (!surface->visible) {
+      continue;
+    }
+    auto const model_matrix =
+        Mat4x4f{surface->transform, {0.0f, 0.0f, 0.0f, 1.0f}};
+    auto const model_view_clip_matrix = view_clip_matrix * model_matrix;
+    glProgramUniformMatrix4fv(
+        shader_program, model_matrix_location, 1, GL_TRUE, &model_matrix[0][0]);
+    glProgramUniformMatrix4fv(shader_program,
+                              model_view_clip_matrix_location,
+                              1,
+                              GL_TRUE,
+                              &model_view_clip_matrix[0][0]);
+    auto const &material = surface->material;
+    if (auto const base_color_texture =
+            static_cast<Texture *>(material.base_color_texture)) {
+      glBindTextureUnit(0, base_color_texture->get());
+    } else {
+      glBindTextureUnit(0, _intrinsic_state->default_base_color_texture());
+    }
+    glProgramUniform3f(shader_program,
+                       base_color_tint_location,
+                       material.base_color_tint.r,
+                       material.base_color_tint.g,
+                       material.base_color_tint.b);
+    auto const mesh = static_cast<Surface_mesh const *>(surface->mesh);
+    mesh->bind_vertex_array();
+    mesh->draw();
+  }
 }
+
+void Render_stream::draw_wireframes(math::Mat4x4f const &view_clip_matrix) {
+  auto constexpr model_view_clip_matrix_location = 0;
+  auto constexpr color_location = 1;
+  auto const shader_program = _intrinsic_state->wireframe_shader_program();
+  glUseProgram(shader_program);
+  for (auto const wireframe : _scene->wireframes()) {
+    if (!wireframe->visible) {
+      continue;
+    }
+    auto const model_matrix =
+        Mat4x4f{wireframe->transform, {0.0f, 0.0f, 0.0f, 1.0f}};
+    auto const model_view_clip_matrix = view_clip_matrix * model_matrix;
+    glProgramUniformMatrix4fv(shader_program,
+                              model_view_clip_matrix_location,
+                              1,
+                              GL_TRUE,
+                              &model_view_clip_matrix[0][0]);
+    glProgramUniform3f(shader_program,
+                       color_location,
+                       wireframe->color.r,
+                       wireframe->color.g,
+                       wireframe->color.b);
+    auto const mesh = static_cast<Wireframe_mesh const *>(wireframe->mesh);
+    mesh->bind_vertex_array();
+    mesh->draw();
+  }
+}
+} // namespace gl
 } // namespace graphics
 } // namespace marlon

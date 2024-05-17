@@ -36,10 +36,10 @@ add_library(
 )
 add_library(
   graphics
+  "src/graphics/scene.cpp"
   "src/graphics/gl/default_render_target.cpp"
   "src/graphics/gl/graphics.cpp"
   "src/graphics/gl/render_stream.cpp"
-  "src/graphics/gl/scene.cpp"
   "src/graphics/gl/surface_mesh.cpp"
   "src/graphics/gl/texture.cpp"
   "src/graphics/gl/unique_buffer_handle.cpp"

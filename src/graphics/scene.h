@@ -4,6 +4,8 @@
 #include <memory>
 #include <optional>
 
+#include <util/set.h>
+
 #include "directional_light.h"
 #include "surface.h"
 #include "wireframe.h"
@@ -17,24 +19,59 @@ struct Scene_create_info {
 
 class Scene {
 public:
-  virtual Rgb_spectrum get_ambient_irradiance() const noexcept = 0;
+  explicit Scene(Scene_create_info const &create_info) noexcept;
 
-  virtual void
-  set_ambient_irradiance(Rgb_spectrum ambient_irradiance) noexcept = 0;
+  ~Scene();
 
-  virtual std::optional<Directional_light> const &
-  get_directional_light() const noexcept = 0;
+  util::Set<Surface const *> const &surfaces() const noexcept {
+    return _surfaces;
+  }
 
-  virtual void set_directional_light(
-      std::optional<Directional_light> const &directional_light) noexcept = 0;
+  void clear_surfaces() noexcept { _surfaces.clear(); }
 
-  virtual void add_surface(Surface const *surface) = 0;
+  void emplace_surface(Surface const *surface) { _surfaces.emplace(surface); }
 
-  virtual void remove_surface(Surface const *surface) noexcept = 0;
+  void erase_surface(Surface const *surface) noexcept {
+    _surfaces.erase(surface);
+  }
 
-  virtual void add_wireframe(Wireframe const *wireframe) = 0;
+  util::Set<Wireframe const *> const &wireframes() const noexcept {
+    return _wireframes;
+  }
 
-  virtual void remove_wireframe(Wireframe const *wireframe) noexcept = 0;
+  void clear_wireframes() noexcept { _wireframes.clear(); }
+
+  void emplace_wireframe(Wireframe const *wireframe) {
+    _wireframes.emplace(wireframe);
+  }
+
+  void erase_wireframe(Wireframe const *wireframe) noexcept {
+    _wireframes.erase(wireframe);
+  }
+
+  Rgb_spectrum ambient_irradiance() const noexcept {
+    return _ambient_irradiance;
+  }
+
+  void ambient_irradiance(Rgb_spectrum ambient_irradiance) noexcept {
+    _ambient_irradiance = ambient_irradiance;
+  }
+
+  std::optional<Directional_light> const &directional_light() const noexcept {
+    return _directional_light;
+  }
+
+  void directional_light(
+      std::optional<Directional_light> const &directional_light) noexcept {
+    _directional_light = directional_light;
+  }
+
+private:
+  util::Block _memory;
+  util::Set<Surface const *> _surfaces;
+  util::Set<Wireframe const *> _wireframes;
+  Rgb_spectrum _ambient_irradiance{Rgb_spectrum::black()};
+  std::optional<Directional_light> _directional_light;
 };
 } // namespace graphics
 } // namespace marlon

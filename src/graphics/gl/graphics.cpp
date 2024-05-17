@@ -17,7 +17,6 @@
 #endif
 
 #include "render_stream.h"
-#include "scene.h"
 #include "surface_mesh.h"
 #include "texture.h"
 
@@ -51,14 +50,6 @@ Render_stream *Graphics::create_render_stream(
 
 void Graphics::destroy_render_stream(graphics::Render_stream *render_stream) noexcept {
   delete static_cast<Render_stream *>(render_stream);
-}
-
-Scene *Graphics::create_scene(Scene_create_info const &create_info) {
-  return new Scene{create_info};
-}
-
-void Graphics::destroy_scene(graphics::Scene *scene) noexcept {
-  delete static_cast<Scene *>(scene);
 }
 
 Surface_mesh *
