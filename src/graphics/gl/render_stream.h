@@ -3,8 +3,8 @@
 
 #include "../render_stream.h"
 #include "render_target.h"
-#include "unique_shader_program_handle.h"
-#include "unique_texture_handle.h"
+#include "wrappers/unique_shader_program.h"
+#include "wrappers/unique_texture.h"
 
 namespace marlon {
 namespace graphics {
@@ -32,9 +32,9 @@ public:
     }
 
   private:
-    Unique_shader_program_handle _surface_shader_program;
-    Unique_shader_program_handle _wireframe_shader_program;
-    Unique_texture_handle _default_base_color_texture;
+    wrappers::Unique_shader_program _surface_shader_program;
+    wrappers::Unique_shader_program _wireframe_shader_program;
+    wrappers::Unique_texture _default_base_color_texture;
   };
 
   explicit Render_stream(Intrinsic_state const *intrinsic_state,

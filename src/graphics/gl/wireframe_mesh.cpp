@@ -15,9 +15,9 @@ namespace gl {
 Wireframe_mesh::Wireframe_mesh(
     Wireframe_mesh_create_info const &create_info)
     : _index_count{static_cast<std::uint32_t>(create_info.indices.size())},
-      _index_buffer{make_unique_buffer()},
-      _vertex_buffer{make_unique_buffer()},
-      _vertex_array{make_unique_vertex_array()} {
+      _index_buffer{wrappers::make_unique_buffer()},
+      _vertex_buffer{wrappers::make_unique_buffer()},
+      _vertex_array{wrappers::make_unique_vertex_array()} {
   glNamedBufferStorage(_index_buffer.get(),
                        create_info.indices.size_bytes(),
                        create_info.indices.data(),

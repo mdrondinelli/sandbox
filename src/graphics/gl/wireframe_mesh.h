@@ -4,8 +4,8 @@
 #include <cstdint>
 
 #include "../wireframe_mesh.h"
-#include "unique_buffer_handle.h"
-#include "unique_vertex_array_handle.h"
+#include "wrappers/unique_buffer.h"
+#include "wrappers/unique_vertex_array.h"
 
 namespace marlon {
 namespace graphics {
@@ -20,11 +20,11 @@ public:
 
 private:
   std::uint32_t _index_count;
-  Unique_buffer_handle _index_buffer;
-  Unique_buffer_handle _vertex_buffer;
-  Unique_vertex_array_handle _vertex_array;
+  wrappers::Unique_buffer _index_buffer;
+  wrappers::Unique_buffer _vertex_buffer;
+  wrappers::Unique_vertex_array _vertex_array;
 };
-}
+} // namespace gl
 } // namespace graphics
 } // namespace marlon
 

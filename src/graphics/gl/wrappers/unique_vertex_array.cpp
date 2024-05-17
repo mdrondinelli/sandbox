@@ -1,4 +1,4 @@
-#include "unique_buffer_handle.h"
+#include "unique_vertex_array.h"
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -12,15 +12,17 @@
 namespace marlon {
 namespace graphics {
 namespace gl {
-Unique_buffer_handle::~Unique_buffer_handle() {
-  glDeleteBuffers(1, &_handle);
+namespace wrappers {
+Unique_vertex_array::~Unique_vertex_array() {
+  glDeleteVertexArrays(1, &_handle);
 }
 
-Unique_buffer_handle make_unique_buffer() {
+Unique_vertex_array make_unique_vertex_array() {
   GLuint handle;
-  glCreateBuffers(1, &handle);
-  return Unique_buffer_handle{handle};
+  glCreateVertexArrays(1, &handle);
+  return Unique_vertex_array{handle};
 }
-}
+} // namespace wrappers
+} // namespace gl
 } // namespace graphics
 } // namespace marlon

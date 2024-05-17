@@ -1,4 +1,4 @@
-#include "unique_vertex_array_handle.h"
+#include "unique_shader_program.h"
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -12,15 +12,13 @@
 namespace marlon {
 namespace graphics {
 namespace gl {
-Unique_vertex_array_handle::~Unique_vertex_array_handle() {
-  glDeleteVertexArrays(1, &_handle);
-}
+namespace wrappers {
+Unique_shader_program::~Unique_shader_program() { glDeleteProgram(_handle); }
 
-Unique_vertex_array_handle make_unique_vertex_array() {
-  GLuint handle;
-  glCreateVertexArrays(1, &handle);
-  return Unique_vertex_array_handle{handle};
+Unique_shader_program make_unique_shader_program() {
+  return Unique_shader_program{glCreateProgram()};
 }
-}
+} // namespace wrappers
+} // namespace gl
 } // namespace graphics
 } // namespace marlon

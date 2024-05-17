@@ -52,7 +52,7 @@ Texture::Texture(Texture_create_info const &create_info) {
   }
   glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glTextureParameterf(handle, GL_TEXTURE_MAX_ANISOTROPY, 16.0f);
-  _handle = Unique_texture_handle{handle};
+  _handle = wrappers::Unique_texture{handle};
 }
 } // namespace gl
 } // namespace graphics

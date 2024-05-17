@@ -8,37 +8,37 @@
 namespace marlon {
 namespace graphics {
 namespace gl {
-class Unique_texture_handle {
+namespace wrappers {
+class Unique_texture {
 public:
-  constexpr Unique_texture_handle() noexcept : _handle{} {}
+  constexpr Unique_texture() noexcept : _handle{} {}
 
-  explicit Unique_texture_handle(std::uint32_t handle) noexcept
-      : _handle{handle} {}
+  explicit Unique_texture(std::uint32_t handle) noexcept : _handle{handle} {}
 
-  ~Unique_texture_handle();
+  ~Unique_texture();
 
-  Unique_texture_handle(Unique_texture_handle &&other) noexcept
+  Unique_texture(Unique_texture &&other) noexcept
       : _handle{std::exchange(other._handle, 0)} {}
 
-  Unique_texture_handle &
-  operator=(Unique_texture_handle &&other) noexcept {
+  Unique_texture &operator=(Unique_texture &&other) noexcept {
     auto temp{std::move(other)};
     swap(temp);
     return *this;
   }
 
   std::uint32_t get() const noexcept { return _handle; }
-  
+
 private:
-  void swap(Unique_texture_handle &other) noexcept {
+  void swap(Unique_texture &other) noexcept {
     std::swap(_handle, other._handle);
   }
 
   std::uint32_t _handle;
 };
 
-Unique_texture_handle make_unique_texture(std::uint32_t target);
-}
+Unique_texture make_unique_texture(std::uint32_t target);
+} // namespace wrappers
+} // namespace gl
 } // namespace graphics
 } // namespace marlon
 

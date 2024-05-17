@@ -36,19 +36,19 @@ add_library(
 )
 add_library(
   graphics
-  "src/graphics/scene.cpp"
-  "src/graphics/gl/default_render_target.cpp"
+  "src/graphics/gl/wrappers/unique_buffer.cpp"
+  "src/graphics/gl/wrappers/unique_texture.cpp"
+  "src/graphics/gl/wrappers/unique_shader.cpp"
+  "src/graphics/gl/wrappers/unique_shader_program.cpp"
+  "src/graphics/gl/wrappers/unique_vertex_array.cpp"
   "src/graphics/gl/graphics.cpp"
-  "src/graphics/gl/render_stream.cpp"
-  "src/graphics/gl/surface_mesh.cpp"
   "src/graphics/gl/texture.cpp"
-  "src/graphics/gl/unique_buffer_handle.cpp"
-  "src/graphics/gl/unique_shader_handle.cpp"
-  "src/graphics/gl/unique_shader_program_handle.cpp"
-  "src/graphics/gl/unique_texture_handle.cpp"
-  "src/graphics/gl/unique_vertex_array_handle.cpp"
+  "src/graphics/gl/surface_mesh.cpp"
   "src/graphics/gl/wireframe_mesh.cpp"
+  "src/graphics/gl/default_render_target.cpp"
+  "src/graphics/gl/render_stream.cpp"
   "src/graphics/glad/gl.cpp"
+  "src/graphics/scene.cpp"
 )
 add_library(
   engine

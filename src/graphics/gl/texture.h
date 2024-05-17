@@ -2,7 +2,7 @@
 #define MARLON_GRAPHICS_GL_TEXTURE_H
 
 #include "../texture.h"
-#include "unique_texture_handle.h"
+#include "wrappers/unique_texture.h"
 
 namespace marlon {
 namespace graphics {
@@ -16,7 +16,7 @@ public:
   }
 
 private:
-  Unique_texture_handle _handle;
+  wrappers::Unique_texture _handle;
 };
 }
 } // namespace graphics

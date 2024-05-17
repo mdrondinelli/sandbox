@@ -1,4 +1,4 @@
-#include "unique_shader_handle.h"
+#include "unique_shader.h"
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -12,11 +12,13 @@
 namespace marlon {
 namespace graphics {
 namespace gl {
-Unique_shader_handle::~Unique_shader_handle() { glDeleteShader(_handle); }
+namespace wrappers {
+Unique_shader::~Unique_shader() { glDeleteShader(_handle); }
 
-Unique_shader_handle make_unique_shader(std::uint32_t type) {
-  return Unique_shader_handle{glCreateShader(type)};
+Unique_shader make_unique_shader(std::uint32_t type) {
+  return Unique_shader{glCreateShader(type)};
 }
-}
+} // namespace wrappers
+} // namespace gl
 } // namespace graphics
 } // namespace marlon
