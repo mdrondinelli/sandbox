@@ -28,8 +28,8 @@ public:
 
   template <typename Allocator>
   static std::pair<util::Block, Aabb_tree> make(Allocator &allocator,
-                                         Size leaf_node_capacity,
-                                         Size internal_node_capacity) {
+                                                Size leaf_node_capacity,
+                                                Size internal_node_capacity) {
     auto const block = allocator.alloc(
         memory_requirement(leaf_node_capacity, internal_node_capacity));
     return {block,
@@ -53,11 +53,12 @@ public:
                      Size internal_node_capacity)
       : Aabb_tree{block.begin, leaf_node_capacity, internal_node_capacity} {}
 
-  explicit Aabb_tree(void *block,
+  explicit Aabb_tree(std::byte *block_begin,
                      Size leaf_node_capacity,
                      Size internal_node_capacity) {
-    auto allocator = util::Stack_allocator<alignof(Node)>{make_block(
-        block, memory_requirement(leaf_node_capacity, internal_node_capacity))};
+    auto allocator = util::Stack_allocator<alignof(Node)>{
+        {block_begin,
+         memory_requirement(leaf_node_capacity, internal_node_capacity)}};
     using leaf_node_pool_t = decltype(_leaf_node_pool);
     _leaf_node_pool =
         leaf_node_pool_t{allocator.alloc(leaf_node_pool_t::memory_requirement(

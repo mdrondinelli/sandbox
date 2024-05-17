@@ -14,18 +14,71 @@
 
 namespace marlon {
 namespace util {
-struct Block {
-  void *begin;
-  void *end;
+struct Const_block {
+  std::byte const *begin;
+  std::byte const *end;
+
+  Const_block() = default;
+
+  constexpr Const_block(std::byte const *begin, Size size) noexcept
+      : Const_block{begin, begin + size} {}
+
+  constexpr Const_block(std::byte const *begin, std::byte const *end) noexcept
+      : begin{begin}, end{end} {}
+
+  constexpr Size size() const noexcept { return end - begin; }
 };
 
-constexpr Block make_block(void *begin, void *end) noexcept {
-  return {begin, end};
-}
+struct Block {
+  std::byte *begin;
+  std::byte *end;
 
-constexpr Block make_block(void *begin, Size size) noexcept {
-  return {begin, static_cast<std::byte *>(begin) + size};
-}
+  Block() = default;
+
+  constexpr Block(std::byte *begin, Size size) noexcept
+      : Block{begin, begin + size} {}
+
+  constexpr Block(std::byte *begin, std::byte *end) noexcept
+      : begin{begin}, end{end} {}
+
+  constexpr operator Const_block() const noexcept { return {begin, end}; }
+
+  constexpr Size size() const noexcept { return end - begin; }
+};
+
+// constexpr Const_block make_block(std::byte const *begin,
+//                                  std::byte const *end) noexcept {
+//   return {begin, end};
+// }
+
+// constexpr Block make_block(std::byte *begin, std::byte *end) noexcept {
+//   return {begin, end};
+// }
+
+// constexpr Const_block make_block(std::byte const *begin, Size size) noexcept
+// {
+//   return {begin, begin + size};
+// }
+
+// constexpr Block make_block(std::byte *begin, Size size) noexcept {
+//   return {begin, begin + size};
+// }
+
+template <Size Len, Size Align> class Storage {
+public:
+  std::byte const *data() const noexcept { return _data.data(); }
+
+  std::byte *data() noexcept { return _data.data(); }
+
+  Const_block block() const noexcept { return {data(), data() + Len}; }
+
+  Block block() noexcept { return {data(), data() + Len}; }
+
+private:
+  alignas(Align) std::array<std::byte, Len> _data;
+};
+
+template <typename T> using Object_storage = Storage<sizeof(T), alignof(T)>;
 
 constexpr Size align(Size size, Size alignment) noexcept {
   return (size + alignment - 1) & -alignment;
@@ -34,19 +87,6 @@ constexpr Size align(Size size, Size alignment) noexcept {
 inline Size ptrdiff(void const *p1, void const *p2) noexcept {
   return std::bit_cast<std::uintptr_t>(p1) - std::bit_cast<std::uintptr_t>(p2);
 }
-
-class Unique_block;
-
-// class Allocator {
-// public:
-//   virtual ~Allocator() = default;
-
-//   virtual Block alloc(Size size) = 0;
-
-//   virtual void free(Block block) noexcept = 0;
-
-//   Unique_block alloc_unique(Size size);
-// };
 
 template <Size Alignment = alignof(std::max_align_t)> class Stack_allocator {
 public:
@@ -64,14 +104,23 @@ public:
   explicit Stack_allocator(Block block) noexcept
       : _block{block}, _top{block.begin} {}
 
-  Block block() const noexcept { return _block; }
+  constexpr Stack_allocator(Stack_allocator &&other) noexcept
+      : _block{std::exchange(other._block, Block{})},
+        _top{std::exchange(other._top, nullptr)} {}
+
+  constexpr Stack_allocator &operator=(Stack_allocator &&other) noexcept {
+    auto temp{std::move(other)};
+    swap(temp);
+    return *this;
+  }
+
+  Const_block block() const noexcept { return _block; }
 
   Block alloc(Size size) {
-    auto const block_end = static_cast<std::byte *>(_top) + size;
-    auto const aligned_block_end =
-        static_cast<std::byte *>(_top) + align(size, Alignment);
+    auto const block_end = _top + size;
+    auto const aligned_block_end = _top + align(size, Alignment);
     if (aligned_block_end <= _block.end) {
-      auto const result = Block{.begin = _top, .end = block_end};
+      auto const result = Block{_top, block_end};
       _top = aligned_block_end;
       return result;
     } else {
@@ -79,24 +128,26 @@ public:
     }
   }
 
-  void free(Block block) noexcept {
-    auto const block_size = static_cast<std::byte *>(block.end) -
-                            static_cast<std::byte *>(block.begin);
-    auto const aligned_block_size = align(block_size, Alignment);
-    auto const aligned_block_end =
-        static_cast<std::byte *>(block.begin) + aligned_block_size;
+  void free(Const_block block) noexcept {
+    auto const aligned_block_size = align(block.size(), Alignment);
+    auto const aligned_block_end = block.begin + aligned_block_size;
     if (aligned_block_end == _top) {
-      _top = block.begin;
+      _top = const_cast<std::byte *>(block.begin);
     }
   }
 
-  bool owns(Block const block) const noexcept {
+  bool owns(Const_block block) const noexcept {
     return block.begin >= _block.begin && block.begin < _block.end;
   }
 
 private:
+  constexpr void swap(Stack_allocator &other) noexcept {
+    std::swap(_block, other._block);
+    std::swap(_top, other._top);
+  }
+
   Block _block;
-  void *_top;
+  std::byte *_top;
 };
 
 template <class Parent, Size MinSize, Size MaxSize = MinSize>
@@ -113,21 +164,21 @@ public:
   Block alloc(Size size) {
     if (size >= MinSize && size <= MaxSize) {
       if (_root) {
-        auto const result = make_block(_root, size);
+        auto const result = Block{reinterpret_cast<std::byte *>(_root), size};
         _root = _root->next;
         return result;
       } else {
-        return make_block(_parent.alloc(MaxSize).begin, size);
+        return Block{_parent.alloc(MaxSize).begin, size};
       }
     } else {
       return _parent.alloc(size);
     }
   }
 
-  void free(Block block) noexcept {
-    auto const size = ptrdiff(block.end, block.begin);
+  void free(Const_block block) noexcept {
+    auto const size = block.size();
     if (size >= MinSize && size <= MaxSize) {
-      _root = new (block.begin) Node{.next = _root};
+      _root = new (const_cast<std::byte *>(block.begin)) Node{.next = _root};
     } else {
       _parent.free(block);
     }
@@ -146,8 +197,8 @@ private:
 
 template <Size MinSize, Size MaxSize = MinSize> class Pool_allocator {
 public:
-  static constexpr Size memory_requirement(Size max_blocks) {
-    return MaxSize * max_blocks;
+  static constexpr Size memory_requirement(Size max_allocations) {
+    return MaxSize * max_allocations;
   }
 
   Pool_allocator() noexcept = default;
@@ -155,16 +206,13 @@ public:
   explicit Pool_allocator(Block block) noexcept
       : _impl{Stack_allocator<1>{block}} {}
 
+  Const_block block() const noexcept { return _impl.parent().block(); }
+
+  Size max_blocks() const noexcept { return block().size() / MaxSize; }
+
   Block alloc(Size size) { return _impl.alloc(size); }
 
-  void free(Block block) noexcept { _impl.free(block); }
-
-  Block block() const noexcept { return _impl.parent().block(); }
-
-  Size max_blocks() const noexcept {
-    auto const blk = block();
-    return ptrdiff(blk.end, blk.begin) / MaxSize;
-  }
+  void free(Const_block block) noexcept { _impl.free(block); }
 
 private:
   Free_list_allocator<Stack_allocator<1>, MinSize, MaxSize> _impl;
@@ -189,10 +237,12 @@ public:
     if (!begin) {
       throw std::bad_alloc{};
     }
-    return make_block(begin, size);
+    return {static_cast<std::byte *>(begin), size};
   }
 
-  void free(Block block) noexcept { std::free(block.begin); }
+  void free(Const_block block) noexcept {
+    std::free(const_cast<std::byte *>(block.begin));
+  }
 };
 
 // class Polymorphic_allocator {

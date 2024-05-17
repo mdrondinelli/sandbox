@@ -27,9 +27,7 @@ Thread_pool::Thread_pool(Size thread_count, Scheduling_policy scheduling_policy)
 }
 
 Thread_pool::~Thread_pool() {
-  if (!empty()) {
-    auto const block = make_block(
-        _threads.data(), List<Thread>::memory_requirement(_threads.max_size()));
+  if (auto const block = _threads.block(); block.size() != 0) {
     _threads = {};
     System_allocator{}.free(block);
   }

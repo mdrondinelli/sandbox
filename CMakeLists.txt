@@ -67,6 +67,7 @@ add_executable(
 set_target_properties(math_tests util util_tests graphics physics engine client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 target_include_directories(graphics PUBLIC src)
 target_include_directories(graphics PRIVATE include)
+target_include_directories(physics PRIVATE src)
 target_include_directories(engine PRIVATE include)
 target_include_directories(client PRIVATE include)
 target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)

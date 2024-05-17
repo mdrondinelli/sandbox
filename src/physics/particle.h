@@ -1,6 +1,7 @@
 #ifndef MARLON_PHYSICS_PARTICLE_H
 #define MARLON_PHYSICS_PARTICLE_H
 
+#include <cstddef>
 #include <cstdint>
 
 #include <bitset>
@@ -170,9 +171,10 @@ public:
                             util::Size max_particles) noexcept
       : Particle_storage{block.begin, max_particles} {}
 
-  explicit Particle_storage(void *block, util::Size max_particles) noexcept {
+  explicit Particle_storage(std::byte *block_begin,
+                            util::Size max_particles) noexcept {
     auto allocator =
-        Allocator{util::make_block(block, memory_requirement(max_particles))};
+        Allocator{{block_begin, memory_requirement(max_particles)}};
     _data = decltype(_data)::make(allocator, max_particles).second;
     _data.resize(max_particles);
     _available_handles =

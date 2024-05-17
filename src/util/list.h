@@ -51,6 +51,11 @@ public:
 
   ~List() { clear(); }
 
+  Const_block block() const noexcept {
+    return {reinterpret_cast<std::byte const *>(_begin),
+            reinterpret_cast<std::byte const *>(_buffer_end)};
+  }
+
   T const &operator[](Size index) const noexcept { return _begin[index]; }
 
   T &operator[](Size index) noexcept { return _begin[index]; }
@@ -177,12 +182,13 @@ public:
 
   ~Allocating_list() {
     if (_impl->data() != nullptr) {
-      auto const block =
-          make_block(_impl->data(), _impl->data() + _impl->max_size());
+      auto const block = _impl->block();
       _impl.destruct();
       Allocator::free(block);
     }
   }
+
+  Const_block block() const noexcept { return _impl->block(); }
 
   T const &operator[](Size index) const noexcept { return (*_impl)[index]; }
 
@@ -228,8 +234,7 @@ public:
         temp.emplace_back(std::move(object));
       }
       if (_impl->data() != nullptr) {
-        auto const block =
-            make_block(_impl->data(), _impl->data() + _impl->max_size());
+        auto const block = _impl->block();
         *_impl = std::move(temp);
         Allocator::free(block);
       } else {

@@ -206,10 +206,10 @@ public:
                               util::Size max_rigid_bodies) noexcept
       : Rigid_body_storage{block.begin, max_rigid_bodies} {}
 
-  explicit Rigid_body_storage(void *block,
+  explicit Rigid_body_storage(std::byte *block_begin,
                               util::Size max_rigid_bodies) noexcept {
-    auto allocator = Allocator{
-        util::make_block(block, memory_requirement(max_rigid_bodies))};
+    auto allocator =
+        Allocator{{block_begin, memory_requirement(max_rigid_bodies)}};
     _data = decltype(_data)::make(allocator, max_rigid_bodies).second;
     _data.resize(max_rigid_bodies);
     _available_handles =

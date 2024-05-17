@@ -43,7 +43,7 @@ class Set {
     T &value() noexcept { return *reinterpret_cast<T *>(&storage); }
   };
 
-  static constexpr auto _alignment = std::max(alignof(Bucket), alignof(Node));
+  static auto constexpr alignment = std::max(alignof(Bucket), alignof(Node));
 
 public:
   class Iterator {
@@ -157,7 +157,7 @@ public:
   static constexpr Size memory_requirement(Size max_node_count,
                                            Size max_bucket_count) noexcept {
     // assert(std::has_single_bit(max_bucket_count));
-    return Stack_allocator<_alignment>::memory_requirement({
+    return Stack_allocator<alignment>::memory_requirement({
         List<Bucket>::memory_requirement(static_cast<Size>(std::bit_ceil(
             static_cast<std::size_t>(std::max(max_bucket_count, Size{2}))))),
         Pool_allocator<sizeof(Node)>::memory_requirement(max_node_count + 1),
@@ -172,16 +172,16 @@ public:
   explicit Set(Block block, Size max_node_count, Size max_bucket_count) noexcept
       : Set{block.begin, max_node_count, max_bucket_count} {}
 
-  explicit Set(void *block_begin, Size max_node_count) noexcept
+  explicit Set(std::byte *block_begin, Size max_node_count) noexcept
       : Set{block_begin, max_node_count, max_node_count} {}
 
-  explicit Set(void *block_begin,
+  explicit Set(std::byte *block_begin,
                Size max_node_count,
                Size max_bucket_count) noexcept {
     max_bucket_count = static_cast<Size>(std::bit_ceil(
         static_cast<std::size_t>(std::max(max_bucket_count, Size{2}))));
-    auto allocator = Stack_allocator<_alignment>{make_block(
-        block_begin, memory_requirement(max_node_count, max_bucket_count))};
+    auto allocator = Stack_allocator<alignment>{
+        {block_begin, memory_requirement(max_node_count, max_bucket_count)}};
     _buckets = List<Bucket>::make(allocator, max_bucket_count).second;
     _buckets.resize(2);
     _nodes =
@@ -209,9 +209,14 @@ public:
     }
   }
 
-  void const *data() const noexcept { return _buckets.data(); }
+  Const_block block() const noexcept {
+    return {reinterpret_cast<std::byte const *>(_buckets.data()),
+            memory_requirement(max_size(), max_bucket_count())};
+  }
 
-  void *data() noexcept { return _buckets.data(); }
+  // void const *data() const noexcept { return _buckets.data(); }
+
+  // void *data() noexcept { return _buckets.data(); }
 
   Iterator begin() noexcept { return Iterator{_head}; }
 
@@ -240,7 +245,7 @@ public:
     while (node) {
       node->value().~T();
       auto const next = node->next();
-      _nodes.free(make_block(node, sizeof(Node)));
+      _nodes.free({reinterpret_cast<std::byte *>(node), sizeof(Node)});
       node = next;
       --_size;
     }
@@ -493,7 +498,7 @@ public:
       pos._node->next()->prev(pos._node->prev());
     }
     auto result = Iterator{pos._node->next()};
-    _nodes.free(make_block(pos._node, sizeof(Node)));
+    _nodes.free({reinterpret_cast<std::byte *>(pos._node), sizeof(Node)});
     --_size;
     return result;
   }
@@ -638,14 +643,14 @@ template <typename T,
           typename Hash = Hash<T>,
           typename Equal = Equal<T>,
           typename Allocator = System_allocator>
-class Allocating_set {
+class Allocating_set : Allocator {
 public:
   using Iterator = typename Set<T, Hash, Equal>::Iterator;
   using Const_iterator = typename Set<T, Hash, Equal>::Const_iterator;
 
   Allocating_set() { _impl.construct(); }
 
-  explicit Allocating_set(Allocator const &allocator) : _allocator{allocator} {
+  explicit Allocating_set(Allocator const &allocator) : Allocator{allocator} {
     _impl.construct();
   }
 
@@ -656,13 +661,17 @@ public:
                      Set<T, Hash, Equal>::memory_requirement(
                          _impl->max_size(), _impl->max_bucket_count()));
       _impl.destruct();
-      _allocator.free(block);
+      Allocator::free(block);
     }
   }
 
-  void const *data() const noexcept { return _impl->data(); }
+  Const_block block() const noexcept {
+    return _impl->block();
+  }
 
-  void *data() noexcept { return _impl->data(); }
+  // void const *data() const noexcept { return _impl->data(); }
+
+  // void *data() noexcept { return _impl->data(); }
 
   Iterator begin() noexcept { return _impl->begin(); }
 
@@ -735,9 +744,10 @@ public:
         max_bucket_count * static_cast<double>(max_load_factor()));
     if (max_bucket_count > _impl->max_bucket_count() ||
         max_node_count > _impl->max_size()) {
-      auto temp =
-          make_set<T, Hash, Equal>(_allocator, max_node_count, max_bucket_count)
-              .second;
+      auto temp = make_set<T, Hash, Equal>(static_cast<Allocator &>(*this),
+                                           max_node_count,
+                                           max_bucket_count)
+                      .second;
       temp.rehash(max_bucket_count);
       for (auto &object : *_impl) {
         temp.emplace(std::move(object));
@@ -748,7 +758,7 @@ public:
                        Set<T, Hash, Equal>::memory_requirement(
                            _impl->max_size(), _impl->max_bucket_count()));
         *_impl = std::move(temp);
-        _allocator.free(block);
+        Allocator::free(block);
       } else {
         *_impl = std::move(temp);
       }
@@ -769,7 +779,6 @@ private:
     }
   }
 
-  Allocator _allocator;
   Lifetime_box<Set<T, Hash, Equal>> _impl;
 };
 } // namespace util

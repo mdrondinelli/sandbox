@@ -69,10 +69,10 @@ public:
                                util::Size max_static_bodies) noexcept
       : Static_body_storage{block.begin, max_static_bodies} {}
 
-  explicit Static_body_storage(void *block,
+  explicit Static_body_storage(std::byte *block_begin,
                                util::Size max_static_bodies) noexcept {
-    auto allocator = Allocator{
-        util::make_block(block, memory_requirement(max_static_bodies))};
+    auto allocator =
+        Allocator{{block_begin, memory_requirement(max_static_bodies)}};
     _data = decltype(_data)::make(allocator, max_static_bodies).second;
     _data.resize(max_static_bodies);
     _available_handles =

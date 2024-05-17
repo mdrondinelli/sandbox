@@ -7,7 +7,8 @@
 #include <type_traits>
 #include <variant>
 
-#include "../math/math.h"
+#include <math/math.h>
+
 #include "aabb.h"
 #include "contact.h"
 #include "particle.h"

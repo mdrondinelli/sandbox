@@ -146,6 +146,11 @@ public:
 
   ~Queue() { clear(); }
 
+  Const_block block() const noexcept {
+    return {reinterpret_cast<std::byte const *>(_slots.data()),
+            static_cast<Size>(_slots.size_bytes())};
+  }
+
   T const &front() const noexcept { return _slots[_head]; }
 
   T &front() noexcept { return _slots[_head]; }
@@ -157,10 +162,6 @@ public:
   T &back() noexcept {
     return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)];
   }
-
-  void const *data() const noexcept { return _slots.data(); }
-
-  void *data() noexcept { return _slots.data(); }
 
   Const_iterator cbegin() const noexcept {
     return Const_iterator{_slots, _head, 0};
@@ -280,13 +281,15 @@ public:
   }
 
   ~Allocating_queue() {
-    if (_impl->data() != nullptr) {
-      auto const block = make_block(
-          _impl->data(), Queue<T>::memory_requirement(_impl->max_size()));
+    if (auto const block = _impl->block(); block.size() != 0) {
+      // auto const block = make_block(
+      //     _impl->data(), Queue<T>::memory_requirement(_impl->max_size()));
       _impl.destruct();
       _allocator.free(block);
     }
   }
+
+  Const_block block() const noexcept { return _impl->block(); }
 
   T const &front() const noexcept { return _impl->front(); }
 
@@ -326,9 +329,7 @@ public:
       for (auto &object : *_impl) {
         temp.emplace_back(std::move(object));
       }
-      if (_impl->data() != nullptr) {
-        auto const block = make_block(
-            _impl->data(), Queue<T>::memory_requirement(_impl->max_size()));
+      if (auto const block = _impl->block(); block.size() != 0) {
         *_impl = std::move(temp);
         _allocator.free(block);
       } else {

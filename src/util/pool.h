@@ -32,9 +32,9 @@ public:
   explicit Pool(Block block, Size max_objects) noexcept
       : Pool{block.begin, max_objects} {}
 
-  explicit Pool(void *block_begin, Size max_objects) noexcept
+  explicit Pool(std::byte *block_begin, Size max_objects) noexcept
       : _allocator{Stack_allocator<alignof(T)>{
-            make_block(block_begin, memory_requirement(max_objects))}} {}
+            {block_begin, memory_requirement(max_objects)}}} {}
 
   template <typename... Args> T *emplace(Args &&...args) {
     return new (_allocator.alloc(sizeof(T)).begin)
@@ -43,7 +43,7 @@ public:
 
   void erase(T *object) {
     object->~T();
-    _allocator.free(make_block(object, sizeof(T)));
+    _allocator.free({reinterpret_cast<std::byte *>(object), sizeof(T)});
   }
 
 private:

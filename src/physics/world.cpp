@@ -59,11 +59,11 @@ public:
       : Neighbor_group_storage{block.begin, max_object_count, max_group_count} {
   }
 
-  Neighbor_group_storage(void *block_begin,
+  Neighbor_group_storage(std::byte *block_begin,
                          Size max_object_count,
                          Size max_group_count) {
-    auto allocator = Allocator{make_block(
-        block_begin, memory_requirement(max_object_count, max_group_count))};
+    auto allocator = Allocator{
+        {block_begin, memory_requirement(max_object_count, max_group_count)}};
     _objects = decltype(_objects)::make(allocator, max_object_count).second;
     _groups = decltype(_groups)::make(allocator, max_group_count).second;
   }
