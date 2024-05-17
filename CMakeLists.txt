@@ -38,6 +38,7 @@ add_library(
   graphics
   "src/graphics/gl/wrappers/unique_buffer.cpp"
   "src/graphics/gl/wrappers/unique_texture.cpp"
+  "src/graphics/gl/wrappers/unique_framebuffer.cpp"
   "src/graphics/gl/wrappers/unique_shader.cpp"
   "src/graphics/gl/wrappers/unique_shader_program.cpp"
   "src/graphics/gl/wrappers/unique_vertex_array.cpp"

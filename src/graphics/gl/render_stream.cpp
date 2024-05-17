@@ -2,14 +2,7 @@
 
 #include <iostream>
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wlanguage-extension-token"
 #include <glad/gl.h>
-#pragma clang diagnostic pop
-#else
-#include <glad/gl.h>
-#endif
 
 #include <math/math.h>
 

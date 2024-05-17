@@ -63,6 +63,10 @@
 #endif
 
 /* To avoid including <KHR/khrplatform.h> define our own types. */
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlanguage-extension-token"
+#endif
 typedef unsigned char ktx_uint8_t;
 typedef bool ktx_bool_t;
 #ifdef _MSC_VER
@@ -82,6 +86,9 @@ typedef  int32_t ktx_int32_t;
 typedef   size_t ktx_size_t;
 typedef uint64_t ktx_uint64_t;
 typedef  int64_t ktx_int64_t;
+#endif
+#ifdef __clang__
+#pragma clang diagnostic pop
 #endif
 
 /* This will cause compilation to fail if size of uint32 != 4. */
@@ -811,10 +818,17 @@ typedef ktx_uint32_t ktxTextureCreateFlags;
  * to be changed to explicitly handle large files by
  * using the 64-bit stream functions.
  */
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlanguage-extension-token"
+#endif
 #if defined(_MSC_VER) && defined(_WIN64)
   typedef unsigned __int64 ktx_off_t;
 #else
   typedef   off_t ktx_off_t;
+#endif
+#ifdef __clang__
+#pragma clang diagnostic pop
 #endif
 typedef struct ktxMem ktxMem;
 typedef struct ktxStream ktxStream;

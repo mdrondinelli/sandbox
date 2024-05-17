@@ -7,14 +7,7 @@
 #include <stdexcept>
 #include <vector>
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wlanguage-extension-token"
 #include <glad/gl.h>
-#pragma clang diagnostic pop
-#else
-#include <glad/gl.h>
-#endif
 
 #include "render_stream.h"
 #include "surface_mesh.h"

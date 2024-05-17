@@ -1,13 +1,6 @@
 #include "surface_mesh.h"
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wlanguage-extension-token"
 #include <glad/gl.h>
-#pragma clang diagnostic pop
-#else
-#include <glad/gl.h>
-#endif
 
 namespace marlon {
 namespace graphics {

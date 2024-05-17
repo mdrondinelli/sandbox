@@ -1543,8 +1543,14 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_ZERO 0
 #define GL_ZERO_TO_ONE 0x935F
 
-
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlanguage-extension-token"
+#endif
 #include <KHR/khrplatform.h>
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 typedef unsigned int GLenum;
 typedef unsigned char GLboolean;
 typedef unsigned int GLbitfield;
