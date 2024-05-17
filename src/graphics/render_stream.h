@@ -17,11 +17,11 @@ class Render_stream {
 public:
   virtual void render() = 0;
 
-  virtual Render_target *get_target() const noexcept = 0;
+  virtual Render_target *target() const noexcept = 0;
 
-  virtual Scene const *get_scene() const noexcept = 0;
+  virtual Scene const *scene() const noexcept = 0;
 
-  virtual Camera const *get_camera() const noexcept = 0;
+  virtual Camera const *camera() const noexcept = 0;
 };
 } // namespace graphics
 } // namespace marlon
