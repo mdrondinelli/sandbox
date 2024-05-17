@@ -20,27 +20,16 @@ namespace graphics {
 namespace gl {
 namespace {
 ktxTexture2 *create_ktx_texture(Texture_create_info const &create_info) {
+  assert(create_info.data != nullptr);
+  assert(create_info.size != 0);
   ktxTexture2 *retval{};
-  switch (create_info.source.index()) {
-  case 0: {
-    auto const &source = std::get<0>(create_info.source);
-    assert(source.data != nullptr);
-    assert(source.size != 0);
-    auto const result = ktxTexture2_CreateFromMemory(
-        static_cast<ktx_uint8_t const *>(source.data),
-        static_cast<ktx_size_t>(source.size),
-        KTX_TEXTURE_CREATE_NO_FLAGS,
-        &retval);
-    if (result != KTX_SUCCESS) {
-      throw std::runtime_error{"Failed to create ktx texture"};
-    }
-    break;
-  }
-  case 1: {
-    throw std::runtime_error{"Deprecated"};
-  }
-  default:
-    throw std::runtime_error{"Unhandled switch case"};
+  auto const result = ktxTexture2_CreateFromMemory(
+      static_cast<ktx_uint8_t const *>(create_info.data),
+      static_cast<ktx_size_t>(create_info.size),
+      KTX_TEXTURE_CREATE_NO_FLAGS,
+      &retval);
+  if (result != KTX_SUCCESS) {
+    throw std::runtime_error{"Failed to create ktx texture"};
   }
   if (ktxTexture2_NeedsTranscoding(retval)) {
     ktxTexture2_TranscodeBasis(
@@ -65,6 +54,6 @@ Texture::Texture(Texture_create_info const &create_info) {
   glTextureParameterf(handle, GL_TEXTURE_MAX_ANISOTROPY, 16.0f);
   _handle = Unique_texture_handle{handle};
 }
-}
+} // namespace gl
 } // namespace graphics
 } // namespace marlon

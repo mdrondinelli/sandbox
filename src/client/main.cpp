@@ -70,11 +70,10 @@ graphics::Unique_texture create_texture(graphics::Graphics *graphics,
     data.resize(file_size);
     in.seekg(0, std::ios_base::beg);
     in.read(data.data(), file_size);
-    std::cout << "read " << file_size << " bytes from " << path << std::endl;
-    auto retval = graphics->create_texture_unique(
-        {.source = graphics::Texture_memory_source{.data = data.data(),
-                                                   .size = data.size()}});
-    return retval;
+    return graphics->create_texture_unique({
+        .data = data.data(),
+        .size = data.size(),
+    });
   } else {
     throw std::runtime_error{"Failed to open texture file."};
   }
