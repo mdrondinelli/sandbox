@@ -23,32 +23,6 @@ public:
 
   ~Scene();
 
-  util::Set<Surface const *> const &surfaces() const noexcept {
-    return _surfaces;
-  }
-
-  void clear_surfaces() noexcept { _surfaces.clear(); }
-
-  void emplace_surface(Surface const *surface) { _surfaces.emplace(surface); }
-
-  void erase_surface(Surface const *surface) noexcept {
-    _surfaces.erase(surface);
-  }
-
-  util::Set<Wireframe const *> const &wireframes() const noexcept {
-    return _wireframes;
-  }
-
-  void clear_wireframes() noexcept { _wireframes.clear(); }
-
-  void emplace_wireframe(Wireframe const *wireframe) {
-    _wireframes.emplace(wireframe);
-  }
-
-  void erase_wireframe(Wireframe const *wireframe) noexcept {
-    _wireframes.erase(wireframe);
-  }
-
   Rgb_spectrum ambient_irradiance() const noexcept {
     return _ambient_irradiance;
   }
@@ -64,6 +38,35 @@ public:
   void directional_light(
       std::optional<Directional_light> const &directional_light) noexcept {
     _directional_light = directional_light;
+  }
+
+  util::Set<Surface const *> const &surfaces() const noexcept {
+    return _surfaces;
+  }
+
+  util::Set<Wireframe const *> const &wireframes() const noexcept {
+    return _wireframes;
+  }
+
+  void clear() {
+    _ambient_irradiance = Rgb_spectrum::black();
+    _directional_light = std::nullopt;
+    clear_surfaces();
+    clear_wireframes();
+  }
+
+  void clear_surfaces() noexcept { _surfaces.clear(); }
+
+  void clear_wireframes() noexcept { _wireframes.clear(); }
+
+  void add(Surface const *surface) { _surfaces.emplace(surface); }
+
+  void add(Wireframe const *wireframe) { _wireframes.emplace(wireframe); }
+
+  void remove(Surface const *surface) noexcept { _surfaces.erase(surface); }
+
+  void remove(Wireframe const *wireframe) noexcept {
+    _wireframes.erase(wireframe);
   }
 
 private:
