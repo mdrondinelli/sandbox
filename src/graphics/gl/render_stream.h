@@ -2,10 +2,10 @@
 #define MARLON_GL_RENDER_STREAM_H
 
 #include "../render_stream.h"
+#include "./wrappers/unique_shader_program.h"
+#include "./wrappers/unique_texture.h"
 #include "cascaded_shadow_map.h"
 #include "render_target.h"
-#include "wrappers/unique_shader_program.h"
-#include "wrappers/unique_texture.h"
 
 namespace marlon {
 namespace graphics {
@@ -61,7 +61,8 @@ public:
 private:
   void draw_csm();
 
-  void draw_surfaces(math::Mat4x4f const &view_clip_matrix);
+  void draw_surfaces(math::Mat4x4f const &view_matrix,
+                     math::Mat4x4f const &view_clip_matrix);
 
   void draw_wireframes(math::Mat4x4f const &view_clip_matrix);
 

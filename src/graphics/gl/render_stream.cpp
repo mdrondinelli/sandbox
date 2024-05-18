@@ -46,15 +46,18 @@ layout(location = 2) in vec2 texcoord;
 
 out Vertex_data {
   vec3 world_space_position;
+  vec3 view_space_position;
   vec3 world_space_normal;
   vec2 texcoord;
 } vertex_data;
 
 layout(location = 0) uniform mat4 model_matrix;
-layout(location = 1) uniform mat4 model_view_clip_matrix;
+layout(location = 1) uniform mat4 model_view_matrix;
+layout(location = 2) uniform mat4 model_view_clip_matrix;
 
 void main() {
   vertex_data.world_space_position = (model_matrix * vec4(model_space_position, 1.0)).xyz;
+  vertex_data.view_space_position = (model_view_matrix * vec4(model_space_position, 1.0)).xyz;
   vertex_data.world_space_normal = mat3(model_matrix) * model_space_normal;
   vertex_data.texcoord = texcoord;
   gl_Position = model_view_clip_matrix * vec4(model_space_position, 1.0);
@@ -66,6 +69,7 @@ constexpr auto surface_fragment_shader_source = R"(
 
 in Vertex_data {
   vec3 world_space_position;
+  vec3 view_space_position;
   vec3 world_space_normal;
   vec2 texcoord;
 } vertex_data;
@@ -73,14 +77,42 @@ in Vertex_data {
 layout(location = 0) out vec4 out_color;
 
 layout(binding = 0) uniform sampler2D base_color_texture;
-layout(binding = 1) uniform sampler2DShadow shadow_map;
+layout(binding = 1) uniform sampler2DArrayShadow shadow_map;
 
-layout(location = 2) uniform vec3 base_color_tint;
-layout(location = 3) uniform vec3 ambient_irradiance;
-layout(location = 4) uniform vec3 directional_light_irradiance;
-layout(location = 5) uniform vec3 directional_light_direction;
-layout(location = 6) uniform mat4x3 directional_light_view_clip_matrix;
+struct Cascade {
+  mat4x3 view_clip_matrix;
+  float far_plane_distance;
+  float pixel_length;
+};
+
+layout(row_major, std140, binding = 0) uniform Cascaded_shadow_map {
+  Cascade cascades[8];
+  int cascade_count;
+} csm;
+
+layout(location = 3) uniform vec3 base_color_tint;
+layout(location = 4) uniform vec3 ambient_irradiance;
+layout(location = 5) uniform vec3 directional_light_irradiance;
+layout(location = 6) uniform vec3 directional_light_direction;
 layout(location = 7) uniform float exposure;
+
+int select_csm_cascade() {
+  float z = -vertex_data.view_space_position.z;
+  for (int i = 0; i < csm.cascade_count - 1; ++i) {
+    if (z < csm.cascades[i].far_plane_distance) {
+      return i;
+    }
+  }
+  return csm.cascade_count - 1;
+}
+
+float calculate_csm_shadow_factor(float n_dot_l) {
+  int i = select_csm_cascade();
+  vec3 p_world = vertex_data.world_space_position + directional_light_direction * tan(acos(n_dot_l)) * csm.cascades[i].pixel_length;
+  vec3 p_clip = csm.cascades[i].view_clip_matrix * vec4(p_world, 1.0);
+  vec4 texcoord = vec4(p_clip.xy * vec2(0.5, -0.5) + 0.5, i, clamp(p_clip.z, 0.0, 1.0));
+  return texture(shadow_map, texcoord);
+}
 
 vec3 tonemap(vec3 v) {
   v = mat3(
@@ -102,16 +134,7 @@ void main() {
   vec3 n = normalize(vertex_data.world_space_normal);
   vec3 l = directional_light_direction;
   float n_dot_l = dot(n, l);
-  vec3 directional_light_world_space_position =
-    vertex_data.world_space_position +
-    directional_light_direction * tan(acos(n_dot_l)) * 0.02;
-  vec3 directional_light_clip_space_position =
-    directional_light_view_clip_matrix *
-    vec4(directional_light_world_space_position, 1.0);
-  vec3 shadow_map_texcoord = vec3(
-    directional_light_clip_space_position.xy * vec2(0.5, -0.5) + 0.5,
-    directional_light_clip_space_position.z);
-  float shadow_factor = 1.0 - texture(shadow_map, shadow_map_texcoord);
+  float shadow_factor = calculate_csm_shadow_factor(n_dot_l);
   // float shadow_factor = step(shadow_map_value, directional_light_clip_space_position.z);
   vec3 irradiance = ambient_irradiance + directional_light_irradiance * max(n_dot_l, 0.0) * shadow_factor;
   out_color = vec4(tonemap(irradiance * base_color * exposure), 1.0);
@@ -240,7 +263,7 @@ void Render_stream::render() {
   auto const viewport_extents = _target->get_extents();
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   // glDisable(GL_BLEND);
-  draw_surfaces(view_clip_matrix);
+  draw_surfaces(view_matrix, view_clip_matrix);
   glEnable(GL_POLYGON_OFFSET_LINE);
   glPolygonOffset(-1.0f, -1.0f);
   glLineWidth(2.0f);
@@ -256,68 +279,28 @@ void Render_stream::draw_csm() {
   if (_camera->csm_cascade_count <= 0) {
     _csm = {};
   } else if (_csm.cascade_count() != _camera->csm_cascade_count ||
-             _csm.cascade_resolution() != _camera->csm_cascade_resolution) {
+             _csm.texture_resolution() != _camera->csm_texture_resolution) {
     _csm = Cascaded_shadow_map{{
+        .texture_resolution = _camera->csm_texture_resolution,
         .cascade_count = _camera->csm_cascade_count,
-        .cascade_resolution = _camera->csm_cascade_resolution,
     }};
   }
   if (!_scene->directional_light() || _camera->csm_cascade_count <= 0) {
     return;
   }
-  auto const c_log = [&](float i) {
-    return _camera->near_plane_distance *
-           pow(_camera->csm_distance / _camera->near_plane_distance,
-               i / _camera->csm_cascade_count);
-  };
-  auto const c_uni = [&](float i) {
-    return _camera->near_plane_distance +
-           (_camera->csm_distance - _camera->near_plane_distance) *
-               (i / _camera->csm_cascade_count);
-  };
-  auto const tan_squared_alpha = length_squared(_camera->zoom);
-  auto const tan_alpha = sqrt(tan_squared_alpha);
-  auto const camera_z_axis = column(Mat3x3f::rotation(_camera->orientation), 2);
-  auto const light_z_axis = _scene->directional_light()->direction;
-  auto light_y_axis = abs(light_z_axis.x) < abs(light_z_axis.y)
-                          ? Vec3f::x_axis()
-                          : Vec3f::y_axis();
-  auto const light_x_axis = normalize(cross(light_y_axis, light_z_axis));
-  light_y_axis = cross(light_z_axis, light_x_axis);
+  _csm.update_frusta(_camera->position,
+                     -column(Mat3x3f::rotation(_camera->orientation), 2),
+                     _camera->zoom,
+                     _camera->near_plane_distance,
+                     _camera->csm_render_distance,
+                     _camera->csm_cascade_count,
+                     _scene->directional_light()->direction);
   for (auto i = 0; i < _csm.cascade_count(); ++i) {
-    auto const cascade_near_log = c_log(i);
-    auto const cascade_near_uni = c_uni(i);
-    auto const cascade_far_log = c_log(i + 1);
-    auto const cascade_far_uni = c_uni(i + 1);
-    auto const cascade_near = 0.5f * (cascade_near_log + cascade_near_uni);
-    auto const cascade_far = 0.5f * (cascade_far_log + cascade_far_uni);
-    auto const sphere_distance =
-        min(0.5f * (cascade_near + cascade_far) * (1.0f + tan_squared_alpha),
-            cascade_far);
-    auto const sphere_radius =
-        length(Vec2f{cascade_far * tan_alpha, cascade_far - sphere_distance});
-    auto const sphere_center_world_space =
-        _camera->position - camera_z_axis * sphere_distance;
-    auto const sphere_center_light_space =
-        Vec3f{dot(sphere_center_world_space, light_x_axis),
-              dot(sphere_center_world_space, light_y_axis),
-              dot(sphere_center_world_space, light_z_axis)};
-    _csm.cascades()[i].view_clip_matrix(
-        Mat3x4f::orthographic(sphere_center_light_space.x - sphere_radius,
-                              sphere_center_light_space.x + sphere_radius,
-                              sphere_center_light_space.y - sphere_radius,
-                              sphere_center_light_space.y + sphere_radius,
-                              sphere_center_light_space.z + sphere_radius,
-                              sphere_center_light_space.z - sphere_radius) *
-        Mat4x4f{{light_x_axis.x, light_x_axis.y, light_x_axis.z, 0.0f},
-                {light_y_axis.x, light_y_axis.y, light_y_axis.z, 0.0f},
-                {light_z_axis.x, light_z_axis.y, light_z_axis.z, 0.0f},
-                {0.0f, 0.0f, 0.0f, 1.0f}});
     glBindFramebuffer(GL_FRAMEBUFFER, _csm.cascades()[i].framebuffer());
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
-    glViewport(0, 0, _csm.cascade_resolution(), _csm.cascade_resolution());
+    glViewport(0, 0, _csm.texture_resolution(), _csm.texture_resolution());
     auto const shader_program = _intrinsic_state->shadow_map_shader_program();
     glUseProgram(shader_program);
     for (auto const surface : _scene->surfaces()) {
@@ -342,14 +325,16 @@ void Render_stream::draw_csm() {
   }
 }
 
-void Render_stream::draw_surfaces(Mat4x4f const &view_clip_matrix) {
+void Render_stream::draw_surfaces(Mat4x4f const &view_matrix,
+                                  Mat4x4f const &view_clip_matrix) {
   auto constexpr model_matrix_location = 0;
-  auto constexpr model_view_clip_matrix_location = 1;
-  auto constexpr base_color_tint_location = 2;
-  auto constexpr ambient_irradiance_location = 3;
-  auto constexpr directional_light_irradiance_location = 4;
-  auto constexpr directional_light_direction_location = 5;
-  auto constexpr directional_light_view_clip_matrix_location = 6;
+  auto constexpr model_view_matrix_location = 1;
+  auto constexpr model_view_clip_matrix_location = 2;
+  auto constexpr base_color_tint_location = 3;
+  auto constexpr ambient_irradiance_location = 4;
+  auto constexpr directional_light_irradiance_location = 5;
+  auto constexpr directional_light_direction_location = 6;
+  // auto constexpr directional_light_view_clip_matrix_location = 6;
   auto constexpr exposure_location = 7;
   auto const shader_program = _intrinsic_state->surface_shader_program();
   auto const ambient_irradiance = _scene->ambient_irradiance();
@@ -362,14 +347,17 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_clip_matrix) {
                      ambient_irradiance.g,
                      ambient_irradiance.b);
   if (directional_light) {
-    if (_csm.cascade_count() > 0) {
-      auto const &cascade = _csm.cascades().front();
-      glBindTextureUnit(1, cascade.texture());
-      glProgramUniformMatrix4x3fv(shader_program,
-                                  directional_light_view_clip_matrix_location,
-                                  1,
-                                  GL_TRUE,
-                                  &cascade.view_clip_matrix()[0][0]);
+    if (_csm) {
+      glBindTextureUnit(1, _csm.texture());
+      _csm.acquire_uniform_buffer();
+      _csm.update_uniform_buffer();
+      glBindBufferBase(GL_UNIFORM_BUFFER, 0, _csm.uniform_buffer());
+      // glProgramUniformMatrix4x3fv(
+      //     shader_program,
+      //     directional_light_view_clip_matrix_location,
+      //     1,
+      //     GL_TRUE,
+      //     &_csm.cascades().front().view_clip_matrix()[0][0]);
     }
     glProgramUniform3f(shader_program,
                        directional_light_irradiance_location,
@@ -397,9 +385,15 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_clip_matrix) {
     }
     auto const model_matrix =
         Mat4x4f{surface->transform, {0.0f, 0.0f, 0.0f, 1.0f}};
+    auto const model_view_matrix = view_matrix * model_matrix;
     auto const model_view_clip_matrix = view_clip_matrix * model_matrix;
     glProgramUniformMatrix4fv(
         shader_program, model_matrix_location, 1, GL_TRUE, &model_matrix[0][0]);
+    glProgramUniformMatrix4fv(shader_program,
+                              model_view_matrix_location,
+                              1,
+                              GL_TRUE,
+                              &model_view_matrix[0][0]);
     glProgramUniformMatrix4fv(shader_program,
                               model_view_clip_matrix_location,
                               1,
@@ -421,6 +415,7 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_clip_matrix) {
     mesh->bind_vertex_array();
     mesh->draw();
   }
+  _csm.release_uniform_buffer();
 }
 
 void Render_stream::draw_wireframes(math::Mat4x4f const &view_clip_matrix) {

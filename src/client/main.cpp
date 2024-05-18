@@ -478,7 +478,7 @@ public:
     scene->ambient_irradiance(graphics::Rgb_spectrum{32.0f});
     scene->directional_light(graphics::Directional_light{
         .irradiance = graphics::Rgb_spectrum{481.5f},
-        .direction = normalize(math::Vec3f{1.0f, 2.0f, 0.5f}),
+        .direction = normalize(math::Vec3f{1.0f, 0.3f, 0.5f}),
     });
     _ground_surface = {
         .mesh = _resources.cube_mesh.get(),
@@ -504,6 +504,11 @@ public:
     _phase_index = 2;
     _phases[_phase_index]->start();
   }
+
+  // void pre_input() final {
+  //   auto const fps = 1.0 / get_loop_iteration_wall_time();
+  //   std::cout << (int)fps << " fps\n";
+  // }
 
   void post_input() final {
     auto const window = get_window();
