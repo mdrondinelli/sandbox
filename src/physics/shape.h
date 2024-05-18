@@ -9,7 +9,6 @@
 
 #include <math/math.h>
 
-#include "aabb.h"
 #include "contact.h"
 #include "particle.h"
 
@@ -36,8 +35,8 @@ public:
 
   Shape(Box const &box) noexcept : _v{box} {}
 
-  friend Aabb bounds(Shape const &shape,
-                     math::Mat3x4f const &transform) noexcept;
+  friend math::Aabb bounds(Shape const &shape,
+                           math::Mat3x4f const &transform) noexcept;
 
   friend std::optional<Contact>
   particle_shape_contact(float particle_radius,
@@ -58,30 +57,31 @@ private:
   std::variant<Ball, Capsule, Box> _v;
 };
 
-inline Aabb bounds(Ball const &ball, math::Vec3f const &position) {
+inline math::Aabb bounds(Ball const &ball, math::Vec3f const &position) {
   return {.min = position - math::Vec3f::all(ball.radius),
           .max = position + math::Vec3f::all(ball.radius)};
 }
 
-inline Aabb bounds(Capsule const &capsule,
-                   math::Vec3f const &position,
-                   math::Vec3f const &axis) noexcept {
+inline math::Aabb bounds(Capsule const &capsule,
+                         math::Vec3f const &position,
+                         math::Vec3f const &axis) noexcept {
   auto const world_space_half_extents =
       abs(axis) + math::Vec3f::all(capsule.radius);
   return {.min = position - world_space_half_extents,
           .max = position + world_space_half_extents};
 }
 
-inline Aabb bounds(Box const &box, math::Mat3x4f const &transform) noexcept {
+inline math::Aabb bounds(Box const &box,
+                         math::Mat3x4f const &transform) noexcept {
   auto const world_space_center = column(transform, 3);
   auto const world_space_half_extents =
       abs(transform) * math::Vec4f{box.half_extents, 0.0f};
-  return Aabb{.min = world_space_center - world_space_half_extents,
-              .max = world_space_center + world_space_half_extents};
+  return math::Aabb{.min = world_space_center - world_space_half_extents,
+                    .max = world_space_center + world_space_half_extents};
 }
 
-inline Aabb bounds(Shape const &shape,
-                   math::Mat3x4f const &transform) noexcept {
+inline math::Aabb bounds(Shape const &shape,
+                         math::Mat3x4f const &transform) noexcept {
   return std::visit(
       [&](auto &&arg) {
         using T = std::decay_t<decltype(arg)>;

@@ -6,11 +6,11 @@
 #include <utility>
 #include <variant>
 
-#include "../util/list.h"
-#include "../util/memory.h"
-#include "../util/pool.h"
-#include "../util/set.h"
-#include "aabb.h"
+#include <math/aabb.h>
+#include <util/list.h>
+#include <util/memory.h>
+#include <util/pool.h>
+#include <util/set.h>
 
 namespace marlon {
 namespace physics {
@@ -22,7 +22,7 @@ public:
 
   struct Node {
     Node *parent;
-    Aabb bounds;
+    math::Aabb bounds;
     std::variant<std::array<Node *, 2>, Payload> payload;
   };
 
@@ -72,7 +72,7 @@ public:
         util::List<Node>::make(allocator, internal_node_capacity).second;
   }
 
-  Node *create_leaf(Aabb const &bounds, Payload const &payload) {
+  Node *create_leaf(math::Aabb const &bounds, Payload const &payload) {
     auto const node = _leaf_node_pool.emplace();
     try {
       _leaf_node_set.emplace(node);
