@@ -4,31 +4,52 @@
 #include "vec.h"
 
 namespace marlon::math {
-struct Aabb {
-  Vec3f min;
-  Vec3f max;
+template <typename T, int N> struct Aabb {
+  Vec<T, N> min;
+  Vec<T, N> max;
 };
 
-inline Vec3f center(Aabb const &box) noexcept {
-  return 0.5f * (box.min + box.max);
+using Aabb2i = Aabb<std::int32_t, 2>;
+using Aabb3i = Aabb<std::int32_t, 3>;
+using Aabb2f = Aabb<float, 2>;
+using Aabb3f = Aabb<float, 3>;
+using Aabb2d = Aabb<double, 2>;
+using Aabb3d = Aabb<double, 3>;
+
+template <typename T, int N>
+inline Vec<T, N> center(Aabb<T, N> const &box) noexcept {
+  return (box.min + box.max) / T(2);
 }
 
-inline Vec3f extents(Aabb const &box) noexcept { return box.max - box.min; }
+template <typename T, int N>
+inline Vec<T, N> extents(Aabb<T, N> const &box) noexcept {
+  return box.max - box.min;
+}
 
-inline float volume(Aabb const &box) noexcept {
+template <typename T>
+inline T area(Aabb<T, 2> const &box) noexcept {
+  auto const d = extents(box);
+  return d.x * d.y;
+}
+
+template <typename T>
+inline T volume(Aabb<T, 3> const &box) noexcept {
   auto const d = extents(box);
   return d.x * d.y * d.z;
 }
 
-inline Aabb expand(Aabb const &box, Vec3f const &amount) noexcept {
+template <typename T, int N>
+inline Aabb<T, N> expand(Aabb<T, N> const &box, Vec<T, N> const &amount) noexcept {
   return {box.min - amount, box.max + amount};
 }
 
-inline Aabb expand(Aabb const &box, float amount) noexcept {
-  return expand(box, Vec3f::all(amount));
+template <typename T, int N>
+inline Aabb<T, N> expand(Aabb<T, N> const &box, T amount) noexcept {
+  return expand(box, Vec<T, N>::all(amount));
 }
 
-inline Aabb merge(Aabb const &first, Aabb const &second) noexcept {
+template <typename T, int N>
+inline Aabb<T, N> merge(Aabb<T, N> const &first, Aabb<T, N> const &second) noexcept {
   return {{min(first.min.x, second.min.x),
            min(first.min.y, second.min.y),
            min(first.min.z, second.min.z)},
@@ -37,7 +58,8 @@ inline Aabb merge(Aabb const &first, Aabb const &second) noexcept {
            max(first.max.z, second.max.z)}};
 }
 
-inline bool overlaps(Aabb const &first, Aabb const &second) noexcept {
+template <typename T, int N>
+inline bool overlaps(Aabb<T, N> const &first, Aabb<T, N> const &second) noexcept {
   return first.min.x < second.max.x && first.min.y < second.max.y &&
          first.min.z < second.max.z && second.min.x < first.max.x &&
          second.min.y < first.max.y && second.min.z < first.max.z;

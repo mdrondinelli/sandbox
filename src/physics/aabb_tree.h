@@ -22,7 +22,7 @@ public:
 
   struct Node {
     Node *parent;
-    math::Aabb bounds;
+    math::Aabb3f bounds;
     std::variant<std::array<Node *, 2>, Payload> payload;
   };
 
@@ -72,7 +72,7 @@ public:
         util::List<Node>::make(allocator, internal_node_capacity).second;
   }
 
-  Node *create_leaf(math::Aabb const &bounds, Payload const &payload) {
+  Node *create_leaf(math::Aabb3f const &bounds, Payload const &payload) {
     auto const node = _leaf_node_pool.emplace();
     try {
       _leaf_node_set.emplace(node);

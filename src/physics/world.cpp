@@ -1044,8 +1044,9 @@ private:
                                    length(object_data->velocity()) *
                                    delta_time +
                                gravity_safety_term;
-      object_data->bvh_node()->bounds = expand(
-          {object_data->position(), object_data->position()}, half_extent);
+      object_data->bvh_node()->bounds =
+          expand(Aabb3f{object_data->position(), object_data->position()},
+                 half_extent);
     });
     _rigid_bodies.for_each([&](Rigid_body object) {
       auto const object_data = data(object);
