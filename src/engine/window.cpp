@@ -25,7 +25,7 @@ Window::Window(Window_create_info const &create_info)
         auto const self =
             static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (self->_cursor_position) {
-          self->_delta_cursor_position = math::Vec2d{
+          self->_delta_cursor_position += math::Vec2d{
               x - self->_cursor_position->x, y - self->_cursor_position->y};
         }
         self->_cursor_position = math::Vec2d{x, y};

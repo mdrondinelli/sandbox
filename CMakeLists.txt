@@ -48,6 +48,7 @@ add_library(
   "src/graphics/gl/wireframe_mesh.cpp"
   "src/graphics/gl/default_render_target.cpp"
   "src/graphics/gl/render_stream.cpp"
+  "src/graphics/gl/cascaded_shadow_map.cpp"
   "src/graphics/glad/gl.cpp"
   "src/graphics/scene.cpp"
 )

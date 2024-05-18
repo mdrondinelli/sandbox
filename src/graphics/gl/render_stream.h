@@ -2,6 +2,7 @@
 #define MARLON_GL_RENDER_STREAM_H
 
 #include "../render_stream.h"
+#include "cascaded_shadow_map.h"
 #include "render_target.h"
 #include "wrappers/unique_shader_program.h"
 #include "wrappers/unique_texture.h"
@@ -19,6 +20,10 @@ public:
 
     Intrinsic_state(Intrinsic_state_create_info const &);
 
+    constexpr std::uint32_t shadow_map_shader_program() const noexcept {
+      return _shadow_map_shader_program.get();
+    }
+
     constexpr std::uint32_t surface_shader_program() const noexcept {
       return _surface_shader_program.get();
     }
@@ -32,6 +37,7 @@ public:
     }
 
   private:
+    wrappers::Unique_shader_program _shadow_map_shader_program;
     wrappers::Unique_shader_program _surface_shader_program;
     wrappers::Unique_shader_program _wireframe_shader_program;
     wrappers::Unique_texture _default_base_color_texture;
@@ -53,6 +59,8 @@ public:
   Camera const *camera() const noexcept final { return _camera; }
 
 private:
+  void draw_csm();
+
   void draw_surfaces(math::Mat4x4f const &view_clip_matrix);
 
   void draw_wireframes(math::Mat4x4f const &view_clip_matrix);
@@ -61,7 +69,7 @@ private:
   Render_target *_target;
   Scene const *_scene;
   Camera const *_camera;
-  
+  Cascaded_shadow_map _csm;
 };
 } // namespace gl
 } // namespace graphics

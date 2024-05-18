@@ -19,12 +19,6 @@ namespace marlon {
 namespace graphics {
 class Graphics;
 
-struct Render_info {
-  Render_target *target;
-  Scene const *scene;
-  Camera const *camera;
-};
-
 class Surface_mesh_deleter {
 public:
   Surface_mesh_deleter(Graphics *owner = nullptr) noexcept : _owner{owner} {}
@@ -84,9 +78,16 @@ using Unique_render_target =
 using Unique_render_stream =
     std::unique_ptr<Render_stream, Render_stream_deleter>;
 
+struct Graphics_implementation_info {
+  int cascaded_shadow_map_max_cascade_count;
+};
+
 class Graphics {
 public:
   virtual ~Graphics() = default;
+
+  virtual Graphics_implementation_info const &
+  implementation_info() const noexcept = 0;
 
   Unique_texture create_texture_unique(Texture_create_info const &create_info) {
     return Unique_texture{create_texture(create_info), this};
@@ -130,8 +131,6 @@ public:
   create_render_stream(Render_stream_create_info const &create_info) = 0;
 
   virtual void destroy_render_stream(Render_stream *render_stream) = 0;
-
-  // virtual void render(Render_info const &info) = 0;
 
   // TODO: interface for compositing or figure out how multi view rendering will
   // work compositing could be used for first person view models
