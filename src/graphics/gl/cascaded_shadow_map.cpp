@@ -110,6 +110,7 @@ void Cascaded_shadow_map::draw(Scene const &scene,
   };
   auto const camera_to_world_matrix =
       Mat3x4f::rigid(camera.position, camera.orientation);
+  auto const tan_half_fov = Vec2f{1.0f / camera.zoom.x, 1.0f / camera.zoom.y};
   auto const temp_axis = abs(light_z_axis.x) < abs(light_z_axis.y)
                              ? Vec3f::x_axis()
                              : Vec3f::y_axis();
@@ -134,29 +135,29 @@ void Cascaded_shadow_map::draw(Scene const &scene,
     auto const cascade_far =
         lambda * cascade_far_log + (1.0f - lambda) * cascade_far_uni;
     auto const camera_space_frustum_vertices = std::array<Vec3f, 8>{
-        Vec3f{-camera.zoom.x * cascade_near,
-              -camera.zoom.y * cascade_near,
+        Vec3f{-tan_half_fov.x * cascade_near,
+              -tan_half_fov.y * cascade_near,
               -cascade_near},
-        Vec3f{camera.zoom.x * cascade_near,
-              -camera.zoom.y * cascade_near,
+        Vec3f{tan_half_fov.x * cascade_near,
+              -tan_half_fov.y * cascade_near,
               -cascade_near},
-        Vec3f{-camera.zoom.x * cascade_near,
-              camera.zoom.y * cascade_near,
+        Vec3f{-tan_half_fov.x * cascade_near,
+              tan_half_fov.y * cascade_near,
               -cascade_near},
-        Vec3f{camera.zoom.x * cascade_near,
-              camera.zoom.y * cascade_near,
+        Vec3f{tan_half_fov.x * cascade_near,
+              tan_half_fov.y * cascade_near,
               -cascade_near},
-        Vec3f{-camera.zoom.x * cascade_far,
-              -camera.zoom.y * cascade_far,
+        Vec3f{-tan_half_fov.x * cascade_far,
+              -tan_half_fov.y * cascade_far,
               -cascade_far},
-        Vec3f{camera.zoom.x * cascade_far,
-              -camera.zoom.y * cascade_far,
+        Vec3f{tan_half_fov.x * cascade_far,
+              -tan_half_fov.y * cascade_far,
               -cascade_far},
-        Vec3f{-camera.zoom.x * cascade_far,
-              camera.zoom.y * cascade_far,
+        Vec3f{-tan_half_fov.x * cascade_far,
+              tan_half_fov.y * cascade_far,
               -cascade_far},
-        Vec3f{camera.zoom.x * cascade_far,
-              camera.zoom.y * cascade_far,
+        Vec3f{tan_half_fov.x * cascade_far,
+              tan_half_fov.y * cascade_far,
               -cascade_far},
     };
     auto const light_space_frustum_vertices = std::array<Vec3f, 8>{
