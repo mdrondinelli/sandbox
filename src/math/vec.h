@@ -132,6 +132,8 @@ template <typename T> struct Vec<T, 3> {
       unreachable();
     }
   }
+
+  constexpr Vec<T, 2> xy() const noexcept { return {x, y}; }
 };
 
 template <typename T> struct Vec<T, 4> {
@@ -224,6 +226,10 @@ template <typename T> struct Vec<T, 4> {
       unreachable();
     }
   }
+
+  constexpr Vec<T, 2> xy() const noexcept { return {x, y}; }
+
+  constexpr Vec<T, 3> xyz() const noexcept { return {x, y, z}; }
 };
 
 template <typename T> using Vec2 = Vec<T, 2>;

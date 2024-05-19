@@ -7,6 +7,21 @@ namespace marlon::math {
 template <typename T, int N> struct Aabb {
   Vec<T, N> min;
   Vec<T, N> max;
+
+  Aabb() noexcept = default;
+
+  constexpr Aabb(Vec<T, N> const &p) noexcept : Aabb{p, p} {}
+
+  constexpr Aabb(Vec<T, N> const &min, Vec<T, N> const &max) noexcept
+      : min{min}, max{max} {}
+
+  constexpr Aabb<T, 2> xy() const noexcept {
+    return Aabb<T, 2>{min.xy(), max.xy()};
+  }
+
+  constexpr Aabb<T, 3> xyz() const noexcept {
+    return Aabb<T, 3>{min.xyz(), max.xyz()};
+  }
 };
 
 using Aabb2i = Aabb<std::int32_t, 2>;
@@ -54,12 +69,14 @@ inline Aabb<T, N> merge(Aabb<T, N> const &first,
 }
 
 template <typename T, int N>
-inline Aabb<T, N> merge(Aabb<T, N> const &box, Vec<T, N> const &point) noexcept {
+inline Aabb<T, N> merge(Aabb<T, N> const &box,
+                        Vec<T, N> const &point) noexcept {
   return {min(box.min, point), max(box.max, point)};
 }
 
 template <typename T, int N>
-inline Aabb<T, N> merge(Vec<T, N> const &point, Aabb<T, N> const &box) noexcept {
+inline Aabb<T, N> merge(Vec<T, N> const &point,
+                        Aabb<T, N> const &box) noexcept {
   return merge(box, point);
 }
 
@@ -67,7 +84,7 @@ template <typename T, int N>
 inline bool overlaps(Aabb<T, N> const &first,
                      Aabb<T, N> const &second) noexcept {
   for (auto i = 0; i != N; ++i) {
-    if (first.min.x >= second.max.x || second.min.x >= first.max.x) {
+    if (first.min[i] >= second.max[i] || second.min[i] >= first.max[i]) {
       return false;
     }
   }

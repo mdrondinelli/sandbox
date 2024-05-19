@@ -3,11 +3,13 @@
 
 #include <cstddef>
 
+#include <util/size.h>
+
 #include "wrappers/wrappers.h"
 
 namespace marlon::graphics::gl {
 struct Uniform_buffer_create_info {
-  int size;
+  util::Size size;
 };
 
 class Uniform_buffer {

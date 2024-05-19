@@ -5,6 +5,7 @@
 #include "./wrappers/unique_shader_program.h"
 #include "./wrappers/unique_texture.h"
 #include "cascaded_shadow_map.h"
+#include "surface_resource.h"
 #include "render_target.h"
 
 namespace marlon {
@@ -20,8 +21,9 @@ public:
 
     Intrinsic_state(Intrinsic_state_create_info const &);
 
-    constexpr std::uint32_t shadow_map_shader_program() const noexcept {
-      return _shadow_map_shader_program.get();
+    Cascaded_shadow_map::Intrinsic_state const *
+    cascaded_shadow_map_intrinsic_state() const noexcept {
+      return &_cascaded_shadow_map_intrinsic_state;
     }
 
     constexpr std::uint32_t surface_shader_program() const noexcept {
@@ -37,7 +39,7 @@ public:
     }
 
   private:
-    wrappers::Unique_shader_program _shadow_map_shader_program;
+    Cascaded_shadow_map::Intrinsic_state _cascaded_shadow_map_intrinsic_state;
     wrappers::Unique_shader_program _surface_shader_program;
     wrappers::Unique_shader_program _wireframe_shader_program;
     wrappers::Unique_texture _default_base_color_texture;
@@ -59,18 +61,21 @@ public:
   Camera const *camera() const noexcept final { return _camera; }
 
 private:
+  void prepare_surface_resource();
+
   void draw_csm();
 
   void draw_surfaces(math::Mat4x4f const &view_matrix,
-                     math::Mat4x4f const &view_clip_matrix);
+                     math::Mat4x4f const &projection_matrix);
 
-  void draw_wireframes(math::Mat4x4f const &view_clip_matrix);
+  void draw_wireframes(math::Mat4x4f const &view_projection_matrix);
 
   Intrinsic_state const *_intrinsic_state;
   Render_target *_target;
   Scene const *_scene;
   Camera const *_camera;
-  Cascaded_shadow_map _csm;
+  Surface_resource _surface_resource;
+  Cascaded_shadow_map _cascaded_shadow_map;
 };
 } // namespace gl
 } // namespace graphics

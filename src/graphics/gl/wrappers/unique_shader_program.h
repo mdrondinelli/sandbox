@@ -21,8 +21,7 @@ public:
   Unique_shader_program(Unique_shader_program &&other) noexcept
       : _handle{std::exchange(other._handle, 0)} {}
 
-  Unique_shader_program &
-  operator=(Unique_shader_program &&other) noexcept {
+  Unique_shader_program &operator=(Unique_shader_program &&other) noexcept {
     auto temp{std::move(other)};
     swap(temp);
     return *this;
@@ -39,7 +38,11 @@ private:
 };
 
 Unique_shader_program make_unique_shader_program();
-}
+
+wrappers::Unique_shader_program
+make_unique_shader_program(char const *vertex_shader_source,
+                           char const *fragment_shader_source);
+} // namespace wrappers
 } // namespace gl
 } // namespace graphics
 } // namespace marlon

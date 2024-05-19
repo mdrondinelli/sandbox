@@ -58,8 +58,8 @@ private:
 };
 
 inline math::Aabb3f bounds(Ball const &ball, math::Vec3f const &position) {
-  return {.min = position - math::Vec3f::all(ball.radius),
-          .max = position + math::Vec3f::all(ball.radius)};
+  return {position - math::Vec3f::all(ball.radius),
+          position + math::Vec3f::all(ball.radius)};
 }
 
 inline math::Aabb3f bounds(Capsule const &capsule,
@@ -67,8 +67,8 @@ inline math::Aabb3f bounds(Capsule const &capsule,
                            math::Vec3f const &axis) noexcept {
   auto const world_space_half_extents =
       abs(axis) + math::Vec3f::all(capsule.radius);
-  return {.min = position - world_space_half_extents,
-          .max = position + world_space_half_extents};
+  return {position - world_space_half_extents,
+          position + world_space_half_extents};
 }
 
 inline math::Aabb3f bounds(Box const &box,
@@ -76,8 +76,8 @@ inline math::Aabb3f bounds(Box const &box,
   auto const world_space_center = column(transform, 3);
   auto const world_space_half_extents =
       abs(transform) * math::Vec4f{box.half_extents, 0.0f};
-  return math::Aabb{.min = world_space_center - world_space_half_extents,
-                    .max = world_space_center + world_space_half_extents};
+  return math::Aabb{world_space_center - world_space_half_extents,
+                    world_space_center + world_space_half_extents};
 }
 
 inline math::Aabb3f bounds(Shape const &shape,
