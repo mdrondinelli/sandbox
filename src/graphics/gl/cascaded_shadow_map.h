@@ -6,6 +6,7 @@
 #include <math/math.h>
 #include <util/list.h>
 
+#include "../camera.h"
 #include "./wrappers/wrappers.h"
 #include "multiple_buffer.h"
 #include "uniform_buffer.h"
@@ -100,12 +101,7 @@ public:
     return _uniform_buffers.get().get();
   }
 
-  void update_frusta(math::Vec3f const &camera_position,
-                     math::Vec3f const &camera_direction,
-                     math::Vec2f const &camera_zoom,
-                     float camera_near_plane_distance,
-                     float camera_csm_render_distance,
-                     int camera_csm_cascade_count,
+  void update_frusta(Camera const &camera,
                      math::Vec3f const &light_z_axis);
 
   void acquire_uniform_buffer();

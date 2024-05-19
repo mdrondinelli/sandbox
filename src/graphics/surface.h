@@ -13,6 +13,7 @@ struct Surface {
   Surface_material material{};
   math::Mat3x4f transform{math::Mat3x4f::identity()};
   bool visible{true};
+  bool shadow_casting{true};
 };
 } // namespace graphics
 } // namespace marlon

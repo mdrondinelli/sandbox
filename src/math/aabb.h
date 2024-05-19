@@ -26,20 +26,19 @@ inline Vec<T, N> extents(Aabb<T, N> const &box) noexcept {
   return box.max - box.min;
 }
 
-template <typename T>
-inline T area(Aabb<T, 2> const &box) noexcept {
+template <typename T> inline T area(Aabb<T, 2> const &box) noexcept {
   auto const d = extents(box);
   return d.x * d.y;
 }
 
-template <typename T>
-inline T volume(Aabb<T, 3> const &box) noexcept {
+template <typename T> inline T volume(Aabb<T, 3> const &box) noexcept {
   auto const d = extents(box);
   return d.x * d.y * d.z;
 }
 
 template <typename T, int N>
-inline Aabb<T, N> expand(Aabb<T, N> const &box, Vec<T, N> const &amount) noexcept {
+inline Aabb<T, N> expand(Aabb<T, N> const &box,
+                         Vec<T, N> const &amount) noexcept {
   return {box.min - amount, box.max + amount};
 }
 
@@ -49,20 +48,30 @@ inline Aabb<T, N> expand(Aabb<T, N> const &box, T amount) noexcept {
 }
 
 template <typename T, int N>
-inline Aabb<T, N> merge(Aabb<T, N> const &first, Aabb<T, N> const &second) noexcept {
-  return {{min(first.min.x, second.min.x),
-           min(first.min.y, second.min.y),
-           min(first.min.z, second.min.z)},
-          {max(first.max.x, second.max.x),
-           max(first.max.y, second.max.y),
-           max(first.max.z, second.max.z)}};
+inline Aabb<T, N> merge(Aabb<T, N> const &first,
+                        Aabb<T, N> const &second) noexcept {
+  return {min(first.min, second.min), max(first.max, second.max)};
 }
 
 template <typename T, int N>
-inline bool overlaps(Aabb<T, N> const &first, Aabb<T, N> const &second) noexcept {
-  return first.min.x < second.max.x && first.min.y < second.max.y &&
-         first.min.z < second.max.z && second.min.x < first.max.x &&
-         second.min.y < first.max.y && second.min.z < first.max.z;
+inline Aabb<T, N> merge(Aabb<T, N> const &box, Vec<T, N> const &point) noexcept {
+  return {min(box.min, point), max(box.max, point)};
+}
+
+template <typename T, int N>
+inline Aabb<T, N> merge(Vec<T, N> const &point, Aabb<T, N> const &box) noexcept {
+  return merge(box, point);
+}
+
+template <typename T, int N>
+inline bool overlaps(Aabb<T, N> const &first,
+                     Aabb<T, N> const &second) noexcept {
+  for (auto i = 0; i != N; ++i) {
+    if (first.min.x >= second.max.x || second.min.x >= first.max.x) {
+      return false;
+    }
+  }
+  return true;
 }
 } // namespace marlon::math
 

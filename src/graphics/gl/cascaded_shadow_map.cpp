@@ -5,6 +5,8 @@
 
 #include <glad/gl.h>
 
+#include "surface_mesh.h"
+
 namespace marlon::graphics::gl {
 using namespace math;
 
@@ -43,30 +45,26 @@ Cascaded_shadow_map::Cascaded_shadow_map(
   }
 }
 
-void Cascaded_shadow_map::update_frusta(Vec3f const &camera_position,
-                                        Vec3f const &camera_direction,
-                                        Vec2f const &camera_zoom,
-                                        float camera_near_plane_distance,
-                                        float camera_csm_render_distance,
-                                        int camera_csm_cascade_count,
+void Cascaded_shadow_map::update_frusta(Camera const &camera,
                                         Vec3f const &light_z_axis) {
-  auto constexpr lambda = 0.9f;
+  auto constexpr lambda = 0.6f;
   auto const c_log = [&](float i) {
-    return camera_near_plane_distance *
-           pow(camera_csm_render_distance / camera_near_plane_distance,
-               i / camera_csm_cascade_count);
+    return camera.near_plane_distance *
+           pow(camera.csm_render_distance / camera.near_plane_distance,
+               i / camera.csm_cascade_count);
   };
   auto const c_uni = [&](float i) {
-    return camera_near_plane_distance +
-           (camera_csm_render_distance - camera_near_plane_distance) *
-               (i / camera_csm_cascade_count);
+    return camera.near_plane_distance +
+           (camera.csm_render_distance - camera.near_plane_distance) *
+               (i / camera.csm_cascade_count);
   };
-  auto const tan_squared_alpha = length_squared(camera_zoom);
+  auto const camera_z_axis = column(Mat3x3f::rotation(camera.orientation), 2);
+  auto const tan_squared_alpha = length_squared(camera.zoom);
   auto const tan_alpha = sqrt(tan_squared_alpha);
-  auto const temp_y_axis = abs(light_z_axis.x) < abs(light_z_axis.y)
-                               ? Vec3f::x_axis()
-                               : Vec3f::y_axis();
-  auto const light_x_axis = normalize(cross(temp_y_axis, light_z_axis));
+  auto const temp_axis = abs(light_z_axis.x) < abs(light_z_axis.y)
+                             ? Vec3f::x_axis()
+                             : Vec3f::y_axis();
+  auto const light_x_axis = normalize(cross(temp_axis, light_z_axis));
   auto const light_y_axis = cross(light_z_axis, light_x_axis);
   for (auto i = 0; i < cascade_count(); ++i) {
     auto const cascade_near_log = c_log(i);
@@ -83,7 +81,7 @@ void Cascaded_shadow_map::update_frusta(Vec3f const &camera_position,
     auto const sphere_radius =
         length(Vec2f{cascade_far * tan_alpha, cascade_far - sphere_distance});
     auto const sphere_center_world_space =
-        camera_position + camera_direction * sphere_distance;
+        camera.position + camera_z_axis * sphere_distance;
     auto const sphere_center_light_space =
         Vec3f{dot(sphere_center_world_space, light_x_axis),
               dot(sphere_center_world_space, light_y_axis),

@@ -244,6 +244,9 @@ void Render_stream::render() {
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClearDepth(0.0f);
   glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
+  glEnable(GL_DEPTH_CLAMP);
+  glEnable(GL_CULL_FACE);
+  glCullFace(GL_BACK);
   glFrontFace(GL_CW);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_GREATER);
@@ -258,16 +261,15 @@ void Render_stream::render() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // glEnable(GL_POLYGON_OFFSET_FILL);
   // glPolygonOffset(1.0f, 1.0f);
-  glEnable(GL_CULL_FACE);
-  glCullFace(GL_BACK);
   auto const viewport_extents = _target->get_extents();
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   // glDisable(GL_BLEND);
+  glDisable(GL_DEPTH_CLAMP);
   draw_surfaces(view_matrix, view_clip_matrix);
   glEnable(GL_POLYGON_OFFSET_LINE);
-  glPolygonOffset(-1.0f, -1.0f);
+  glPolygonOffset(1.0f, 1.0f);
   glLineWidth(2.0f);
-  glDepthFunc(GL_LEQUAL);
+  glDepthFunc(GL_GEQUAL);
   // glEnable(GL_BLEND);
   // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   // glEnable(GL_LINE_SMOOTH);
@@ -288,23 +290,15 @@ void Render_stream::draw_csm() {
   if (!_scene->directional_light() || _camera->csm_cascade_count <= 0) {
     return;
   }
-  _csm.update_frusta(_camera->position,
-                     -column(Mat3x3f::rotation(_camera->orientation), 2),
-                     _camera->zoom,
-                     _camera->near_plane_distance,
-                     _camera->csm_render_distance,
-                     _camera->csm_cascade_count,
-                     _scene->directional_light()->direction);
+  _csm.update_frusta(*_camera, _scene->directional_light()->direction);
   for (auto i = 0; i < _csm.cascade_count(); ++i) {
     glBindFramebuffer(GL_FRAMEBUFFER, _csm.cascades()[i].framebuffer());
     glClear(GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
     glViewport(0, 0, _csm.texture_resolution(), _csm.texture_resolution());
     auto const shader_program = _intrinsic_state->shadow_map_shader_program();
     glUseProgram(shader_program);
     for (auto const surface : _scene->surfaces()) {
-      if (!surface->visible) {
+      if (!surface->shadow_casting) {
         continue;
       }
       auto const model_matrix =
