@@ -478,7 +478,7 @@ public:
     scene->ambient_irradiance(graphics::Rgb_spectrum{32.0f});
     scene->directional_light(graphics::Directional_light{
         .irradiance = graphics::Rgb_spectrum{481.5f},
-        .direction = normalize(math::Vec3f{1.0f, 0.3f, 0.5f}),
+        .direction = normalize(math::Vec3f{1.0f, 2.0f, 0.5f}),
     });
     _ground_surface = {
         .mesh = _resources.cube_mesh.get(),

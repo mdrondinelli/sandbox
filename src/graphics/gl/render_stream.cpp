@@ -172,9 +172,11 @@ wrappers::Unique_texture make_default_base_color_texture() {
   return result;
 }
 
-Mat4x4f calculate_clip_matrix(Vec2f const &zoom, float near_plane_distance) {
-  return Mat4x4f{{zoom.x, 0.0f, 0.0f, 0.0f},
-                 {0.0f, -zoom.y, 0.0f, 0.0f},
+Mat4x4f perspective(Vec2f const &zoom,
+                    float near_plane_distance,
+                    Vec2f const &jitter = Vec2f::zero()) {
+  return Mat4x4f{{zoom.x, 0.0f, jitter.x, 0.0f},
+                 {0.0f, -zoom.y, jitter.y, 0.0f},
                  {0.0f, 0.0f, 0.0f, near_plane_distance},
                  {0.0f, 0.0f, -1.0f, 0.0f}};
 }
@@ -204,14 +206,19 @@ void Render_stream::render() {
   draw_csm();
   auto const view_matrix =
       rigid_inverse(Mat4x4f::rigid(_camera->position, _camera->orientation));
+  auto const viewport_extents = _target->get_extents();
+  auto const ndc_pixel_extents =
+      Vec2f{2.0f / viewport_extents.x, 2.0f / viewport_extents.y};
+  auto const jitter =
+      Vec2f{(rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.x,
+            (rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.y};
   auto const projection_matrix =
-      calculate_clip_matrix(_camera->zoom, _camera->near_plane_distance);
+      perspective(_camera->zoom, _camera->near_plane_distance, jitter);
   auto const view_projection_matrix = projection_matrix * view_matrix;
   glBindFramebuffer(GL_FRAMEBUFFER, _target->get_framebuffer());
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // glEnable(GL_POLYGON_OFFSET_FILL);
   // glPolygonOffset(1.0f, 1.0f);
-  auto const viewport_extents = _target->get_extents();
   glViewport(0, 0, viewport_extents.x, viewport_extents.y);
   // glDisable(GL_BLEND);
   // glDisable(GL_DEPTH_CLAMP);
@@ -325,11 +332,8 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_matrix,
         _surface_resource.uniform_buffer().get(),
         _surface_resource.get_mapping(surface).uniform_buffer_offset,
         64);
-    glProgramUniformMatrix4fv(shader_program,
-                              view_matrix_location,
-                              1,
-                              GL_TRUE,
-                              &view_matrix[0][0]);
+    glProgramUniformMatrix4fv(
+        shader_program, view_matrix_location, 1, GL_TRUE, &view_matrix[0][0]);
     glProgramUniformMatrix4fv(shader_program,
                               projection_matrix_location,
                               1,
@@ -352,7 +356,8 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_matrix,
   }
 }
 
-void Render_stream::draw_wireframes(math::Mat4x4f const &view_projection_matrix) {
+void Render_stream::draw_wireframes(
+    math::Mat4x4f const &view_projection_matrix) {
   auto constexpr model_view_projection_matrix_location = 0;
   auto constexpr color_location = 1;
   auto const shader_program = _intrinsic_state->wireframe_shader_program();
@@ -363,7 +368,8 @@ void Render_stream::draw_wireframes(math::Mat4x4f const &view_projection_matrix)
     }
     auto const model_matrix =
         Mat4x4f{wireframe->transform, {0.0f, 0.0f, 0.0f, 1.0f}};
-    auto const model_view_projection_matrix = view_projection_matrix * model_matrix;
+    auto const model_view_projection_matrix =
+        view_projection_matrix * model_matrix;
     glProgramUniformMatrix4fv(shader_program,
                               model_view_projection_matrix_location,
                               1,
