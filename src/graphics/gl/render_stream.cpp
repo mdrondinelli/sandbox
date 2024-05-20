@@ -84,7 +84,6 @@ layout(row_major, std140, binding = 1) uniform Surface {
 layout(location = 2) uniform vec3 ambient_irradiance;
 layout(location = 3) uniform vec3 directional_light_irradiance;
 layout(location = 4) uniform vec3 directional_light_direction;
-layout(location = 5) uniform float exposure;
 
 const float PHI = 1.61803398874989484820459; // Φ = Golden Ratio 
 
@@ -98,11 +97,6 @@ int select_csm_cascade() {
   return csm.cascade_count - 1;
 }
 
-float gold_noise(vec2 xy, float seed)
-{
-  return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
-}
-
 float calculate_csm_shadow_factor(float n_dot_l) {
   int i = select_csm_cascade();
   vec3 p_world =
@@ -113,21 +107,6 @@ float calculate_csm_shadow_factor(float n_dot_l) {
   return texture(shadow_map, texcoord);
 }
 
-vec3 tonemap(vec3 v) {
-  v = mat3(
-    vec3(0.59719, 0.07600, 0.02840),
-    vec3(0.35458, 0.90834, 0.13383),
-    vec3(0.04823, 0.01566, 0.83777)
-  ) * v;
-  v = (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.4329510) + 0.238081);
-  v = mat3(
-    vec3(1.60475, -0.10208, -0.00327),
-    vec3(-0.53108,  1.10813, -0.07276),
-    vec3(-0.07367, -0.00605,  1.07602)
-  ) * v;
-  return clamp(v, vec3(0.0), vec3(1.0));
-}
-
 void main() {
   vec3 base_color = texture(base_color_texture, vertex_data.texcoord).rgb * surface.base_color_tint.rgb;
   vec3 n = normalize(vertex_data.world_space_normal);
@@ -135,7 +114,8 @@ void main() {
   float n_dot_l = dot(n, l);
   float shadow_factor = calculate_csm_shadow_factor(n_dot_l);
   vec3 irradiance = ambient_irradiance + directional_light_irradiance * max(n_dot_l, 0.0) * shadow_factor;
-  out_color = vec4(tonemap(irradiance * base_color * exposure), 1.0);
+  out_color = vec4(irradiance * base_color, 1.0);
+  // out_color = vec4(tonemap(irradiance * base_color * exposure), 1.0);
 }
 )";
 
@@ -160,6 +140,78 @@ layout(location = 1) uniform vec3 in_color;
 
 void main() {
   out_color = vec4(in_color, 1.0);
+}
+)";
+
+auto constexpr temporal_antialiasing_vertex_shader_source = R"(
+#version 460 core
+
+out vec2 texcoord;
+
+void main() {
+  vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(-1.0, 3.0), vec2(3.0, -1.0));
+  texcoord = positions[gl_VertexID] * vec2(0.5, -0.5) + 0.5;
+  gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+}
+)";
+
+auto constexpr temporal_antialiasing_fragment_shader_source = R"(
+#version 460 core
+
+in vec2 texcoord;
+
+out vec4 out_color;
+
+layout(binding = 0) uniform sampler2D accumulation_buffer;
+layout(binding = 1) uniform sampler2D sample_buffer;
+
+void main() {
+  vec3 accumulation_value = texture(accumulation_buffer, texcoord).rgb;
+  vec3 sample_value = texture(sample_buffer, texcoord).rgb;
+  out_color = vec4(mix(accumulation_value, sample_value, 0.1), 1.0);
+}
+)";
+
+auto constexpr postprocessing_vertex_shader_source = R"(
+#version 460 core
+
+out vec2 texcoord;
+
+void main() {
+  vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(-1.0, 3.0), vec2(3.0, -1.0));
+  texcoord = positions[gl_VertexID] * vec2(0.5, -0.5) + 0.5;
+  gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+}
+)";
+
+auto constexpr postprocessing_fragment_shader_source = R"(
+#version 460 core
+
+in vec2 texcoord;
+
+out vec4 out_color;
+
+layout(binding = 0) uniform sampler2D in_color;
+
+layout(location = 0) uniform float exposure;
+
+vec3 tonemap(vec3 v) {
+  v = mat3(
+    vec3(0.59719, 0.07600, 0.02840),
+    vec3(0.35458, 0.90834, 0.13383),
+    vec3(0.04823, 0.01566, 0.83777)
+  ) * v;
+  v = (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.4329510) + 0.238081);
+  v = mat3(
+    vec3(1.60475, -0.10208, -0.00327),
+    vec3(-0.53108,  1.10813, -0.07276),
+    vec3(-0.07367, -0.00605,  1.07602)
+  ) * v;
+  return clamp(v, vec3(0.0), vec3(1.0));
+}
+
+void main() {
+  out_color = vec4(tonemap(exposure * texture(in_color, texcoord).rgb), 1.0);
 }
 )";
 
@@ -189,51 +241,36 @@ Render_stream::Intrinsic_state::Intrinsic_state(
           surface_vertex_shader_source, surface_fragment_shader_source)},
       _wireframe_shader_program{wrappers::make_unique_shader_program(
           wireframe_vertex_shader_source, wireframe_fragment_shader_source)},
-      _default_base_color_texture{make_default_base_color_texture()} {}
+      _temporal_antialiasing_shader_program{
+          wrappers::make_unique_shader_program(
+              temporal_antialiasing_vertex_shader_source,
+              temporal_antialiasing_fragment_shader_source)},
+      _postprocessing_shader_program{wrappers::make_unique_shader_program(
+          postprocessing_vertex_shader_source,
+          postprocessing_fragment_shader_source)},
+      _default_base_color_texture{make_default_base_color_texture()},
+      _empty_vertex_array{wrappers::make_unique_vertex_array()} {}
 
 void Render_stream::render() {
-  prepare_surface_resource();
+  update_surface_resource();
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClearDepth(0.0f);
   glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
-  // glEnable(GL_DEPTH_CLAMP);
   glEnable(GL_CULL_FACE);
   glCullFace(GL_BACK);
   glFrontFace(GL_CW);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_GREATER);
   glEnable(GL_FRAMEBUFFER_SRGB);
-  draw_csm();
-  auto const view_matrix =
-      rigid_inverse(Mat4x4f::rigid(_camera->position, _camera->orientation));
-  auto const viewport_extents = _target->get_extents();
-  auto const ndc_pixel_extents =
-      Vec2f{2.0f / viewport_extents.x, 2.0f / viewport_extents.y};
-  auto const jitter =
-      Vec2f{(rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.x,
-            (rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.y};
-  auto const projection_matrix =
-      perspective(_camera->zoom, _camera->near_plane_distance, jitter);
-  auto const view_projection_matrix = projection_matrix * view_matrix;
-  glBindFramebuffer(GL_FRAMEBUFFER, _target->get_framebuffer());
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  // glEnable(GL_POLYGON_OFFSET_FILL);
-  // glPolygonOffset(1.0f, 1.0f);
-  glViewport(0, 0, viewport_extents.x, viewport_extents.y);
-  // glDisable(GL_BLEND);
-  // glDisable(GL_DEPTH_CLAMP);
-  draw_surfaces(view_matrix, projection_matrix);
-  glEnable(GL_POLYGON_OFFSET_LINE);
-  glPolygonOffset(1.0f, 1.0f);
-  glLineWidth(2.0f);
-  glDepthFunc(GL_GEQUAL);
-  // glEnable(GL_BLEND);
-  // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  // glEnable(GL_LINE_SMOOTH);
-  draw_wireframes(view_projection_matrix);
+  draw_cascaded_shadow_maps();
+  draw_visibility_buffer();
+  glDisable(GL_DEPTH_TEST);
+  glBindVertexArray(_intrinsic_state->empty_vertex_array());
+  do_temporal_antialiasing();
+  do_postprocessing();
 }
 
-void Render_stream::prepare_surface_resource() {
+void Render_stream::update_surface_resource() {
   if (_surface_resource.max_surfaces() != _scene->surfaces().max_size()) {
     _surface_resource = Surface_resource{{
         .max_surfaces = _scene->surfaces().max_size(),
@@ -247,7 +284,7 @@ void Render_stream::prepare_surface_resource() {
   _surface_resource.update();
 }
 
-void Render_stream::draw_csm() {
+void Render_stream::draw_cascaded_shadow_maps() {
   // auto constexpr model_view_clip_matrix_location = 0;
   if (_camera->csm_cascade_count <= 0) {
     _cascaded_shadow_map = {};
@@ -271,6 +308,39 @@ void Render_stream::draw_csm() {
   }
 }
 
+void Render_stream::draw_visibility_buffer() {
+  auto const target_extents = _target->get_extents();
+  if (_visibility_buffer.extents() != target_extents) {
+    _visibility_buffer = Visibility_buffer{{.extents = target_extents}};
+  }
+  auto const view_matrix =
+      rigid_inverse(Mat4x4f::rigid(_camera->position, _camera->orientation));
+  auto const ndc_pixel_extents =
+      Vec2f{2.0f / target_extents.x, 2.0f / target_extents.y};
+  auto const jitter =
+      Vec2f{(rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.x,
+            (rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.y};
+  auto const projection_matrix =
+      perspective(_camera->zoom, _camera->near_plane_distance, jitter);
+  // glBindFramebuffer(GL_FRAMEBUFFER, _target->get_framebuffer());
+  glBindFramebuffer(GL_FRAMEBUFFER, _visibility_buffer.framebuffer());
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  // glEnable(GL_POLYGON_OFFSET_FILL);
+  // glPolygonOffset(1.0f, 1.0f);
+  glViewport(0, 0, target_extents.x, target_extents.y);
+  // glDisable(GL_BLEND);
+  // glDisable(GL_DEPTH_CLAMP);
+  draw_surfaces(view_matrix, projection_matrix);
+  glEnable(GL_POLYGON_OFFSET_LINE);
+  glPolygonOffset(1.0f, 1.0f);
+  glLineWidth(2.0f);
+  glDepthFunc(GL_GEQUAL);
+  // glEnable(GL_BLEND);
+  // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  // glEnable(GL_LINE_SMOOTH);
+  draw_wireframes(projection_matrix * view_matrix);
+}
+
 void Render_stream::draw_surfaces(Mat4x4f const &view_matrix,
                                   Mat4x4f const &projection_matrix) {
   auto constexpr view_matrix_location = 0;
@@ -278,11 +348,11 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_matrix,
   auto constexpr ambient_irradiance_location = 2;
   auto constexpr directional_light_irradiance_location = 3;
   auto constexpr directional_light_direction_location = 4;
-  auto constexpr exposure_location = 5;
+  // auto constexpr exposure_location = 5;
   auto const shader_program = _intrinsic_state->surface_shader_program();
   auto const ambient_irradiance = _scene->ambient_irradiance();
   auto const &directional_light = _scene->directional_light();
-  auto const exposure = _camera->exposure;
+  // auto const exposure = _camera->exposure;
   glUseProgram(shader_program);
   glProgramUniform3f(shader_program,
                      ambient_irradiance_location,
@@ -314,7 +384,7 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_matrix,
     glProgramUniform3f(
         shader_program, directional_light_direction_location, 1.0f, 0.0f, 0.0f);
   }
-  glProgramUniform1f(shader_program, exposure_location, exposure);
+  // glProgramUniform1f(shader_program, exposure_location, exposure);
   for (auto const surface : _scene->surfaces()) {
     if (!surface->visible) {
       continue;
@@ -384,6 +454,29 @@ void Render_stream::draw_wireframes(
     mesh->bind_vertex_array();
     mesh->draw();
   }
+}
+
+void Render_stream::do_temporal_antialiasing() {
+  auto const target_extents = _target->get_extents();
+  if (_taa_resource.extents() != target_extents) {
+    _taa_resource = Temporal_antialiasing_resource{{.extents = target_extents}};
+  }
+  _taa_resource.swap_accumulation_buffers();
+  glBindFramebuffer(GL_FRAMEBUFFER,
+                    _taa_resource.curr_accumulation_buffer().framebuffer());
+  glUseProgram(_intrinsic_state->temporal_antialiasing_shader_program());
+  glBindTextureUnit(0, _taa_resource.prev_accumulation_buffer().texture());
+  glBindTextureUnit(1, _visibility_buffer.color_texture());
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+  
+void Render_stream::do_postprocessing() {
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glUseProgram(_intrinsic_state->postprocessing_shader_program());
+  glBindTextureUnit(0, _taa_resource.curr_accumulation_buffer().texture());
+  glProgramUniform1f(
+      _intrinsic_state->postprocessing_shader_program(), 0, _camera->exposure);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 } // namespace gl
 } // namespace graphics

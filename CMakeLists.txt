@@ -52,6 +52,9 @@ add_library(
   "src/graphics/gl/uniform_buffer.cpp"
   "src/graphics/gl/surface_resource.cpp"
   "src/graphics/gl/cascaded_shadow_map.cpp"
+  "src/graphics/gl/visibility_buffer.cpp"
+  "src/graphics/gl/temporal_accumulation_buffer.cpp"
+  "src/graphics/gl/temporal_antialiasing_resource.cpp"
   "src/graphics/glad/gl.cpp"
   "src/graphics/scene.cpp"
 )
