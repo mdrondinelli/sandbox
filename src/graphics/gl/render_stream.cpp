@@ -233,7 +233,10 @@ void main() {
   vec3 light = vec3(0.0);
   light += ambient_irradiance.rgb;
   float n_dot_l = dot(n_world, directional_light_direction.xyz);
-  light += directional_light_irradiance.rgb * max(n_dot_l, 0.0) * calculate_csm_shadow_factor(p_world + n_world * 0.01, p_view.z, n_dot_l);
+  light +=
+    directional_light_irradiance.rgb *
+    max(n_dot_l, 0.0) *
+    calculate_csm_shadow_factor(p_world + n_world * 0.01, p_view.z, n_dot_l);
   out_color = vec4(light * color, 1.0);
 }
 )";
