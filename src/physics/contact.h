@@ -30,8 +30,8 @@ public:
   void update(std::array<math::Vec3f, 2> const &object_positions,
               std::array<math::Quatf, 2> const &object_orientations) noexcept {
     using namespace math;
-    auto constexpr max_position_distance = 0.01f;
-    auto constexpr min_orientation_abs_dot = 0.99f;
+    auto constexpr max_position_distance = 0.005f;
+    auto constexpr min_orientation_abs_dot = 0.995f;
     auto const object_rotations = std::array<Mat3x3f, 2>{
         Mat3x3f::rotation(object_orientations[0]),
         Mat3x3f::rotation(object_orientations[1]),
@@ -92,7 +92,7 @@ public:
   void marked(bool marked) noexcept { _marked = marked; }
 
 private:
-  static auto constexpr max_size = std::size_t{3};
+  static auto constexpr max_size = std::size_t{4};
 
   std::pair<Cached_contact *, float> closest(Contact const &contact) noexcept {
     auto const begin = _contacts.data();
