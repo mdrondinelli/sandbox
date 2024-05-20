@@ -21,7 +21,7 @@ struct Cascaded_shadow_map_create_info {
 
 class Cascaded_shadow_map {
 public:
-  static auto constexpr max_cascade_count = 8;
+  static auto constexpr max_cascade_count = 4;
 
   struct Intrinsic_state_create_info {};
 

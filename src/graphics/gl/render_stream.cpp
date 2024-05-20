@@ -53,6 +53,8 @@ void main() {
 constexpr auto surface_fragment_shader_source = R"(
 #version 460 core
 
+#define MAX_CASCADE_COUNT 4
+
 in Vertex_data {
   vec3 world_space_position;
   vec3 view_space_position;
@@ -72,7 +74,7 @@ struct Cascade {
 };
 
 layout(row_major, std140, binding = 0) uniform Cascaded_shadow_map {
-  Cascade cascades[8];
+  Cascade cascades[MAX_CASCADE_COUNT];
   int cascade_count;
 } csm;
 
