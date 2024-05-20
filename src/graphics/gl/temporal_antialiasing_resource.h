@@ -19,13 +19,9 @@ public:
   explicit Temporal_antialiasing_resource(
       Temporal_antialiasing_resource_create_info const &create_info);
 
-  operator bool() const noexcept {
-    return extents() != math::Vec2i::zero();
-  }
+  operator bool() const noexcept { return extents() != math::Vec2i::zero(); }
 
-  math::Vec2i const &extents() const noexcept {
-    return _extents;
-  }
+  math::Vec2i const &extents() const noexcept { return _extents; }
 
   Temporal_accumulation_buffer const &
   prev_accumulation_buffer() const noexcept {
@@ -37,6 +33,10 @@ public:
     return _accumulation_buffers[1 - _accumulation_buffer_index];
   }
 
+  Temporal_accumulation_buffer const &sample_buffer() const noexcept {
+    return _sample_buffer;
+  }
+
   void swap_accumulation_buffers() noexcept {
     _accumulation_buffer_index = 1 - _accumulation_buffer_index;
   }
@@ -44,6 +44,7 @@ public:
 private:
   math::Vec2i _extents{};
   std::array<Temporal_accumulation_buffer, 2> _accumulation_buffers;
+  Temporal_accumulation_buffer _sample_buffer;
   int _accumulation_buffer_index{};
 };
 } // namespace marlon::graphics::gl

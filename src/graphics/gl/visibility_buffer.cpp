@@ -1,5 +1,6 @@
 #include "visibility_buffer.h"
 
+#include <array>
 #include <stdexcept>
 
 #include <glad/gl.h>
@@ -10,6 +11,7 @@ Visibility_buffer::Visibility_buffer(
     : _extents{create_info.extents},
       _depth_texture{wrappers::make_unique_texture(GL_TEXTURE_2D)},
       _color_texture{wrappers::make_unique_texture(GL_TEXTURE_2D)},
+      _normal_texture{wrappers::make_unique_texture(GL_TEXTURE_2D)},
       _framebuffer{wrappers::make_unique_framebuffer()} {
   glTextureStorage2D(_depth_texture.get(),
                      1,
@@ -18,17 +20,30 @@ Visibility_buffer::Visibility_buffer(
                      create_info.extents.y);
   glTextureStorage2D(_color_texture.get(),
                      1,
-                     GL_RGB16F,
+                     GL_SRGB8_ALPHA8,
+                     create_info.extents.x,
+                     create_info.extents.y);
+  glTextureStorage2D(_normal_texture.get(),
+                     1,
+                     GL_RG16_SNORM,
                      create_info.extents.x,
                      create_info.extents.y);
   glTextureParameteri(_depth_texture.get(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTextureParameteri(_depth_texture.get(), GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTextureParameteri(_color_texture.get(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTextureParameteri(_color_texture.get(), GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTextureParameteri(_normal_texture.get(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTextureParameteri(_normal_texture.get(), GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glNamedFramebufferTexture(
       _framebuffer.get(), GL_DEPTH_ATTACHMENT, _depth_texture.get(), 0);
   glNamedFramebufferTexture(
       _framebuffer.get(), GL_COLOR_ATTACHMENT0, _color_texture.get(), 0);
+  glNamedFramebufferTexture(
+      _framebuffer.get(), GL_COLOR_ATTACHMENT1, _normal_texture.get(), 0);
+  auto const draw_buffers =
+      std::array<GLenum, 2>{GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+  glNamedFramebufferDrawBuffers(
+      _framebuffer.get(), draw_buffers.size(), draw_buffers.data());
   if (glCheckNamedFramebufferStatus(_framebuffer.get(), GL_FRAMEBUFFER) !=
       GL_FRAMEBUFFER_COMPLETE) {
     throw std::runtime_error{

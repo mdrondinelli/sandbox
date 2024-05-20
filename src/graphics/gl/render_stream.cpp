@@ -27,26 +27,21 @@ layout(location = 1) in vec3 model_space_normal;
 layout(location = 2) in vec2 texcoord;
 
 out Vertex_data {
-  vec3 world_space_position;
-  vec3 view_space_position;
   vec3 world_space_normal;
   vec2 texcoord;
 } vertex_data;
 
-layout(location = 0) uniform mat4 view_matrix;
-layout(location = 1) uniform mat4 projection_matrix;
+layout(location = 0) uniform mat4 view_projection_matrix;
 
-layout(row_major, std140, binding = 1) uniform Surface {
+layout(row_major, std140, binding = 0) uniform Surface {
   mat4x3 model_matrix;
   vec4 base_color_tint;
 } surface;
 
 void main() {
-  vertex_data.world_space_position = (surface.model_matrix * vec4(model_space_position, 1.0)).xyz;
-  vertex_data.view_space_position = (view_matrix * vec4(vertex_data.world_space_position, 1.0)).xyz;
   vertex_data.world_space_normal = mat3(surface.model_matrix) * model_space_normal;
   vertex_data.texcoord = texcoord;
-  gl_Position = projection_matrix * vec4(vertex_data.view_space_position, 1.0);
+  gl_Position = view_projection_matrix * vec4(surface.model_matrix * vec4(model_space_position, 1.0), 1.0);
 }
 )";
 
@@ -56,96 +51,100 @@ constexpr auto surface_fragment_shader_source = R"(
 #define MAX_CASCADE_COUNT 4
 
 in Vertex_data {
-  vec3 world_space_position;
-  vec3 view_space_position;
   vec3 world_space_normal;
   vec2 texcoord;
 } vertex_data;
 
 layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec2 out_normal;
+
+vec2 oct_encode(vec3 v) {
+  vec2 p = v.xy * (1.0 / (abs(v.x) + abs(v.y) + abs(v.z)));
+  return v.z <= 0.0 ? (1.0 - abs(p.yx)) * (2.0 * step(0.0, p) - 1.0) : p;
+}
 
 layout(binding = 0) uniform sampler2D base_color_texture;
-layout(binding = 1) uniform sampler2DArrayShadow shadow_map;
+// layout(binding = 1) uniform sampler2DArrayShadow shadow_map;
 
-struct Cascade {
-  mat4x3 view_clip_matrix;
-  float far_plane_distance;
-  float pixel_length;
-};
+// struct Cascade {
+//   mat4x3 view_clip_matrix;
+//   float far_plane_distance;
+//   float pixel_length;
+// };
 
-layout(row_major, std140, binding = 0) uniform Cascaded_shadow_map {
-  Cascade cascades[MAX_CASCADE_COUNT];
-  int cascade_count;
-} csm;
+// layout(row_major, std140, binding = 0) uniform Cascaded_shadow_map {
+//   Cascade cascades[MAX_CASCADE_COUNT];
+//   int cascade_count;
+// } csm;
 
-layout(row_major, std140, binding = 1) uniform Surface {
+layout(row_major, std140, binding = 0) uniform Surface {
   mat4x3 model_matrix;
   vec4 base_color_tint;
 } surface;
 
-layout(location = 2) uniform vec3 ambient_irradiance;
-layout(location = 3) uniform vec3 directional_light_irradiance;
-layout(location = 4) uniform vec3 directional_light_direction;
+// layout(location = 2) uniform vec3 ambient_irradiance;
+// layout(location = 3) uniform vec3 directional_light_irradiance;
+// layout(location = 4) uniform vec3 directional_light_direction;
 
-const float PHI = 1.61803398874989484820459; // Φ = Golden Ratio 
+// int select_csm_cascade() {
+//   float z = -vertex_data.view_space_position.z;
+//   for (int i = 0; i < csm.cascade_count - 1; ++i) {
+//     if (z < csm.cascades[i].far_plane_distance) {
+//       return i;
+//     }
+//   }
+//   return csm.cascade_count - 1;
+// }
 
-int select_csm_cascade() {
-  float z = -vertex_data.view_space_position.z;
-  for (int i = 0; i < csm.cascade_count - 1; ++i) {
-    if (z < csm.cascades[i].far_plane_distance) {
-      return i;
-    }
-  }
-  return csm.cascade_count - 1;
-}
-
-float calculate_csm_shadow_factor(float n_dot_l) {
-  int i = select_csm_cascade();
-  vec3 p_world =
-    vertex_data.world_space_position +
-    0.5 * csm.cascades[i].pixel_length * tan(acos(n_dot_l)) * directional_light_direction;
-  vec3 p_clip = csm.cascades[i].view_clip_matrix * vec4(p_world, 1.0);
-  vec4 texcoord = vec4(p_clip.xy * vec2(0.5, -0.5) + 0.5, i, clamp(p_clip.z, 0.0, 1.0));
-  return texture(shadow_map, texcoord);
-}
+// float calculate_csm_shadow_factor(float n_dot_l) {
+//   int i = select_csm_cascade();
+//   vec3 p_world =
+//     vertex_data.world_space_position +
+//     0.5 * csm.cascades[i].pixel_length * tan(acos(n_dot_l)) * directional_light_direction;
+//   vec3 p_clip = csm.cascades[i].view_clip_matrix * vec4(p_world, 1.0);
+//   vec4 texcoord = vec4(p_clip.xy * vec2(0.5, -0.5) + 0.5, i, clamp(p_clip.z, 0.0, 1.0));
+//   return texture(shadow_map, texcoord);
+// }
 
 void main() {
-  vec3 base_color = texture(base_color_texture, vertex_data.texcoord).rgb * surface.base_color_tint.rgb;
-  vec3 n = normalize(vertex_data.world_space_normal);
-  vec3 l = directional_light_direction;
-  float n_dot_l = dot(n, l);
-  float shadow_factor = calculate_csm_shadow_factor(n_dot_l);
-  vec3 irradiance = ambient_irradiance + directional_light_irradiance * max(n_dot_l, 0.0) * shadow_factor;
-  out_color = vec4(irradiance * base_color, 1.0);
-  // out_color = vec4(tonemap(irradiance * base_color * exposure), 1.0);
+  vec3 color = texture(base_color_texture, vertex_data.texcoord).rgb * surface.base_color_tint.rgb;
+  vec3 normal = normalize(vertex_data.world_space_normal);
+  out_color = vec4(color, 1.0);
+  out_normal = oct_encode(normal);
+  // vec3 l = directional_light_direction;
+  // float n_dot_l = dot(n, l);
+  // float shadow_factor = calculate_csm_shadow_factor(n_dot_l);
+  // vec3 irradiance = ambient_irradiance + directional_light_irradiance * max(n_dot_l, 0.0) * shadow_factor;
+  // out_color = vec4(irradiance * base_color, 1.0);
 }
 )";
 
-constexpr auto wireframe_vertex_shader_source = R"(
-#version 460 core
+// constexpr auto wireframe_vertex_shader_source = R"(
+// #version 460 core
 
-layout(location = 0) in vec3 model_space_position;
+// layout(location = 0) in vec3 model_space_position;
 
-layout(location = 0) uniform mat4 model_view_projection_matrix;
+// layout(location = 0) uniform mat4 model_view_projection_matrix;
 
-void main() {
-  gl_Position = model_view_projection_matrix * vec4(model_space_position, 1.0);
-}
-)";
+// void main() {
+//   gl_Position = model_view_projection_matrix *
+//   vec4(model_space_position, 1.0);
+// }
+// )";
 
-constexpr auto wireframe_fragment_shader_source = R"(
-#version 460 core
+// constexpr auto wireframe_fragment_shader_source = R"(
+// #version 460 core
 
-layout(location = 0) out vec4 out_color;
+// layout(location = 0) out vec4 out_color;
 
-layout(location = 1) uniform vec3 in_color;
+// layout(location = 1) uniform vec3 in_color;
 
-void main() {
-  out_color = vec4(in_color, 1.0);
-}
-)";
+// void main() {
+//   out_color = vec4(in_color, 1.0);
+// }
+// )";
 
-auto constexpr temporal_antialiasing_vertex_shader_source = R"(
+auto constexpr fullscreen_vertex_shader_source = R"(
 #version 460 core
 
 out vec2 texcoord;
@@ -154,6 +153,88 @@ void main() {
   vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(-1.0, 3.0), vec2(3.0, -1.0));
   texcoord = positions[gl_VertexID] * vec2(0.5, -0.5) + 0.5;
   gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+}
+)";
+
+auto constexpr lighting_fragment_shader_source = R"(
+#version 460 core
+
+in vec2 texcoord;
+
+out vec4 out_color;
+
+layout(binding = 0) uniform sampler2D depth_buffer;
+layout(binding = 1) uniform sampler2D color_buffer;
+layout(binding = 2) uniform sampler2D normal_buffer;
+layout(binding = 3) uniform sampler2DArrayShadow shadow_map;
+
+layout(row_major, std140, binding = 0) uniform Lighting {
+  mat4x3 inverse_view_matrix;
+  vec2 tan_half_fov;
+  float near_plane_distance;
+  vec4 ambient_irradiance;
+  vec4 directional_light_irradiance;
+  vec4 directional_light_direction;
+};
+
+vec3 decode_view_space_position(float d) {
+  float z_view = -near_plane_distance / d;
+  vec2 xy_ndc = vec2(texcoord.x * 2.0 - 1.0, texcoord.y * -2.0 + 1.0);
+  vec2 xy_view = vec2(-1.0, 1.0) * xy_ndc * z_view * tan_half_fov;
+  return vec3(xy_view, z_view);
+}
+
+vec3 decode_world_space_normal(vec2 e) {
+  vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
+  if (v.z < 0) {
+    v.xy = (1.0 - abs(v.yx)) * (2.0 * step(0.0, v.xy) - 1.0);
+  }
+  return normalize(v);
+}
+
+struct Cascade {
+  mat4x3 view_clip_matrix;
+  float far_plane_distance;
+  float pixel_length;
+};
+
+#define MAX_CASCADE_COUNT 4
+layout(row_major, std140, binding = 1) uniform Cascaded_shadow_map {
+  Cascade cascades[MAX_CASCADE_COUNT];
+  int cascade_count;
+} csm;
+
+int select_csm_cascade(float z_view) {
+  for (int i = 0; i < csm.cascade_count - 1; ++i) {
+    if (-z_view < csm.cascades[i].far_plane_distance) {
+      return i;
+    }
+  }
+  return csm.cascade_count - 1;
+}
+
+float calculate_csm_shadow_factor(vec3 p_world, float z_view, float n_dot_l) {
+  int i = select_csm_cascade(z_view);
+  vec3 bias = 0.5 * csm.cascades[i].pixel_length * tan(acos(n_dot_l)) * directional_light_direction.xyz;
+  vec3 p_clip = csm.cascades[i].view_clip_matrix * vec4(p_world + bias, 1.0);
+  vec4 texcoord = vec4(p_clip.xy * vec2(0.5, -0.5) + 0.5, i, clamp(p_clip.z, 0.0, 1.0));
+  return texture(shadow_map, texcoord);
+}
+
+void main() {
+  float depth = texture(depth_buffer, texcoord).r;
+  if (depth == 0.0) {
+    discard;
+  }
+  vec3 p_view = decode_view_space_position(depth);
+  vec3 p_world = inverse_view_matrix * vec4(p_view, 1.0);
+  vec3 n_world = decode_world_space_normal(texture(normal_buffer, texcoord).rg);
+  vec3 color = texture(color_buffer, texcoord).rgb;
+  vec3 light = vec3(0.0);
+  light += ambient_irradiance.rgb;
+  float n_dot_l = dot(n_world, directional_light_direction.xyz);
+  light += directional_light_irradiance.rgb * max(n_dot_l, 0.0) * calculate_csm_shadow_factor(p_world + n_world * 0.01, p_view.z, n_dot_l);
+  out_color = vec4(light * color, 1.0);
 }
 )";
 
@@ -168,22 +249,10 @@ layout(binding = 0) uniform sampler2D accumulation_buffer;
 layout(binding = 1) uniform sampler2D sample_buffer;
 
 void main() {
-  const float blend_factor = 1.0 / 16.0;
+  const float blend_factor = 1.0 / 32.0;
   vec3 accumulation_value = texture(accumulation_buffer, texcoord).rgb;
   vec3 sample_value = texture(sample_buffer, texcoord).rgb;
   out_color = vec4(mix(accumulation_value, sample_value, blend_factor), 1.0);
-}
-)";
-
-auto constexpr postprocessing_vertex_shader_source = R"(
-#version 460 core
-
-out vec2 texcoord;
-
-void main() {
-  vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(-1.0, 3.0), vec2(3.0, -1.0));
-  texcoord = positions[gl_VertexID] * vec2(0.5, -0.5) + 0.5;
-  gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
 }
 )";
 
@@ -242,17 +311,26 @@ Render_stream::Intrinsic_state::Intrinsic_state(
     : _cascaded_shadow_map_intrinsic_state{{}},
       _surface_shader_program{wrappers::make_unique_shader_program(
           surface_vertex_shader_source, surface_fragment_shader_source)},
-      _wireframe_shader_program{wrappers::make_unique_shader_program(
-          wireframe_vertex_shader_source, wireframe_fragment_shader_source)},
+      _lighting_shader_program{wrappers::make_unique_shader_program(
+          fullscreen_vertex_shader_source, lighting_fragment_shader_source)},
       _temporal_antialiasing_shader_program{
           wrappers::make_unique_shader_program(
-              temporal_antialiasing_vertex_shader_source,
+              fullscreen_vertex_shader_source,
               temporal_antialiasing_fragment_shader_source)},
       _postprocessing_shader_program{wrappers::make_unique_shader_program(
-          postprocessing_vertex_shader_source,
+          fullscreen_vertex_shader_source,
           postprocessing_fragment_shader_source)},
       _default_base_color_texture{make_default_base_color_texture()},
       _empty_vertex_array{wrappers::make_unique_vertex_array()} {}
+
+Render_stream::Render_stream(
+    Intrinsic_state const *intrinsic_state,
+    Render_stream_create_info const &create_info) noexcept
+    : _intrinsic_state{intrinsic_state},
+      _target{static_cast<Render_target *>(create_info.target)},
+      _scene{static_cast<Scene const *>(create_info.scene)},
+      _camera{create_info.camera},
+      _lighting_uniform_buffer{Uniform_buffer_create_info{.size = 112}} {}
 
 void Render_stream::render() {
   update_surface_resource();
@@ -266,11 +344,16 @@ void Render_stream::render() {
   glDepthFunc(GL_GREATER);
   glEnable(GL_FRAMEBUFFER_SRGB);
   draw_cascaded_shadow_maps();
-  draw_visibility_buffer();
+  auto const inverse_view_matrix =
+      Mat4x4f::rigid(_camera->position, _camera->orientation);
+  auto const view_matrix = rigid_inverse(inverse_view_matrix);
+  draw_visibility_buffer(view_matrix);
   glDisable(GL_DEPTH_TEST);
   glBindVertexArray(_intrinsic_state->empty_vertex_array());
+  do_lighting(inverse_view_matrix);
   do_temporal_antialiasing();
   do_postprocessing();
+  _taa_resource.swap_accumulation_buffers();
 }
 
 void Render_stream::update_surface_resource() {
@@ -311,13 +394,11 @@ void Render_stream::draw_cascaded_shadow_maps() {
   }
 }
 
-void Render_stream::draw_visibility_buffer() {
+void Render_stream::draw_visibility_buffer(math::Mat4x4f const &view_matrix) {
   auto const target_extents = _target->get_extents();
   if (_visibility_buffer.extents() != target_extents) {
     _visibility_buffer = Visibility_buffer{{.extents = target_extents}};
   }
-  auto const view_matrix =
-      rigid_inverse(Mat4x4f::rigid(_camera->position, _camera->orientation));
   auto const ndc_pixel_extents =
       Vec2f{2.0f / target_extents.x, 2.0f / target_extents.y};
   auto const jitter =
@@ -333,61 +414,62 @@ void Render_stream::draw_visibility_buffer() {
   glViewport(0, 0, target_extents.x, target_extents.y);
   // glDisable(GL_BLEND);
   // glDisable(GL_DEPTH_CLAMP);
-  draw_surfaces(view_matrix, projection_matrix);
-  glEnable(GL_POLYGON_OFFSET_LINE);
-  glPolygonOffset(1.0f, 1.0f);
-  glLineWidth(2.0f);
-  glDepthFunc(GL_GEQUAL);
-  // glEnable(GL_BLEND);
-  // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  // glEnable(GL_LINE_SMOOTH);
-  draw_wireframes(projection_matrix * view_matrix);
+  draw_surfaces(projection_matrix * view_matrix);
+  // glEnable(GL_POLYGON_OFFSET_LINE);
+  // glPolygonOffset(1.0f, 1.0f);
+  // glLineWidth(2.0f);
+  // glDepthFunc(GL_GEQUAL);
+  // // glEnable(GL_BLEND);
+  // // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  // // glEnable(GL_LINE_SMOOTH);
+  // draw_wireframes(projection_matrix * view_matrix);
 }
 
-void Render_stream::draw_surfaces(Mat4x4f const &view_matrix,
-                                  Mat4x4f const &projection_matrix) {
-  auto constexpr view_matrix_location = 0;
-  auto constexpr projection_matrix_location = 1;
-  auto constexpr ambient_irradiance_location = 2;
-  auto constexpr directional_light_irradiance_location = 3;
-  auto constexpr directional_light_direction_location = 4;
+void Render_stream::draw_surfaces(Mat4x4f const &view_projection_matrix) {
+  auto constexpr view_projection_matrix_location = 0;
   // auto constexpr exposure_location = 5;
   auto const shader_program = _intrinsic_state->surface_shader_program();
-  auto const ambient_irradiance = _scene->ambient_irradiance();
-  auto const &directional_light = _scene->directional_light();
+  // auto const ambient_irradiance = _scene->ambient_irradiance();
+  // auto const &directional_light = _scene->directional_light();
   // auto const exposure = _camera->exposure;
   glUseProgram(shader_program);
-  glProgramUniform3f(shader_program,
-                     ambient_irradiance_location,
-                     ambient_irradiance.r,
-                     ambient_irradiance.g,
-                     ambient_irradiance.b);
-  if (directional_light) {
-    if (_cascaded_shadow_map) {
-      glBindTextureUnit(1, _cascaded_shadow_map.texture());
-      glBindBufferBase(
-          GL_UNIFORM_BUFFER, 0, _cascaded_shadow_map.uniform_buffer());
-    }
-    glProgramUniform3f(shader_program,
-                       directional_light_irradiance_location,
-                       directional_light->irradiance.r,
-                       directional_light->irradiance.g,
-                       directional_light->irradiance.b);
-    glProgramUniform3f(shader_program,
-                       directional_light_direction_location,
-                       directional_light->direction.x,
-                       directional_light->direction.y,
-                       directional_light->direction.z);
-  } else {
-    glProgramUniform3f(shader_program,
-                       directional_light_irradiance_location,
-                       0.0f,
-                       0.0f,
-                       0.0f);
-    glProgramUniform3f(
-        shader_program, directional_light_direction_location, 1.0f, 0.0f, 0.0f);
-  }
+  // glProgramUniform3f(shader_program,
+  //                    ambient_irradiance_location,
+  //                    ambient_irradiance.r,
+  //                    ambient_irradiance.g,
+  //                    ambient_irradiance.b);
+  // if (directional_light) {
+  //   if (_cascaded_shadow_map) {
+  //     glBindTextureUnit(1, _cascaded_shadow_map.texture());
+  //     glBindBufferBase(
+  //         GL_UNIFORM_BUFFER, 0, _cascaded_shadow_map.uniform_buffer());
+  //   }
+  //   glProgramUniform3f(shader_program,
+  //                      directional_light_irradiance_location,
+  //                      directional_light->irradiance.r,
+  //                      directional_light->irradiance.g,
+  //                      directional_light->irradiance.b);
+  //   glProgramUniform3f(shader_program,
+  //                      directional_light_direction_location,
+  //                      directional_light->direction.x,
+  //                      directional_light->direction.y,
+  //                      directional_light->direction.z);
+  // } else {
+  //   glProgramUniform3f(shader_program,
+  //                      directional_light_irradiance_location,
+  //                      0.0f,
+  //                      0.0f,
+  //                      0.0f);
+  //   glProgramUniform3f(
+  //       shader_program, directional_light_direction_location, 1.0f, 0.0f,
+  //       0.0f);
+  // }
   // glProgramUniform1f(shader_program, exposure_location, exposure);
+  glProgramUniformMatrix4fv(shader_program,
+                            view_projection_matrix_location,
+                            1,
+                            GL_TRUE,
+                            &view_projection_matrix[0][0]);
   for (auto const surface : _scene->surfaces()) {
     if (!surface->visible) {
       continue;
@@ -399,19 +481,6 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_matrix,
     // glProgramUniformMatrix4fv(
     //     shader_program, model_matrix_location, 1, GL_TRUE,
     //     &model_matrix[0][0]);
-    glBindBufferRange(
-        GL_UNIFORM_BUFFER,
-        1,
-        _surface_resource.uniform_buffer().get(),
-        _surface_resource.get_mapping(surface).uniform_buffer_offset,
-        64);
-    glProgramUniformMatrix4fv(
-        shader_program, view_matrix_location, 1, GL_TRUE, &view_matrix[0][0]);
-    glProgramUniformMatrix4fv(shader_program,
-                              projection_matrix_location,
-                              1,
-                              GL_TRUE,
-                              &projection_matrix[0][0]);
     auto const &material = surface->material;
     if (auto const base_color_texture =
             static_cast<Texture *>(material.base_color_texture)) {
@@ -419,57 +488,95 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_matrix,
     } else {
       glBindTextureUnit(0, _intrinsic_state->default_base_color_texture());
     }
+    glBindBufferRange(
+        GL_UNIFORM_BUFFER,
+        0,
+        _surface_resource.uniform_buffer().get(),
+        _surface_resource.get_mapping(surface).uniform_buffer_offset,
+        64);
     auto const mesh = static_cast<Surface_mesh const *>(surface->mesh);
     mesh->bind_vertex_array();
     mesh->draw();
   }
   _surface_resource.release();
+}
+
+// void Render_stream::draw_wireframes(
+//     math::Mat4x4f const &view_projection_matrix) {
+//   auto constexpr model_view_projection_matrix_location = 0;
+//   auto constexpr color_location = 1;
+//   auto const shader_program = _intrinsic_state->wireframe_shader_program();
+//   glUseProgram(shader_program);
+//   for (auto const wireframe : _scene->wireframes()) {
+//     if (!wireframe->visible) {
+//       continue;
+//     }
+//     auto const model_matrix =
+//         Mat4x4f{wireframe->transform, {0.0f, 0.0f, 0.0f, 1.0f}};
+//     auto const model_view_projection_matrix =
+//         view_projection_matrix * model_matrix;
+//     glProgramUniformMatrix4fv(shader_program,
+//                               model_view_projection_matrix_location,
+//                               1,
+//                               GL_TRUE,
+//                               &model_view_projection_matrix[0][0]);
+//     glProgramUniform3f(shader_program,
+//                        color_location,
+//                        wireframe->color.r,
+//                        wireframe->color.g,
+//                        wireframe->color.b);
+//     auto const mesh = static_cast<Wireframe_mesh const *>(wireframe->mesh);
+//     mesh->bind_vertex_array();
+//     mesh->draw();
+//   }
+// }
+
+void Render_stream::do_lighting(Mat4x4f const &inverse_view_matrix) {
+  _lighting_uniform_buffer.acquire();
+  auto const data = _lighting_uniform_buffer.get().data();
+  std::memcpy(data, &inverse_view_matrix, 48);
+  auto const tan_half_fov =
+      Vec2f{1.0f / _camera->zoom.x, 1.0f / _camera->zoom.y};
+  std::memcpy(data + 48, &tan_half_fov, 8);
+  std::memcpy(data + 56, &_camera->near_plane_distance, 4);
+  auto const ambient_irradiance = _scene->ambient_irradiance();
+  std::memcpy(data + 64, &ambient_irradiance, 12);
+  if (auto const &directional_light = _scene->directional_light()) {
+    std::memcpy(data + 80, &directional_light->irradiance, 12);
+    std::memcpy(data + 96, &directional_light->direction, 12);
+  } else {
+    auto const v = Vec3f::zero();
+    std::memcpy(data + 80, &v, 12);
+    std::memcpy(data + 96, &v, 12);
+  }
+  auto const target_extents = _target->get_extents();
+  if (_taa_resource.extents() != target_extents) {
+    _taa_resource = Temporal_antialiasing_resource{{.extents = target_extents}};
+  }
+  auto const shader_program = _intrinsic_state->lighting_shader_program();
+  glBindFramebuffer(GL_FRAMEBUFFER,
+                    _taa_resource.sample_buffer().framebuffer());
+  glClear(GL_COLOR_BUFFER_BIT);
+  glUseProgram(shader_program);
+  glBindTextureUnit(0, _visibility_buffer.depth_texture());
+  glBindTextureUnit(1, _visibility_buffer.color_texture());
+  glBindTextureUnit(2, _visibility_buffer.normal_texture());
+  glBindTextureUnit(3, _cascaded_shadow_map.texture());
+  glBindBufferBase(GL_UNIFORM_BUFFER, 0, _lighting_uniform_buffer.get().get());
+  glBindBufferBase(GL_UNIFORM_BUFFER, 1, _cascaded_shadow_map.uniform_buffer());
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+  _lighting_uniform_buffer.release();
   if (_cascaded_shadow_map) {
     _cascaded_shadow_map.release();
   }
 }
 
-void Render_stream::draw_wireframes(
-    math::Mat4x4f const &view_projection_matrix) {
-  auto constexpr model_view_projection_matrix_location = 0;
-  auto constexpr color_location = 1;
-  auto const shader_program = _intrinsic_state->wireframe_shader_program();
-  glUseProgram(shader_program);
-  for (auto const wireframe : _scene->wireframes()) {
-    if (!wireframe->visible) {
-      continue;
-    }
-    auto const model_matrix =
-        Mat4x4f{wireframe->transform, {0.0f, 0.0f, 0.0f, 1.0f}};
-    auto const model_view_projection_matrix =
-        view_projection_matrix * model_matrix;
-    glProgramUniformMatrix4fv(shader_program,
-                              model_view_projection_matrix_location,
-                              1,
-                              GL_TRUE,
-                              &model_view_projection_matrix[0][0]);
-    glProgramUniform3f(shader_program,
-                       color_location,
-                       wireframe->color.r,
-                       wireframe->color.g,
-                       wireframe->color.b);
-    auto const mesh = static_cast<Wireframe_mesh const *>(wireframe->mesh);
-    mesh->bind_vertex_array();
-    mesh->draw();
-  }
-}
-
 void Render_stream::do_temporal_antialiasing() {
-  auto const target_extents = _target->get_extents();
-  if (_taa_resource.extents() != target_extents) {
-    _taa_resource = Temporal_antialiasing_resource{{.extents = target_extents}};
-  }
-  _taa_resource.swap_accumulation_buffers();
   glBindFramebuffer(GL_FRAMEBUFFER,
                     _taa_resource.curr_accumulation_buffer().framebuffer());
   glUseProgram(_intrinsic_state->temporal_antialiasing_shader_program());
   glBindTextureUnit(0, _taa_resource.prev_accumulation_buffer().texture());
-  glBindTextureUnit(1, _visibility_buffer.color_texture());
+  glBindTextureUnit(1, _taa_resource.sample_buffer().texture());
   glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 

@@ -7,5 +7,6 @@ Temporal_antialiasing_resource::Temporal_antialiasing_resource(
       _accumulation_buffers{
           Temporal_accumulation_buffer{{.extents = create_info.extents}},
           Temporal_accumulation_buffer{{.extents = create_info.extents}},
-      } {}
+      },
+      _sample_buffer{{.extents = create_info.extents}} {}
 } // namespace marlon::graphics::gl

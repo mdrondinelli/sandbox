@@ -32,8 +32,12 @@ public:
       return _surface_shader_program.get();
     }
 
-    constexpr std::uint32_t wireframe_shader_program() const noexcept {
-      return _wireframe_shader_program.get();
+    // constexpr std::uint32_t wireframe_shader_program() const noexcept {
+    //   return _wireframe_shader_program.get();
+    // }
+
+    constexpr std::uint32_t lighting_shader_program() const noexcept {
+      return _lighting_shader_program.get();
     }
 
     constexpr std::uint32_t
@@ -56,7 +60,8 @@ public:
   private:
     Cascaded_shadow_map::Intrinsic_state _cascaded_shadow_map_intrinsic_state;
     wrappers::Unique_shader_program _surface_shader_program;
-    wrappers::Unique_shader_program _wireframe_shader_program;
+    // wrappers::Unique_shader_program _wireframe_shader_program;
+    wrappers::Unique_shader_program _lighting_shader_program;
     wrappers::Unique_shader_program _temporal_antialiasing_shader_program;
     wrappers::Unique_shader_program _postprocessing_shader_program;
     wrappers::Unique_texture _default_base_color_texture;
@@ -64,11 +69,7 @@ public:
   };
 
   explicit Render_stream(Intrinsic_state const *intrinsic_state,
-                         Render_stream_create_info const &create_info) noexcept
-      : _intrinsic_state{intrinsic_state},
-        _target{static_cast<Render_target *>(create_info.target)},
-        _scene{static_cast<Scene const *>(create_info.scene)},
-        _camera{create_info.camera} {}
+                         Render_stream_create_info const &create_info) noexcept;
 
   void render() final;
 
@@ -83,15 +84,16 @@ private:
 
   void draw_cascaded_shadow_maps();
 
-  void draw_visibility_buffer();
+  void draw_visibility_buffer(math::Mat4x4f const &view_matrix);
 
-  void draw_surfaces(math::Mat4x4f const &view_matrix,
-                     math::Mat4x4f const &projection_matrix);
+  void draw_surfaces(math::Mat4x4f const &view_projection_matrix);
 
-  void draw_wireframes(math::Mat4x4f const &view_projection_matrix);
+  // void draw_wireframes(math::Mat4x4f const &view_projection_matrix);
+
+  void do_lighting(math::Mat4x4f const &inverse_view_matrix);
 
   void do_temporal_antialiasing();
-  
+
   void do_postprocessing();
 
   Intrinsic_state const *_intrinsic_state;
@@ -101,6 +103,7 @@ private:
   Surface_resource _surface_resource;
   Cascaded_shadow_map _cascaded_shadow_map;
   Visibility_buffer _visibility_buffer;
+  Triple_buffer<Uniform_buffer> _lighting_uniform_buffer;
   Temporal_antialiasing_resource _taa_resource;
 };
 } // namespace gl
