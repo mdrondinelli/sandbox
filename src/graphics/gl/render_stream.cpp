@@ -166,9 +166,10 @@ layout(binding = 0) uniform sampler2D accumulation_buffer;
 layout(binding = 1) uniform sampler2D sample_buffer;
 
 void main() {
+  const float blend_factor = 1.0 / 16.0;
   vec3 accumulation_value = texture(accumulation_buffer, texcoord).rgb;
   vec3 sample_value = texture(sample_buffer, texcoord).rgb;
-  out_color = vec4(mix(accumulation_value, sample_value, 0.1), 1.0);
+  out_color = vec4(mix(accumulation_value, sample_value, blend_factor), 1.0);
 }
 )";
 
@@ -469,7 +470,7 @@ void Render_stream::do_temporal_antialiasing() {
   glBindTextureUnit(1, _visibility_buffer.color_texture());
   glDrawArrays(GL_TRIANGLES, 0, 3);
 }
-  
+
 void Render_stream::do_postprocessing() {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glUseProgram(_intrinsic_state->postprocessing_shader_program());
