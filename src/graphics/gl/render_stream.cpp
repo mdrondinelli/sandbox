@@ -12,9 +12,7 @@
 #include "wireframe_mesh.h"
 #include "wrappers/unique_shader.h"
 
-namespace marlon {
-namespace graphics {
-namespace gl {
+namespace marlon::graphics::gl {
 using namespace math;
 using namespace util;
 
@@ -27,21 +25,25 @@ layout(location = 1) in vec3 model_space_normal;
 layout(location = 2) in vec2 texcoord;
 
 out Vertex_data {
+  vec3 model_space_position;
   vec3 world_space_normal;
   vec2 texcoord;
 } vertex_data;
 
-layout(location = 0) uniform mat4 view_projection_matrix;
+layout(location = 0) uniform mat4 jitter_matrix;
 
 layout(row_major, std140, binding = 0) uniform Surface {
+  mat4 current_model_view_projection_matrix;
+  mat4 previous_model_view_projection_matrix;
   mat4x3 model_matrix;
   vec4 base_color_tint;
 } surface;
 
 void main() {
+  vertex_data.model_space_position = model_space_position;
   vertex_data.world_space_normal = mat3(surface.model_matrix) * model_space_normal;
   vertex_data.texcoord = texcoord;
-  gl_Position = view_projection_matrix * vec4(surface.model_matrix * vec4(model_space_position, 1.0), 1.0);
+  gl_Position = jitter_matrix * (surface.current_model_view_projection_matrix * vec4(model_space_position, 1.0));
 }
 )";
 
@@ -51,12 +53,14 @@ constexpr auto surface_fragment_shader_source = R"(
 #define MAX_CASCADE_COUNT 4
 
 in Vertex_data {
+  vec3 model_space_position;
   vec3 world_space_normal;
   vec2 texcoord;
 } vertex_data;
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec2 out_normal;
+layout(location = 2) out vec2 out_motion_vector;
 
 vec2 oct_encode(vec3 v) {
   vec2 p = v.xy * (1.0 / (abs(v.x) + abs(v.y) + abs(v.z)));
@@ -64,58 +68,26 @@ vec2 oct_encode(vec3 v) {
 }
 
 layout(binding = 0) uniform sampler2D base_color_texture;
-// layout(binding = 1) uniform sampler2DArrayShadow shadow_map;
-
-// struct Cascade {
-//   mat4x3 view_clip_matrix;
-//   float far_plane_distance;
-//   float pixel_length;
-// };
-
-// layout(row_major, std140, binding = 0) uniform Cascaded_shadow_map {
-//   Cascade cascades[MAX_CASCADE_COUNT];
-//   int cascade_count;
-// } csm;
 
 layout(row_major, std140, binding = 0) uniform Surface {
+  mat4 current_model_view_projection_matrix;
+  mat4 previous_model_view_projection_matrix;
   mat4x3 model_matrix;
   vec4 base_color_tint;
 } surface;
-
-// layout(location = 2) uniform vec3 ambient_irradiance;
-// layout(location = 3) uniform vec3 directional_light_irradiance;
-// layout(location = 4) uniform vec3 directional_light_direction;
-
-// int select_csm_cascade() {
-//   float z = -vertex_data.view_space_position.z;
-//   for (int i = 0; i < csm.cascade_count - 1; ++i) {
-//     if (z < csm.cascades[i].far_plane_distance) {
-//       return i;
-//     }
-//   }
-//   return csm.cascade_count - 1;
-// }
-
-// float calculate_csm_shadow_factor(float n_dot_l) {
-//   int i = select_csm_cascade();
-//   vec3 p_world =
-//     vertex_data.world_space_position +
-//     0.5 * csm.cascades[i].pixel_length * tan(acos(n_dot_l)) * directional_light_direction;
-//   vec3 p_clip = csm.cascades[i].view_clip_matrix * vec4(p_world, 1.0);
-//   vec4 texcoord = vec4(p_clip.xy * vec2(0.5, -0.5) + 0.5, i, clamp(p_clip.z, 0.0, 1.0));
-//   return texture(shadow_map, texcoord);
-// }
 
 void main() {
   vec3 color = texture(base_color_texture, vertex_data.texcoord).rgb * surface.base_color_tint.rgb;
   vec3 normal = normalize(vertex_data.world_space_normal);
   out_color = vec4(color, 1.0);
   out_normal = oct_encode(normal);
-  // vec3 l = directional_light_direction;
-  // float n_dot_l = dot(n, l);
-  // float shadow_factor = calculate_csm_shadow_factor(n_dot_l);
-  // vec3 irradiance = ambient_irradiance + directional_light_irradiance * max(n_dot_l, 0.0) * shadow_factor;
-  // out_color = vec4(irradiance * base_color, 1.0);
+  vec4 current_clip_space_position = surface.current_model_view_projection_matrix * vec4(vertex_data.model_space_position, 1.0);
+  vec4 previous_clip_space_position = surface.previous_model_view_projection_matrix * vec4(vertex_data.model_space_position, 1.0);
+  vec2 current_ndc_position = current_clip_space_position.xy / current_clip_space_position.w;
+  vec2 previous_ndc_position = previous_clip_space_position.xy / previous_clip_space_position.w;
+  vec2 current_texcoord = vec2(0.5, -0.5) * current_ndc_position + 0.5;
+  vec2 previous_texcoord = vec2(0.5, -0.5) * previous_ndc_position + 0.5;
+  out_motion_vector = previous_texcoord - current_texcoord;
 }
 )";
 
@@ -228,8 +200,8 @@ void main() {
   }
   vec3 p_view = decode_view_space_position(depth);
   vec3 p_world = inverse_view_matrix * vec4(p_view, 1.0);
-  vec3 n_world = decode_world_space_normal(texture(normal_buffer, texcoord).rg);
   vec3 color = texture(color_buffer, texcoord).rgb;
+  vec3 n_world = decode_world_space_normal(texture(normal_buffer, texcoord).rg);
   vec3 light = vec3(0.0);
   light += ambient_irradiance.rgb;
   float n_dot_l = dot(n_world, directional_light_direction.xyz);
@@ -250,12 +222,20 @@ out vec4 out_color;
 
 layout(binding = 0) uniform sampler2D accumulation_buffer;
 layout(binding = 1) uniform sampler2D sample_buffer;
+layout(binding = 2) uniform sampler2D motion_vectors_buffer;
 
 void main() {
-  const float blend_factor = 1.0 / 32.0;
-  vec3 accumulation_value = texture(accumulation_buffer, texcoord).rgb;
+  vec2 motion_vector = texture(motion_vectors_buffer, texcoord).rg;
+  vec2 accumulation_texcoord = texcoord + vec2(1.0, 1.0) * motion_vector;
+  float blend_factor = 1.0;
+  if (accumulation_texcoord == clamp(accumulation_texcoord, vec2(0.0), vec2(1.0))) {
+    blend_factor = 1.0 / 32.0;
+  }
+  vec3 accumulation_value = texture(accumulation_buffer, accumulation_texcoord).rgb;
   vec3 sample_value = texture(sample_buffer, texcoord).rgb;
   out_color = vec4(mix(accumulation_value, sample_value, blend_factor), 1.0);
+  // out_color.rg = abs(motion_vector) * 10;
+  // out_color.ba = vec2(0.0, 1.0);
 }
 )";
 
@@ -299,11 +279,9 @@ wrappers::Unique_texture make_default_base_color_texture() {
   return result;
 }
 
-Mat4x4f perspective(Vec2f const &zoom,
-                    float near_plane_distance,
-                    Vec2f const &jitter = Vec2f::zero()) {
-  return Mat4x4f{{zoom.x, 0.0f, jitter.x, 0.0f},
-                 {0.0f, -zoom.y, jitter.y, 0.0f},
+Mat4x4f perspective(Vec2f const &zoom, float near_plane_distance) {
+  return Mat4x4f{{zoom.x, 0.0f, 0.0f, 0.0f},
+                 {0.0f, -zoom.y, 0.0f, 0.0f},
                  {0.0f, 0.0f, 0.0f, near_plane_distance},
                  {0.0f, 0.0f, -1.0f, 0.0f}};
 }
@@ -336,7 +314,19 @@ Render_stream::Render_stream(
       _lighting_uniform_buffer{Uniform_buffer_create_info{.size = 112}} {}
 
 void Render_stream::render() {
-  update_surface_resource();
+  auto const inverse_view_matrix =
+      Mat4x4f::rigid(_camera->position, _camera->orientation);
+  auto const view_matrix = rigid_inverse(inverse_view_matrix);
+  auto const target_extents = _target->get_extents();
+  auto const ndc_pixel_extents =
+      Vec2f{2.0f / target_extents.x, 2.0f / target_extents.y};
+  auto const jitter =
+      Vec2f{(rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.x,
+            (rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.y};
+  auto const projection_matrix =
+      perspective(_camera->zoom, _camera->near_plane_distance);
+  auto const view_projection_matrix = projection_matrix * view_matrix;
+  prepare_surface_resource(view_projection_matrix);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   glClearDepth(0.0f);
   glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
@@ -347,10 +337,8 @@ void Render_stream::render() {
   glDepthFunc(GL_GREATER);
   glEnable(GL_FRAMEBUFFER_SRGB);
   draw_cascaded_shadow_maps();
-  auto const inverse_view_matrix =
-      Mat4x4f::rigid(_camera->position, _camera->orientation);
-  auto const view_matrix = rigid_inverse(inverse_view_matrix);
-  draw_visibility_buffer(view_matrix);
+  glViewport(0, 0, target_extents.x, target_extents.y);
+  draw_visibility_buffer(Mat4x4f::translation(Vec3f{jitter, 0.0f}));
   glDisable(GL_DEPTH_TEST);
   glBindVertexArray(_intrinsic_state->empty_vertex_array());
   do_lighting(inverse_view_matrix);
@@ -359,7 +347,8 @@ void Render_stream::render() {
   _taa_resource.swap_accumulation_buffers();
 }
 
-void Render_stream::update_surface_resource() {
+void Render_stream::prepare_surface_resource(
+    Mat4x4f const &view_projection_matrix) {
   if (_surface_resource.max_surfaces() != _scene->surfaces().max_size()) {
     _surface_resource = Surface_resource{{
         .max_surfaces = _scene->surfaces().max_size(),
@@ -370,7 +359,7 @@ void Render_stream::update_surface_resource() {
     _surface_resource.add_mapping(surface);
   }
   _surface_resource.acquire();
-  _surface_resource.update();
+  _surface_resource.prepare(view_projection_matrix);
 }
 
 void Render_stream::draw_cascaded_shadow_maps() {
@@ -397,93 +386,27 @@ void Render_stream::draw_cascaded_shadow_maps() {
   }
 }
 
-void Render_stream::draw_visibility_buffer(math::Mat4x4f const &view_matrix) {
+void Render_stream::draw_visibility_buffer(math::Mat4x4f const &jitter_matrix) {
   auto const target_extents = _target->get_extents();
   if (_visibility_buffer.extents() != target_extents) {
     _visibility_buffer = Visibility_buffer{{.extents = target_extents}};
   }
-  auto const ndc_pixel_extents =
-      Vec2f{2.0f / target_extents.x, 2.0f / target_extents.y};
-  auto const jitter =
-      Vec2f{(rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.x,
-            (rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.y};
-  auto const projection_matrix =
-      perspective(_camera->zoom, _camera->near_plane_distance, jitter);
   // glBindFramebuffer(GL_FRAMEBUFFER, _target->get_framebuffer());
   glBindFramebuffer(GL_FRAMEBUFFER, _visibility_buffer.framebuffer());
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  // glEnable(GL_POLYGON_OFFSET_FILL);
-  // glPolygonOffset(1.0f, 1.0f);
-  glViewport(0, 0, target_extents.x, target_extents.y);
-  // glDisable(GL_BLEND);
-  // glDisable(GL_DEPTH_CLAMP);
-  draw_surfaces(projection_matrix * view_matrix);
-  // glEnable(GL_POLYGON_OFFSET_LINE);
-  // glPolygonOffset(1.0f, 1.0f);
-  // glLineWidth(2.0f);
-  // glDepthFunc(GL_GEQUAL);
-  // // glEnable(GL_BLEND);
-  // // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  // // glEnable(GL_LINE_SMOOTH);
-  // draw_wireframes(projection_matrix * view_matrix);
+  draw_surfaces(jitter_matrix);
 }
 
-void Render_stream::draw_surfaces(Mat4x4f const &view_projection_matrix) {
-  auto constexpr view_projection_matrix_location = 0;
-  // auto constexpr exposure_location = 5;
+void Render_stream::draw_surfaces(Mat4x4f const &jitter_matrix) {
+  auto constexpr jitter_matrix_location = 0;
   auto const shader_program = _intrinsic_state->surface_shader_program();
-  // auto const ambient_irradiance = _scene->ambient_irradiance();
-  // auto const &directional_light = _scene->directional_light();
-  // auto const exposure = _camera->exposure;
   glUseProgram(shader_program);
-  // glProgramUniform3f(shader_program,
-  //                    ambient_irradiance_location,
-  //                    ambient_irradiance.r,
-  //                    ambient_irradiance.g,
-  //                    ambient_irradiance.b);
-  // if (directional_light) {
-  //   if (_cascaded_shadow_map) {
-  //     glBindTextureUnit(1, _cascaded_shadow_map.texture());
-  //     glBindBufferBase(
-  //         GL_UNIFORM_BUFFER, 0, _cascaded_shadow_map.uniform_buffer());
-  //   }
-  //   glProgramUniform3f(shader_program,
-  //                      directional_light_irradiance_location,
-  //                      directional_light->irradiance.r,
-  //                      directional_light->irradiance.g,
-  //                      directional_light->irradiance.b);
-  //   glProgramUniform3f(shader_program,
-  //                      directional_light_direction_location,
-  //                      directional_light->direction.x,
-  //                      directional_light->direction.y,
-  //                      directional_light->direction.z);
-  // } else {
-  //   glProgramUniform3f(shader_program,
-  //                      directional_light_irradiance_location,
-  //                      0.0f,
-  //                      0.0f,
-  //                      0.0f);
-  //   glProgramUniform3f(
-  //       shader_program, directional_light_direction_location, 1.0f, 0.0f,
-  //       0.0f);
-  // }
-  // glProgramUniform1f(shader_program, exposure_location, exposure);
-  glProgramUniformMatrix4fv(shader_program,
-                            view_projection_matrix_location,
-                            1,
-                            GL_TRUE,
-                            &view_projection_matrix[0][0]);
+  glProgramUniformMatrix4fv(
+      shader_program, jitter_matrix_location, 1, GL_TRUE, &jitter_matrix[0][0]);
   for (auto const surface : _scene->surfaces()) {
     if (!surface->visible) {
       continue;
     }
-    // auto const model_matrix =
-    //     Mat4x4f{surface->transform, {0.0f, 0.0f, 0.0f, 1.0f}};
-    // auto const model_view_matrix = view_matrix * model_matrix;
-    // auto const model_view_clip_matrix = view_clip_matrix * model_matrix;
-    // glProgramUniformMatrix4fv(
-    //     shader_program, model_matrix_location, 1, GL_TRUE,
-    //     &model_matrix[0][0]);
     auto const &material = surface->material;
     if (auto const base_color_texture =
             static_cast<Texture *>(material.base_color_texture)) {
@@ -503,36 +426,6 @@ void Render_stream::draw_surfaces(Mat4x4f const &view_projection_matrix) {
   }
   _surface_resource.release();
 }
-
-// void Render_stream::draw_wireframes(
-//     math::Mat4x4f const &view_projection_matrix) {
-//   auto constexpr model_view_projection_matrix_location = 0;
-//   auto constexpr color_location = 1;
-//   auto const shader_program = _intrinsic_state->wireframe_shader_program();
-//   glUseProgram(shader_program);
-//   for (auto const wireframe : _scene->wireframes()) {
-//     if (!wireframe->visible) {
-//       continue;
-//     }
-//     auto const model_matrix =
-//         Mat4x4f{wireframe->transform, {0.0f, 0.0f, 0.0f, 1.0f}};
-//     auto const model_view_projection_matrix =
-//         view_projection_matrix * model_matrix;
-//     glProgramUniformMatrix4fv(shader_program,
-//                               model_view_projection_matrix_location,
-//                               1,
-//                               GL_TRUE,
-//                               &model_view_projection_matrix[0][0]);
-//     glProgramUniform3f(shader_program,
-//                        color_location,
-//                        wireframe->color.r,
-//                        wireframe->color.g,
-//                        wireframe->color.b);
-//     auto const mesh = static_cast<Wireframe_mesh const *>(wireframe->mesh);
-//     mesh->bind_vertex_array();
-//     mesh->draw();
-//   }
-// }
 
 void Render_stream::do_lighting(Mat4x4f const &inverse_view_matrix) {
   _lighting_uniform_buffer.acquire();
@@ -580,6 +473,7 @@ void Render_stream::do_temporal_antialiasing() {
   glUseProgram(_intrinsic_state->temporal_antialiasing_shader_program());
   glBindTextureUnit(0, _taa_resource.prev_accumulation_buffer().texture());
   glBindTextureUnit(1, _taa_resource.sample_buffer().texture());
+  glBindTextureUnit(2, _visibility_buffer.motion_vectors_texture());
   glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
@@ -591,6 +485,4 @@ void Render_stream::do_postprocessing() {
       _intrinsic_state->postprocessing_shader_program(), 0, _camera->exposure);
   glDrawArrays(GL_TRIANGLES, 0, 3);
 }
-} // namespace gl
-} // namespace graphics
-} // namespace marlon
+} // namespace marlon::graphics::gl

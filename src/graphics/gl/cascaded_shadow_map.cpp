@@ -20,7 +20,10 @@ layout(row_major, std140, binding = 0) uniform Cascade {
 };
 
 layout(row_major, std140, binding = 1) uniform Surface {
+  mat4 current_model_view_projection_matrix;
+  mat4 previous_model_view_projection_matrix;
   mat4x3 model_matrix;
+  vec4 base_color_tint;
 };
 
 void main() {

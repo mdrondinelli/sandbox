@@ -80,13 +80,13 @@ public:
   Camera const *camera() const noexcept final { return _camera; }
 
 private:
-  void update_surface_resource();
+  void prepare_surface_resource(math::Mat4x4f const &view_projection_matrix);
 
   void draw_cascaded_shadow_maps();
 
-  void draw_visibility_buffer(math::Mat4x4f const &view_matrix);
+  void draw_visibility_buffer(math::Mat4x4f const &jitter_matrix);
 
-  void draw_surfaces(math::Mat4x4f const &view_projection_matrix);
+  void draw_surfaces(math::Mat4x4f const &jitter_matrix);
 
   // void draw_wireframes(math::Mat4x4f const &view_projection_matrix);
 

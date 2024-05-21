@@ -41,19 +41,30 @@ void Surface_resource::clear_mappings() noexcept { _mappings.clear(); }
 
 void Surface_resource::acquire() { _uniform_buffers.acquire(); }
 
-void Surface_resource::update() {
+void Surface_resource::prepare(Mat4x4f const &view_projection_matrix) {
   auto const uniform_buffer_base = _uniform_buffers.get().data();
   for (auto const &[surface, mapping] : _mappings) {
     auto const surface_base =
         uniform_buffer_base + mapping.uniform_buffer_offset;
     auto const &model_matrix = surface->transform;
+    auto const current_model_view_projection_matrix =
+        view_projection_matrix *
+        Mat4x4f{model_matrix, {0.0f, 0.0f, 0.0f, 1.0f}};
+    auto const previous_model_view_projection_matrix =
+        _previous_view_projection_matrix
+            ? *_previous_view_projection_matrix *
+                  Mat4x4f{model_matrix, {0.0f, 0.0f, 0.0f, 1.0f}}
+            : current_model_view_projection_matrix;
     auto const base_color_tint = Vec4f{surface->material.base_color_tint.r,
                                        surface->material.base_color_tint.g,
                                        surface->material.base_color_tint.b,
                                        1.0f};
-    std::memcpy(surface_base, &model_matrix, 48);
-    std::memcpy(surface_base + 48, &base_color_tint, 16);
+    std::memcpy(surface_base, &current_model_view_projection_matrix, 64);
+    std::memcpy(surface_base + 64, &previous_model_view_projection_matrix, 64);
+    std::memcpy(surface_base + 128, &model_matrix, 48);
+    std::memcpy(surface_base + 176, &base_color_tint, 16);
   }
+  _previous_view_projection_matrix = view_projection_matrix;
 }
 
 void Surface_resource::release() { _uniform_buffers.release(); }

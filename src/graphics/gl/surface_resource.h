@@ -1,6 +1,8 @@
 #ifndef MARLON_GRAPHICS_GL_SURFACE_RESOURCE_H
 #define MARLON_GRAPHICS_GL_SURFACE_RESOURCE_H
 
+#include <optional>
+
 #include <util/map.h>
 #include <util/size.h>
 
@@ -37,7 +39,7 @@ public:
 
   void acquire();
 
-  void update();
+  void prepare(math::Mat4x4f const &view_projection_matrix);
 
   void release();
 
@@ -45,6 +47,7 @@ private:
   util::Size _max_surfaces{};
   util::Allocating_map<Surface const *, Mapping> _mappings;
   Triple_buffer<Uniform_buffer> _uniform_buffers;
+  std::optional<math::Mat4x4f> _previous_view_projection_matrix;
 };
 } // namespace marlon::graphics::gl
 
