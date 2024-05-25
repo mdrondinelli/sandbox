@@ -34,8 +34,8 @@ public:
     return _normal_texture.get();
   }
 
-  constexpr std::uint32_t motion_vectors_texture() const noexcept {
-    return _motion_vectors_texture.get();
+  constexpr std::uint32_t motion_vector_texture() const noexcept {
+    return _motion_vector_texture.get();
   }
 
   constexpr std::uint32_t framebuffer() const noexcept {
@@ -47,7 +47,7 @@ private:
   wrappers::Unique_texture _depth_texture;
   wrappers::Unique_texture _color_texture;
   wrappers::Unique_texture _normal_texture;
-  wrappers::Unique_texture _motion_vectors_texture;
+  wrappers::Unique_texture _motion_vector_texture;
   wrappers::Unique_framebuffer _framebuffer;
 };
 } // namespace marlon::graphics::gl

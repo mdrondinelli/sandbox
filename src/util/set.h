@@ -40,7 +40,7 @@ class Set {
 
     void next(Node *next) noexcept { _next = next; }
 
-    T &value() noexcept { return *reinterpret_cast<T *>(&storage); }
+    T &value() noexcept { return *std::launder(reinterpret_cast<T *>(&storage)); }
   };
 
   static auto constexpr alignment = std::max(alignof(Bucket), alignof(Node));
