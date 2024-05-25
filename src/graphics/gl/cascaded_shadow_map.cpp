@@ -96,10 +96,11 @@ void Cascaded_shadow_map::release() {
   _uniform_buffers.release();
 }
 
-void Cascaded_shadow_map::draw(Scene const &scene,
-                               Camera const &camera,
-                               Vec3f const &light_z_axis,
-                               Surface_resource const &surface_resource) {
+void Cascaded_shadow_map::draw(
+    Scene const &scene,
+    Camera const &camera,
+    Vec3f const &light_z_axis,
+    Surface_resource const &acquired_surface_resource) {
   auto constexpr lambda = 3.0f / 4.0f;
   auto const c_log = [&](float i) {
     return camera.near_plane_distance *
@@ -273,8 +274,8 @@ void Cascaded_shadow_map::draw(Scene const &scene,
           glBindBufferRange(
               GL_UNIFORM_BUFFER,
               1,
-              surface_resource.uniform_buffer().get(),
-              surface_resource.get_mapping(surface).uniform_buffer_offset,
+              acquired_surface_resource.uniform_buffer(),
+              acquired_surface_resource.uniform_buffer_offset(surface),
               48);
           mesh->bind_vertex_array();
           mesh->draw();

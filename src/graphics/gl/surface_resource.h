@@ -16,38 +16,39 @@ struct Surface_resource_create_info {
 };
 
 class Surface_resource {
-public:
-  struct Mapping {
+  struct Surface_data {
     util::Size uniform_buffer_offset;
+    math::Mat4x4f model_view_projection_matrix;
+    bool marked;
   };
 
+public:
   Surface_resource() noexcept = default;
 
   Surface_resource(Surface_resource_create_info const &create_info);
 
   util::Size max_surfaces() const noexcept;
 
-  Mapping const &get_mapping(Surface const *surface) const noexcept;
+  // only call when acquired
+  std::uint32_t uniform_buffer() const noexcept;
 
-  Mapping const &add_mapping(Surface const *surface);
+  // only call when acquired
+  util::Size uniform_buffer_offset(Surface const *surface) const noexcept;
 
-  void clear_mappings() noexcept;
-
-  Uniform_buffer const &uniform_buffer() const noexcept {
-    return _uniform_buffers.get();
-  }
+  // only call when acquired
+  void write(Surface const *surface,
+             math::Mat4x4f const &view_projection_matrix);
 
   void acquire();
 
-  void prepare(math::Mat4x4f const &view_projection_matrix);
-
   void release();
 
+  // void prepare(math::Mat4x4f const &view_projection_matrix);
+
 private:
-  util::Size _max_surfaces{};
-  util::Allocating_map<Surface const *, Mapping> _mappings;
+  util::Allocating_map<Surface const *, Surface_data> _surfaces;
   Triple_buffer<Uniform_buffer> _uniform_buffers;
-  std::optional<math::Mat4x4f> _previous_view_projection_matrix;
+  util::Size _uniform_buffer_offset{};
 };
 } // namespace marlon::graphics::gl
 

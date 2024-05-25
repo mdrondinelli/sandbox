@@ -2,3 +2,4 @@ AllowAllArgumentsOnNextLine: true
 BinPackArguments: false
 BinPackParameters: false
 PackConstructorInitializers: NextLine
+ColumnLimit: 120

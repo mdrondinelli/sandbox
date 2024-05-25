@@ -245,39 +245,80 @@ public:
   }
 };
 
-// class Polymorphic_allocator {
-// public:
-//   Polymorphic_allocator() = default;
+class Polymorphic_allocator {
+public:
+  Polymorphic_allocator() = default;
 
-//   template <typename Allocator>
-//   Polymorphic_allocator(Allocator *allocator)
-//       : _allocator{allocator}, _vtable{&vtable<Allocator>} {}
+  template <typename Allocator>
+  Polymorphic_allocator(Allocator *allocator)
+      : _allocator{allocator}, _vtable{&vtable<Allocator>} {}
 
-//   Block alloc(Size size) { return _vtable->alloc(_allocator, size); }
+  Block alloc(Size size) { return _vtable->alloc(_allocator, size); }
 
-//   void free(Block block) noexcept { _vtable->free(_allocator, block); }
+  void free(Block block) noexcept { _vtable->free(_allocator, block); }
 
-// private:
-//   struct Vtable {
-//     std::add_pointer_t<Block(void *, Size)> alloc;
-//     std::add_pointer_t<void(void *, Block)> free;
-//   };
+private:
+  struct Vtable {
+    std::add_pointer_t<Block(void *, Size)> alloc;
+    std::add_pointer_t<void(void *, Block)> free;
+  };
 
-//   template <typename Allocator>
-//   static auto constexpr vtable = Vtable{
-//       .alloc =
-//           [](void *allocator, Size size) {
-//             return static_cast<Allocator *>(allocator)->alloc(size);
-//           },
-//       .free =
-//           [](void *allocator, Block block) {
-//             return static_cast<Allocator *>(allocator)->free(block);
-//           },
-//   };
+  template <typename Allocator>
+  static auto constexpr vtable = Vtable{
+      .alloc =
+          [](void *allocator, Size size) {
+            return static_cast<Allocator *>(allocator)->alloc(size);
+          },
+      .free =
+          [](void *allocator, Block block) {
+            return static_cast<Allocator *>(allocator)->free(block);
+          },
+  };
 
-//   void *_allocator{};
-//   Vtable *_vtable{};
-// };
+  void *_allocator{};
+  Vtable *_vtable{};
+};
+
+template <typename Allocator = System_allocator>
+class Unique_block : private Allocator {
+public:
+  Unique_block() = default;
+
+  explicit Unique_block(Allocator const &allocator, Size size)
+      : Allocator{allocator}, _block{Allocator::alloc(size)} {}
+
+  explicit Unique_block(Allocator &&allocator, Size size)
+      : Allocator{std::move(allocator)}, _block{Allocator::alloc(size)} {}
+
+  explicit Unique_block(Size size) : _block{Allocator::alloc(size)} {}
+
+  Unique_block(Unique_block &&other) noexcept
+      : Allocator{std::move(static_cast<Allocator&>(other))},
+        _block{std::exchange(other._block, Block{})} {}
+
+  Unique_block &operator=(Unique_block &&other) noexcept {
+    auto temp{std::move(other)};
+    swap(temp);
+    return *this;
+  }
+
+  ~Unique_block() {
+    if (_block.size() != 0) {
+      Allocator::free(_block);
+    }
+  }
+
+  Block get() const noexcept { return _block; }
+
+private:
+  void swap(Unique_block &other) noexcept {
+    using std::swap;
+    swap(static_cast<Allocator &>(*this), static_cast<Allocator &>(other));
+    swap(_block, other._block);
+  }
+
+  Block _block{};
+};
 
 // class Unique_block {
 // public:

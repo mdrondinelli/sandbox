@@ -123,7 +123,7 @@ public:
   void draw(Scene const &scene,
             Camera const &camera,
             math::Vec3f const &light_z_axis,
-            Surface_resource const &surface_resource);
+            Surface_resource const &acquired_surface_resource);
 
 private:
   void update_uniform_buffer();

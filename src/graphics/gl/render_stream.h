@@ -1,6 +1,8 @@
 #ifndef MARLON_GL_RENDER_STREAM_H
 #define MARLON_GL_RENDER_STREAM_H
 
+#include <chrono>
+
 #include "../render_stream.h"
 #include "./wrappers/unique_shader_program.h"
 #include "./wrappers/unique_texture.h"
@@ -23,25 +25,19 @@ public:
 
     Intrinsic_state(Intrinsic_state_create_info const &);
 
-    Cascaded_shadow_map::Intrinsic_state const *
-    cascaded_shadow_map_intrinsic_state() const noexcept {
+    Cascaded_shadow_map::Intrinsic_state const *cascaded_shadow_map_intrinsic_state() const noexcept {
       return &_cascaded_shadow_map_intrinsic_state;
     }
 
-    constexpr std::uint32_t surface_shader_program() const noexcept {
-      return _surface_shader_program.get();
-    }
+    constexpr std::uint32_t surface_shader_program() const noexcept { return _surface_shader_program.get(); }
 
     // constexpr std::uint32_t wireframe_shader_program() const noexcept {
     //   return _wireframe_shader_program.get();
     // }
 
-    constexpr std::uint32_t lighting_shader_program() const noexcept {
-      return _lighting_shader_program.get();
-    }
+    constexpr std::uint32_t lighting_shader_program() const noexcept { return _lighting_shader_program.get(); }
 
-    constexpr std::uint32_t
-    temporal_antialiasing_shader_program() const noexcept {
+    constexpr std::uint32_t temporal_antialiasing_shader_program() const noexcept {
       return _temporal_antialiasing_shader_program.get();
     }
 
@@ -49,13 +45,9 @@ public:
       return _postprocessing_shader_program.get();
     }
 
-    constexpr std::uint32_t default_base_color_texture() const noexcept {
-      return _default_base_color_texture.get();
-    }
+    constexpr std::uint32_t default_base_color_texture() const noexcept { return _default_base_color_texture.get(); }
 
-    constexpr std::uint32_t empty_vertex_array() const noexcept {
-      return _empty_vertex_array.get();
-    }
+    constexpr std::uint32_t empty_vertex_array() const noexcept { return _empty_vertex_array.get(); }
 
   private:
     Cascaded_shadow_map::Intrinsic_state _cascaded_shadow_map_intrinsic_state;
@@ -68,8 +60,7 @@ public:
     wrappers::Unique_vertex_array _empty_vertex_array;
   };
 
-  explicit Render_stream(Intrinsic_state const *intrinsic_state,
-                         Render_stream_create_info const &create_info) noexcept;
+  explicit Render_stream(Intrinsic_state const *intrinsic_state, Render_stream_create_info const &create_info) noexcept;
 
   void render() final;
 
@@ -80,9 +71,19 @@ public:
   Camera const *camera() const noexcept final { return _camera; }
 
 private:
-  void prepare_surface_resource(math::Mat4x4f const &view_projection_matrix);
+  using Clock = std::chrono::system_clock;
 
-  void draw_cascaded_shadow_maps();
+  void acquire_surface_resource();
+
+  void release_surface_resource();
+
+  void write_surface_resource(math::Mat4x4f const &view_projection_matrix);
+
+  void acquire_cascaded_shadow_map();
+
+  void release_cascaded_shadow_map();
+
+  void draw_cascaded_shadow_map();
 
   void draw_visibility_buffer(math::Mat4x4f const &jitter_matrix);
 
@@ -92,7 +93,7 @@ private:
 
   void do_lighting(math::Mat4x4f const &inverse_view_matrix);
 
-  void do_temporal_antialiasing();
+  void do_temporal_antialiasing(float blend_factor);
 
   void do_postprocessing();
 
@@ -105,6 +106,8 @@ private:
   Visibility_buffer _visibility_buffer;
   Triple_buffer<Uniform_buffer> _lighting_uniform_buffer;
   Temporal_antialiasing_resource _taa_resource;
+  std::uint32_t _frame_number{};
+  std::optional<std::chrono::time_point<Clock>> _frame_time;
 };
 } // namespace gl
 } // namespace graphics
