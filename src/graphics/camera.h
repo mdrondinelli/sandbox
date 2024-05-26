@@ -13,7 +13,7 @@ struct Camera {
   int csm_texture_resolution{4096};
   int csm_cascade_count{4};
   float csm_render_distance{200.0f};
-  float exposure{0.03f};
+  float exposure{0.01f};
 };
 } // namespace graphics
 } // namespace marlon

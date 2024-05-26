@@ -144,7 +144,8 @@ layout(row_major, std140, binding = 0) uniform Lighting {
   mat4x3 inverse_view_matrix;
   vec2 tan_half_fov;
   float near_plane_distance;
-  vec4 ambient_irradiance;
+  vec4 sky_irradiance;
+  vec4 ground_albedo;
   vec4 directional_light_irradiance;
   vec4 directional_light_direction;
   uint frame_number;
@@ -220,6 +221,8 @@ float calculate_csm_shadow_factor(vec3 p_world, float z_view, float n_dot_l) {
   return texture(shadow_map, texcoord);
 }
 
+#define PI 3.14159
+#define INV_PI (1.0 / PI)
 void main() {
   float depth = texture(depth_buffer, texcoord).r;
   if (depth == 0.0) {
@@ -229,14 +232,19 @@ void main() {
   vec3 p_world = inverse_view_matrix * vec4(p_view, 1.0);
   vec3 color = texture(color_buffer, texcoord).rgb;
   vec3 n_world = decode_world_space_normal(texture(normal_buffer, texcoord).rg);
-  vec3 light = vec3(0.0);
-  light += ambient_irradiance.rgb;
+  vec3 irradiance = vec3(0.0);
+  vec3 ground_irradiance =
+    ground_albedo.rgb * (
+      sky_irradiance.rgb +
+      PI * directional_light_irradiance.rgb * max(directional_light_direction.y, 0.0)
+    );
+  vec3 ambient_irradiance = mix(ground_irradiance, sky_irradiance.rgb, n_world.y * 0.5 + 0.5);
+  irradiance += ambient_irradiance;
   float n_dot_l = dot(n_world, directional_light_direction.xyz);
-  light +=
-    directional_light_irradiance.rgb *
-    max(n_dot_l, 0.0) *
-    calculate_csm_shadow_factor(p_world + n_world * 0.01, p_view.z, n_dot_l);
-  out_color = vec4(light * color, 1.0);
+  irradiance +=
+    PI * directional_light_irradiance.rgb * max(n_dot_l, 0.0) *
+    calculate_csm_shadow_factor(p_world + n_world * 0.005, p_view.z, n_dot_l);
+  out_color = vec4(color * INV_PI * irradiance, 1.0);
 }
 )";
 
@@ -293,9 +301,6 @@ void main() {
   vec3 accumulation_value = texture(accumulation_buffer, accumulation_texcoord).rgb;
   vec3 clamped_accumulation_value = clamp(accumulation_value, neighborhood_min, neighborhood_max);
   out_color = vec4(mix(clamped_accumulation_value, sample_value, blend_factor), 1.0);
-  // out_color = vec4(texture(depth_buffer, texcoord).rrr * 400, 1.0);
-  // out_color.rg = abs(motion_vector) * 10;
-  // out_color.ba = vec2(0.0, 1.0);
 }
 )";
 
@@ -365,14 +370,18 @@ Render_stream::Render_stream(Intrinsic_state const *intrinsic_state,
       _target{static_cast<Render_target *>(create_info.target)},
       _scene{static_cast<Scene const *>(create_info.scene)},
       _camera{create_info.camera},
-      _lighting_uniform_buffer{Uniform_buffer_create_info{.size = 116}} {}
+      _lighting_uniform_buffer{Uniform_buffer_create_info{.size = 132}} {}
 
 void Render_stream::render() {
+  auto const target_extents = _target->get_extents();
+  if (target_extents == Vec2i::zero()) {
+    return;
+  }
   auto const frame_time = Clock::now();
   auto const taa_blend_factor = [&]{
     if (_frame_time) {
       auto const frame_duration = std::chrono::duration_cast<std::chrono::duration<float>>(frame_time - *_frame_time);
-      return 1.0f - pow(0.01f, 1.0f * frame_duration.count());
+      return 1.0f - pow(1.0f - 0.05f, 60.0f * frame_duration.count());
     } else {
       return 1.0f;
     }
@@ -395,7 +404,6 @@ void Render_stream::render() {
   glEnable(GL_DEPTH_TEST);
   acquire_cascaded_shadow_map();
   draw_cascaded_shadow_map();
-  auto const target_extents = _target->get_extents();
   auto const ndc_pixel_extents = Vec2f{2.0f / target_extents.x, 2.0f / target_extents.y};
   auto const jitter = Vec2f{(rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.x,
                             (rand() / (float)RAND_MAX - 0.5f) * ndc_pixel_extents.y};
@@ -509,17 +517,19 @@ void Render_stream::do_lighting(Mat4x4f const &inverse_view_matrix) {
   auto const tan_half_fov = Vec2f{1.0f / _camera->zoom.x, 1.0f / _camera->zoom.y};
   std::memcpy(data + 48, &tan_half_fov, 8);
   std::memcpy(data + 56, &_camera->near_plane_distance, 4);
-  auto const ambient_irradiance = _scene->ambient_irradiance();
-  std::memcpy(data + 64, &ambient_irradiance, 12);
+  auto const sky_irradiance = _scene->sky_irradiance();
+  std::memcpy(data + 64, &sky_irradiance, 12);
+  auto const ground_albedo = _scene->ground_albedo();
+  std::memcpy(data + 80, &ground_albedo, 12);
   if (auto const &directional_light = _scene->directional_light()) {
-    std::memcpy(data + 80, &directional_light->irradiance, 12);
-    std::memcpy(data + 96, &directional_light->direction, 12);
+    std::memcpy(data + 96, &directional_light->irradiance, 12);
+    std::memcpy(data + 112, &directional_light->direction, 12);
   } else {
     auto const v = Vec3f::zero();
-    std::memcpy(data + 80, &v, 12);
     std::memcpy(data + 96, &v, 12);
+    std::memcpy(data + 112, &v, 12);
   }
-  std::memcpy(data + 112, &_frame_number, 4);
+  std::memcpy(data + 128, &_frame_number, 4);
   auto const target_extents = _target->get_extents();
   if (_taa_resource.extents() != target_extents) {
     _taa_resource = Temporal_antialiasing_resource{{.extents = target_extents}};

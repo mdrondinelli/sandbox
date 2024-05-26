@@ -14,8 +14,9 @@ namespace engine {
 struct App_create_info {
   physics::World_create_info world_create_info;
   physics::World_simulate_info world_simulate_info;
-  math::Vec2i window_extents{1280, 720};
   std::string_view window_title{"app"};
+  math::Vec2i window_extents{1280, 720};
+  bool full_screen{false};
 };
 
 class App {
@@ -76,8 +77,9 @@ private:
   physics::World_create_info _world_create_info;
   physics::World_simulate_info _world_simulate_info;
   physics::World_simulate_result _world_simulate_result;
-  math::Vec2i _window_extents;
   std::string _window_title;
+  math::Vec2i _window_extents;
+  bool _full_screen;
   std::unique_ptr<Runtime> _runtime;
   bool _looping{false};
   double _loop_iteration_wall_time{0.0};

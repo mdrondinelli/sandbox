@@ -23,33 +23,26 @@ public:
 
   ~Scene();
 
-  Rgb_spectrum ambient_irradiance() const noexcept {
-    return _ambient_irradiance;
-  }
+  Rgb_spectrum sky_irradiance() const noexcept { return _sky_irradiance; }
 
-  void ambient_irradiance(Rgb_spectrum ambient_irradiance) noexcept {
-    _ambient_irradiance = ambient_irradiance;
-  }
+  void sky_irradiance(Rgb_spectrum sky_irradiance) noexcept { _sky_irradiance = sky_irradiance; }
 
-  std::optional<Directional_light> const &directional_light() const noexcept {
-    return _directional_light;
-  }
+  Rgb_spectrum ground_albedo() const noexcept { return _ground_albedo; }
 
-  void directional_light(
-      std::optional<Directional_light> const &directional_light) noexcept {
+  void ground_albedo(Rgb_spectrum ground_albedo) { _ground_albedo = ground_albedo; }
+
+  std::optional<Directional_light> const &directional_light() const noexcept { return _directional_light; }
+
+  void directional_light(std::optional<Directional_light> const &directional_light) noexcept {
     _directional_light = directional_light;
   }
 
-  util::Set<Surface const *> const &surfaces() const noexcept {
-    return _surfaces;
-  }
+  util::Set<Surface const *> const &surfaces() const noexcept { return _surfaces; }
 
-  util::Set<Wireframe const *> const &wireframes() const noexcept {
-    return _wireframes;
-  }
+  util::Set<Wireframe const *> const &wireframes() const noexcept { return _wireframes; }
 
   void clear() {
-    _ambient_irradiance = Rgb_spectrum::black();
+    _sky_irradiance = Rgb_spectrum::black();
     _directional_light = std::nullopt;
     clear_surfaces();
     clear_wireframes();
@@ -65,15 +58,14 @@ public:
 
   void remove(Surface const *surface) noexcept { _surfaces.erase(surface); }
 
-  void remove(Wireframe const *wireframe) noexcept {
-    _wireframes.erase(wireframe);
-  }
+  void remove(Wireframe const *wireframe) noexcept { _wireframes.erase(wireframe); }
 
 private:
   util::Block _memory;
   util::Set<Surface const *> _surfaces;
   util::Set<Wireframe const *> _wireframes;
-  Rgb_spectrum _ambient_irradiance{Rgb_spectrum::black()};
+  Rgb_spectrum _sky_irradiance{Rgb_spectrum::black()};
+  Rgb_spectrum _ground_albedo{Rgb_spectrum{0.25f}};
   std::optional<Directional_light> _directional_light;
 };
 } // namespace graphics

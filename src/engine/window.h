@@ -152,8 +152,9 @@ enum class Mouse_button {
 enum class Cursor_mode { normal, hidden, disabled };
 
 struct Window_create_info {
-  math::Vec2i extents;
   const char *title;
+  math::Vec2i extents;
+  bool full_screen;
 };
 
 // Member functions, including constructor, must be called from the main thread

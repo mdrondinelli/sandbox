@@ -22,6 +22,12 @@ public:
     return Rgb_spectrum{1.0f};
   }
 };
+
+constexpr Rgb_spectrum mix(Rgb_spectrum a, Rgb_spectrum b, float t) noexcept {
+  auto const wa = 1.0f - t;
+  auto const wb = t;
+  return {wa * a.r + wb * b.r, wa * a.g + wb * b.g, wa * a.b + wb * b.b};
+}
 } // namespace graphics
 } // namespace marlon
 

@@ -50,9 +50,7 @@ public:
 
   graphics::Graphics *get_graphics() noexcept { return &_graphics; }
 
-  graphics::Render_target *get_render_target() noexcept {
-    return _graphics.get_default_render_target();
-  }
+  graphics::Render_target *get_render_target() noexcept { return _graphics.get_default_render_target(); }
 
   graphics::Scene *get_scene() noexcept { return &_scene; }
 
@@ -77,8 +75,9 @@ private:
 App::App(App_create_info const &create_info)
     : _world_create_info{create_info.world_create_info},
       _world_simulate_info{create_info.world_simulate_info},
+      _window_title{create_info.window_title},
       _window_extents{create_info.window_extents},
-      _window_title{create_info.window_title} {}
+      _full_screen{create_info.full_screen} {}
 
 App::~App() {}
 
@@ -88,8 +87,9 @@ int App::run() {
   // try {
   _runtime = std::make_unique<Runtime>(_world_create_info,
                                        Window_create_info{
-                                           .extents = _window_extents,
                                            .title = _window_title.c_str(),
+                                           .extents = _window_extents,
+                                           .full_screen = _full_screen,
                                        });
   pre_loop();
   loop();
@@ -105,40 +105,25 @@ int App::run() {
   return result;
 }
 
-physics::World const *App::get_world() const noexcept {
-  return _runtime->get_world();
-}
+physics::World const *App::get_world() const noexcept { return _runtime->get_world(); }
 
 physics::World *App::get_world() noexcept { return _runtime->get_world(); }
 
-physics::World_simulate_result const &
-App::get_world_simulate_result() const noexcept {
-  return _world_simulate_result;
-}
+physics::World_simulate_result const &App::get_world_simulate_result() const noexcept { return _world_simulate_result; }
 
-Window const *App::get_window() const noexcept {
-  return _runtime->get_window();
-}
+Window const *App::get_window() const noexcept { return _runtime->get_window(); }
 
 Window *App::get_window() noexcept { return _runtime->get_window(); }
 
-graphics::Graphics const *App::get_graphics() const noexcept {
-  return _runtime->get_graphics();
-}
+graphics::Graphics const *App::get_graphics() const noexcept { return _runtime->get_graphics(); }
 
-graphics::Graphics *App::get_graphics() noexcept {
-  return _runtime->get_graphics();
-}
+graphics::Graphics *App::get_graphics() noexcept { return _runtime->get_graphics(); }
 
-graphics::Scene const *App::get_scene() const noexcept {
-  return _runtime->get_scene();
-}
+graphics::Scene const *App::get_scene() const noexcept { return _runtime->get_scene(); }
 
 graphics::Scene *App::get_scene() noexcept { return _runtime->get_scene(); }
 
-graphics::Camera const *App::get_camera() const noexcept {
-  return _runtime->get_camera();
-}
+graphics::Camera const *App::get_camera() const noexcept { return _runtime->get_camera(); }
 
 graphics::Camera *App::get_camera() noexcept { return _runtime->get_camera(); }
 
@@ -146,9 +131,7 @@ bool App::is_looping() const noexcept { return _looping; }
 
 void App::stop_looping() noexcept { _looping = false; }
 
-double App::get_loop_iteration_wall_time() const noexcept {
-  return _loop_iteration_wall_time;
-}
+double App::get_loop_iteration_wall_time() const noexcept { return _loop_iteration_wall_time; }
 
 void App::loop() {
   using clock = std::chrono::high_resolution_clock;
@@ -159,9 +142,7 @@ void App::loop() {
   _looping = true;
   while (_looping) {
     auto const current_time = clock::now();
-    _loop_iteration_wall_time =
-        std::chrono::duration_cast<duration>(current_time - previous_time)
-            .count();
+    _loop_iteration_wall_time = std::chrono::duration_cast<duration>(current_time - previous_time).count();
     previous_time = current_time;
     accumulated_time += _loop_iteration_wall_time;
     _runtime->get_window()->pre_input();
@@ -171,8 +152,7 @@ void App::loop() {
     if (accumulated_time >= _world_simulate_info.delta_time) {
       accumulated_time -= _world_simulate_info.delta_time;
       pre_physics();
-      _world_simulate_result =
-          _runtime->get_world()->simulate(_world_simulate_info);
+      _world_simulate_result = _runtime->get_world()->simulate(_world_simulate_info);
       post_physics();
     }
     _runtime->render();

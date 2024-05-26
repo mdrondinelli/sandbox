@@ -31,7 +31,7 @@ public:
               std::array<math::Quatf, 2> const &object_orientations) noexcept {
     using namespace math;
     auto constexpr max_position_distance = 0.005f;
-    auto constexpr min_orientation_abs_dot = 0.995f;
+    auto constexpr min_orientation_abs_dot = 0.999f;
     auto const object_rotations = std::array<Mat3x3f, 2>{
         Mat3x3f::rotation(object_orientations[0]),
         Mat3x3f::rotation(object_orientations[1]),
@@ -68,7 +68,7 @@ public:
   }
 
   void insert(Cached_contact const &contact) noexcept {
-    auto constexpr max_always_replace_deviation = 0.01f;
+    auto constexpr max_always_replace_deviation = 0.05f;
     auto const [closest_contact, closest_distance] = closest(contact.contact);
     if (closest_distance < max_always_replace_deviation) {
       *closest_contact = contact;

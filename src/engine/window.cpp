@@ -13,28 +13,25 @@ Window::Window(Window_create_info const &create_info)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        return make_unique_glfw_window(
-            create_info.extents.x, create_info.extents.y, create_info.title);
+        return make_unique_glfw_window(create_info.extents.x,
+                                       create_info.extents.y,
+                                       create_info.title,
+                                       create_info.full_screen ? glfwGetPrimaryMonitor() : nullptr);
       }()} {
   if (glfwRawMouseMotionSupported()) {
     glfwSetInputMode(_glfw_window.get(), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
   }
   glfwSetWindowUserPointer(_glfw_window.get(), this);
-  glfwSetCursorPosCallback(
-      _glfw_window.get(), [](GLFWwindow *window, double x, double y) {
-        auto const self =
-            static_cast<Window *>(glfwGetWindowUserPointer(window));
-        if (self->_cursor_position) {
-          self->_delta_cursor_position += math::Vec2d{
-              x - self->_cursor_position->x, y - self->_cursor_position->y};
-        }
-        self->_cursor_position = math::Vec2d{x, y};
-      });
+  glfwSetCursorPosCallback(_glfw_window.get(), [](GLFWwindow *window, double x, double y) {
+    auto const self = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    if (self->_cursor_position) {
+      self->_delta_cursor_position += math::Vec2d{x - self->_cursor_position->x, y - self->_cursor_position->y};
+    }
+    self->_cursor_position = math::Vec2d{x, y};
+  });
 }
 
-bool Window::should_close() const noexcept {
-  return glfwWindowShouldClose(_glfw_window.get());
-}
+bool Window::should_close() const noexcept { return glfwWindowShouldClose(_glfw_window.get()); }
 
 Vec2i Window::get_framebuffer_extents() const noexcept {
   auto result = Vec2i{};
@@ -47,8 +44,7 @@ bool Window::is_key_pressed(Key key) const noexcept {
 }
 
 bool Window::is_mouse_button_pressed(Mouse_button mouse_button) const noexcept {
-  return glfwGetMouseButton(_glfw_window.get(),
-                            static_cast<int>(mouse_button)) == GLFW_PRESS;
+  return glfwGetMouseButton(_glfw_window.get(), static_cast<int>(mouse_button)) == GLFW_PRESS;
 }
 
 math::Vec2d Window::get_cursor_position() const noexcept {
@@ -57,9 +53,7 @@ math::Vec2d Window::get_cursor_position() const noexcept {
   return result;
 }
 
-math::Vec2d Window::get_delta_cursor_position() const noexcept {
-  return _delta_cursor_position;
-}
+math::Vec2d Window::get_delta_cursor_position() const noexcept { return _delta_cursor_position; }
 
 Cursor_mode Window::get_cursor_mode() const noexcept {
   auto const value = glfwGetInputMode(_glfw_window.get(), GLFW_CURSOR);
@@ -95,8 +89,6 @@ void Window::set_cursor_mode(Cursor_mode mode) noexcept {
 
 GLFWwindow *Window::get_glfw_window() noexcept { return _glfw_window.get(); }
 
-void Window::pre_input() noexcept {
-  _delta_cursor_position = math::Vec2d::zero();
-}
+void Window::pre_input() noexcept { _delta_cursor_position = math::Vec2d::zero(); }
 } // namespace engine
 } // namespace marlon

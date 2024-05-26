@@ -17,42 +17,37 @@ struct Resources {
   graphics::Unique_texture striped_cotton_base_color_texture;
   graphics::Surface_material brick_material;
   graphics::Surface_material striped_cotton_material;
-  graphics::Surface_material red_material;
-  graphics::Surface_material blue_material;
-  graphics::Surface_material particle_material;
+  graphics::Surface_material ground_material;
   graphics::Unique_surface_mesh cube_mesh;
   graphics::Unique_surface_mesh low_quality_sphere_mesh;
   graphics::Unique_surface_mesh high_quality_sphere_mesh;
   graphics::Unique_wireframe_mesh cube_wireframe_mesh;
 };
 
-graphics::Unique_texture create_texture(graphics::Graphics *graphics,
-                                        const char *path);
+graphics::Unique_texture create_texture(graphics::Graphics *graphics, const char *path);
 
 graphics::Unique_surface_mesh create_cube_mesh(graphics::Graphics *graphics);
 
-graphics::Unique_surface_mesh
-create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions = 0);
+graphics::Unique_surface_mesh create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions = 0);
 
-graphics::Unique_wireframe_mesh
-create_wireframe_cube_mesh(graphics::Graphics *graphics);
+graphics::Unique_wireframe_mesh create_wireframe_cube_mesh(graphics::Graphics *graphics);
 
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
-  retval.brick_base_color_texture = create_texture(
-      graphics, "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
-  retval.striped_cotton_base_color_texture = create_texture(
-      graphics, "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
+  retval.brick_base_color_texture = create_texture(graphics, "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
+  retval.striped_cotton_base_color_texture =
+      create_texture(graphics, "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
   retval.brick_material = graphics::Surface_material{
-      .base_color_texture = retval.brick_base_color_texture.get()};
+      .base_color_texture = retval.brick_base_color_texture.get(),
+  };
   retval.striped_cotton_material = graphics::Surface_material{
-      .base_color_texture = retval.striped_cotton_base_color_texture.get()};
-  retval.red_material =
-      graphics::Surface_material{.base_color_tint = {0.1f, 0.0f, 0.0f}};
-  retval.blue_material =
-      graphics::Surface_material{.base_color_tint = {0.00f, 0.005f, 0.02f}};
-  retval.particle_material =
-      graphics::Surface_material{.base_color_tint = {0.25f, 0.5f, 1.0f}};
+      .base_color_texture = retval.striped_cotton_base_color_texture.get(),
+  };
+  // retval.blue_material =
+  //     graphics::Surface_material{.base_color_tint = {0.00f, 0.005f, 0.02f}};
+  retval.ground_material = graphics::Surface_material{
+      .base_color_tint = graphics::Rgb_spectrum{0.3f},
+  };
   retval.cube_mesh = create_cube_mesh(graphics);
   retval.low_quality_sphere_mesh = create_icosphere_mesh(graphics, 1);
   retval.high_quality_sphere_mesh = create_icosphere_mesh(graphics, 3);
@@ -60,8 +55,7 @@ Resources create_resources(graphics::Graphics *graphics) {
   return retval;
 }
 
-graphics::Unique_texture create_texture(graphics::Graphics *graphics,
-                                        const char *path) {
+graphics::Unique_texture create_texture(graphics::Graphics *graphics, const char *path) {
   std::ifstream in{path, std::ios_base::binary};
   if (in) {
     in.seekg(0, std::ios_base::end);
@@ -80,64 +74,58 @@ graphics::Unique_texture create_texture(graphics::Graphics *graphics,
 }
 
 graphics::Unique_surface_mesh create_cube_mesh(graphics::Graphics *graphics) {
-  std::vector<graphics::Surface_vertex> const vertices{
-      // -x face
-      {{-1.0f, -1.0f, -1.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-      {{-1.0f, -1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-      {{-1.0f, 1.0f, -1.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-      {{-1.0f, 1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-      // +x face
-      {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-      {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-      {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-      {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-      // -y face
-      {{-1.0f, -1.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
-      {{1.0f, -1.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
-      {{-1.0f, -1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}},
-      {{1.0f, -1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
-      // +y face
-      {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-      {{1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-      {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
-      {{1.0f, 1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-      // -z face
-      {{1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
-      {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
-      {{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
-      {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
-      // +z face
-      {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-      {{1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-      {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-      {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}};
-  std::vector<std::uint16_t> const indices{
-      0,  1,  2,  3,  2,  1,  4,  5,  6,  7,  6,  5,  8,  9,  10, 11, 10, 9,
-      12, 13, 14, 15, 14, 13, 16, 17, 18, 19, 18, 17, 20, 21, 22, 23, 22, 21};
-  return graphics->create_surface_mesh_unique(
-      {.indices = indices, .vertices = vertices});
+  std::vector<graphics::Surface_vertex> const vertices{// -x face
+                                                       {{-1.0f, -1.0f, -1.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                                       {{-1.0f, -1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+                                                       {{-1.0f, 1.0f, -1.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+                                                       {{-1.0f, 1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+                                                       // +x face
+                                                       {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                                       {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+                                                       {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+                                                       {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+                                                       // -y face
+                                                       {{-1.0f, -1.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
+                                                       {{1.0f, -1.0f, -1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+                                                       {{-1.0f, -1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}},
+                                                       {{1.0f, -1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
+                                                       // +y face
+                                                       {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+                                                       {{1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                                                       {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+                                                       {{1.0f, 1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+                                                       // -z face
+                                                       {{1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+                                                       {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+                                                       {{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+                                                       {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
+                                                       // +z face
+                                                       {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+                                                       {{1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+                                                       {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+                                                       {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}};
+  std::vector<std::uint16_t> const indices{0,  1,  2,  3,  2,  1,  4,  5,  6,  7,  6,  5,  8,  9,  10, 11, 10, 9,
+                                           12, 13, 14, 15, 14, 13, 16, 17, 18, 19, 18, 17, 20, 21, 22, 23, 22, 21};
+  return graphics->create_surface_mesh_unique({.indices = indices, .vertices = vertices});
 }
 
-graphics::Unique_surface_mesh
-create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
+graphics::Unique_surface_mesh create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
   auto const phi = std::numbers::phi_v<float>;
-  std::vector<graphics::Surface_vertex> vertices{
-      {normalize(math::Vec3f{phi, 1.0f, 0.0f}), {}, {}},
-      {normalize(math::Vec3f{phi, -1.0f, 0.0f}), {}, {}},
-      {normalize(math::Vec3f{-phi, -1.0f, 0.0f}), {}, {}},
-      {normalize(math::Vec3f{-phi, 1.0f, 0.0f}), {}, {}},
-      {normalize(math::Vec3f{1.0f, 0.0f, phi}), {}, {}},
-      {normalize(math::Vec3f{-1.0f, 0.0f, phi}), {}, {}},
-      {normalize(math::Vec3f{-1.0f, 0.0f, -phi}), {}, {}},
-      {normalize(math::Vec3f{1.0f, 0.0f, -phi}), {}, {}},
-      {normalize(math::Vec3f{0.0f, phi, 1.0f}), {}, {}},
-      {normalize(math::Vec3f{0.0f, phi, -1.0f}), {}, {}},
-      {normalize(math::Vec3f{0.0f, -phi, -1.0f}), {}, {}},
-      {normalize(math::Vec3f{0.0f, -phi, 1.0f}), {}, {}}};
-  std::vector<std::uint16_t> indices{
-      0, 9, 8,  0, 8,  4,  0,  4, 1, 0, 1, 7,  0, 7,  9,  3, 8,  9,  3, 9,
-      6, 3, 6,  2, 3,  2,  5,  3, 5, 8, 4, 8,  5, 11, 1,  4, 11, 4,  5, 11,
-      5, 2, 11, 2, 10, 11, 10, 1, 6, 9, 7, 10, 7, 1,  10, 6, 7,  10, 2, 6};
+  std::vector<graphics::Surface_vertex> vertices{{normalize(math::Vec3f{phi, 1.0f, 0.0f}), {}, {}},
+                                                 {normalize(math::Vec3f{phi, -1.0f, 0.0f}), {}, {}},
+                                                 {normalize(math::Vec3f{-phi, -1.0f, 0.0f}), {}, {}},
+                                                 {normalize(math::Vec3f{-phi, 1.0f, 0.0f}), {}, {}},
+                                                 {normalize(math::Vec3f{1.0f, 0.0f, phi}), {}, {}},
+                                                 {normalize(math::Vec3f{-1.0f, 0.0f, phi}), {}, {}},
+                                                 {normalize(math::Vec3f{-1.0f, 0.0f, -phi}), {}, {}},
+                                                 {normalize(math::Vec3f{1.0f, 0.0f, -phi}), {}, {}},
+                                                 {normalize(math::Vec3f{0.0f, phi, 1.0f}), {}, {}},
+                                                 {normalize(math::Vec3f{0.0f, phi, -1.0f}), {}, {}},
+                                                 {normalize(math::Vec3f{0.0f, -phi, -1.0f}), {}, {}},
+                                                 {normalize(math::Vec3f{0.0f, -phi, 1.0f}), {}, {}}};
+  std::vector<std::uint16_t> indices{0, 9, 8,  0, 8,  4,  0,  4, 1, 0, 1, 7,  0, 7,  9,  3, 8,  9,  3, 9,
+                                     6, 3, 6,  2, 3,  2,  5,  3, 5, 8, 4, 8,  5, 11, 1,  4, 11, 4,  5, 11,
+                                     5, 2, 11, 2, 10, 11, 10, 1, 6, 9, 7, 10, 7, 1,  10, 6, 7,  10, 2, 6};
   for (int i = 0; i < subdivisions; ++i) {
     auto const indices_copy = indices;
     indices.clear();
@@ -148,18 +136,15 @@ create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
       auto const &vertex_0 = vertices[index_0];
       auto const &vertex_1 = vertices[index_1];
       auto const &vertex_2 = vertices[index_2];
-      auto const new_vertex_0 = graphics::Surface_vertex{
-          normalize(0.5f * (vertex_0.position + vertex_1.position)), {}, {}};
-      auto const new_vertex_1 = graphics::Surface_vertex{
-          normalize(0.5f * (vertex_1.position + vertex_2.position)), {}, {}};
-      auto const new_vertex_2 = graphics::Surface_vertex{
-          normalize(0.5f * (vertex_2.position + vertex_0.position)), {}, {}};
-      auto const new_vertex_0_index =
-          static_cast<std::uint32_t>(vertices.size());
-      auto const new_vertex_1_index =
-          static_cast<std::uint32_t>(vertices.size() + 1);
-      auto const new_vertex_2_index =
-          static_cast<std::uint32_t>(vertices.size() + 2);
+      auto const new_vertex_0 =
+          graphics::Surface_vertex{normalize(0.5f * (vertex_0.position + vertex_1.position)), {}, {}};
+      auto const new_vertex_1 =
+          graphics::Surface_vertex{normalize(0.5f * (vertex_1.position + vertex_2.position)), {}, {}};
+      auto const new_vertex_2 =
+          graphics::Surface_vertex{normalize(0.5f * (vertex_2.position + vertex_0.position)), {}, {}};
+      auto const new_vertex_0_index = static_cast<std::uint32_t>(vertices.size());
+      auto const new_vertex_1_index = static_cast<std::uint32_t>(vertices.size() + 1);
+      auto const new_vertex_2_index = static_cast<std::uint32_t>(vertices.size() + 2);
       vertices.emplace_back(new_vertex_0);
       vertices.emplace_back(new_vertex_1);
       vertices.emplace_back(new_vertex_2);
@@ -186,8 +171,7 @@ create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions) {
   });
 }
 
-graphics::Unique_wireframe_mesh
-create_wireframe_cube_mesh(graphics::Graphics *graphics) {
+graphics::Unique_wireframe_mesh create_wireframe_cube_mesh(graphics::Graphics *graphics) {
   std::vector<math::Vec3f> const vertices{
       {1.0f, 1.0f, 1.0f},
       {-1.0f, 1.0f, 1.0f},
@@ -201,8 +185,7 @@ create_wireframe_cube_mesh(graphics::Graphics *graphics) {
   std::vector<std::uint16_t> const indices{
       0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7,
   };
-  return graphics->create_wireframe_mesh_unique(
-      {.indices = indices, .vertices = vertices});
+  return graphics->create_wireframe_mesh_unique({.indices = indices, .vertices = vertices});
 }
 
 constexpr float physics_delta_time = 1.0f / 128.0f;
@@ -242,8 +225,7 @@ public:
 
   explicit Column_phase(client::Dynamic_prop_manager *box_manager,
                         std::optional<client::Dynamic_prop_handle> *selection)
-      : _box_manager{box_manager},
-        _selection{selection} {
+      : _box_manager{box_manager}, _selection{selection} {
     _boxes.reserve(768);
   }
 
@@ -270,8 +252,7 @@ public:
       auto const box = _box_manager->create({
           .position = math::Vec3f{_box_spawn_x, _box_spawn_y, _box_spawn_z},
           .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                                 math::deg_to_rad(90.0f)),
+          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f}, math::deg_to_rad(90.0f)),
           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
       });
       _boxes.emplace_back(box);
@@ -307,8 +288,7 @@ class Pyramid_phase : public Phase {
 public:
   Pyramid_phase() = default;
 
-  explicit Pyramid_phase(client::Dynamic_prop_manager *box_manager)
-      : _box_manager{box_manager} {}
+  explicit Pyramid_phase(client::Dynamic_prop_manager *box_manager) : _box_manager{box_manager} {}
 
   void on_start() final {
     _box_spawn_timer = 0.0f;
@@ -332,14 +312,12 @@ public:
       _box_spawn_timer -= 0.1f;
       auto const size = pyramid_layers - _box_spawn_layer;
       _boxes.emplace_back(_box_manager->create({
-          .position =
-              math::Vec3f{spacing * _box_spawn_row - 0.5f * spacing * size,
-                          spacing * _box_spawn_layer + 0.4f,
-                          spacing * _box_spawn_col - 0.5f * spacing * size},
+          .position = math::Vec3f{spacing * _box_spawn_row - 0.5f * spacing * size,
+                                  spacing * _box_spawn_layer + 0.4f,
+                                  spacing * _box_spawn_col - 0.5f * spacing * size},
           // .position = math::Vec3f{0.0f, 0.4f + _box_spawn_col * 10.0f, 0.0f},
           .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                                 math::deg_to_rad(90.0f)),
+          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f}, math::deg_to_rad(90.0f)),
           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
       }));
       if (++_box_spawn_col == size) {
@@ -376,8 +354,7 @@ class Ring_phase : public Phase {
 public:
   Ring_phase() = default;
 
-  explicit Ring_phase(client::Dynamic_prop_manager *box_manager)
-      : _box_manager{box_manager}, _boxes{} {
+  explicit Ring_phase(client::Dynamic_prop_manager *box_manager) : _box_manager{box_manager}, _boxes{} {
     _boxes.reserve(768);
   }
 
@@ -393,12 +370,9 @@ public:
     if (_box_spawn_timer > 0.0f) {
       _box_spawn_timer -= 0.1f;
       auto const new_box = _box_manager->create({
-          .position = math::Vec3f{std::cos(_box_spawn_angle) * 15.0f,
-                                  5.0f,
-                                  std::sin(_box_spawn_angle) * 15.0f},
+          .position = math::Vec3f{std::cos(_box_spawn_angle) * 15.0f, 5.0f, std::sin(_box_spawn_angle) * 15.0f},
           .velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
-          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f},
-                                                 math::deg_to_rad(90.0f)),
+          .orientation = math::Quatf::axis_angle(math::Vec3f{0.0f, 1.0f, 0.0f}, math::deg_to_rad(90.0f)),
           .angular_velocity = math::Vec3f{0.0f, 0.0f, 0.0f},
       });
       _boxes.emplace_back(new_box);
@@ -431,9 +405,9 @@ public:
                     .worker_thread_count = 7,
                     .gravitational_acceleration = {0.0f, -9.8f, 0.0f},
                 },
-            .world_simulate_info = {.delta_time = physics_delta_time,
-                                    .substep_count = physics_substeps},
-            .window_extents = {1920, 1080},
+            .world_simulate_info = {.delta_time = physics_delta_time, .substep_count = physics_substeps},
+            .window_extents = {2560, 1440},
+            .full_screen = true,
         }} {}
 
   void pre_loop() final {
@@ -444,27 +418,24 @@ public:
     auto const box_radius = 0.3f;
     auto const box_shape = physics::Box{{box_radius, box_radius, box_radius}};
     _resources = create_resources(graphics);
-    _box_manager = std::make_unique<client::Dynamic_prop_manager>(
-        client::Dynamic_prop_manager_create_info{
-            .scene = scene,
-            .surface_mesh = _resources.cube_mesh.get(),
-            .surface_material = _resources.striped_cotton_material,
-            .surface_pretransform =
-                math::Mat3x4f{{box_radius, 0.0f, 0.0f, 0.0f},
-                              {0.0f, box_radius, 0.0f, 0.0f},
-                              {0.0f, 0.0f, box_radius, 0.0f}},
-            .space = world,
-            .body_mass = box_mass,
-            .body_inertia_tensor =
-                box_mass * physics::solid_inertia_tensor(box_shape),
-            .body_shape = box_shape,
-            .body_material =
-                {
-                    .static_friction_coefficient = 0.3f,
-                    .dynamic_friction_coefficient = 0.2f,
-                    .restitution_coefficient = 0.1f,
-                },
-        });
+    _box_manager = std::make_unique<client::Dynamic_prop_manager>(client::Dynamic_prop_manager_create_info{
+        .scene = scene,
+        .surface_mesh = _resources.cube_mesh.get(),
+        .surface_material = _resources.striped_cotton_material,
+        .surface_pretransform = math::Mat3x4f{{box_radius, 0.0f, 0.0f, 0.0f},
+                                              {0.0f, box_radius, 0.0f, 0.0f},
+                                              {0.0f, 0.0f, box_radius, 0.0f}},
+        .space = world,
+        .body_mass = box_mass,
+        .body_inertia_tensor = box_mass * physics::solid_inertia_tensor(box_shape),
+        .body_shape = box_shape,
+        .body_material =
+            {
+                .static_friction_coefficient = 0.3f,
+                .dynamic_friction_coefficient = 0.2f,
+                .restitution_coefficient = 0.1f,
+            },
+    });
     world->create_static_body({
         .shape = physics::Box{{100.0f, 0.5f, 100.0f}},
         .material =
@@ -475,17 +446,10 @@ public:
             },
         .position = {0.0f, -0.5f, 0.0f},
     });
-    scene->ambient_irradiance(graphics::Rgb_spectrum{32.0f});
-    scene->directional_light(graphics::Directional_light{
-        .irradiance = graphics::Rgb_spectrum{481.5f},
-        .direction = normalize(math::Vec3f{1.0f, 0.3f, 0.5f}),
-    });
     _ground_surface = {
         .mesh = _resources.cube_mesh.get(),
-        .material = _resources.blue_material,
-        .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f},
-                                   {0.0f, 0.5f, 0.0f, -0.5f},
-                                   {0.0f, 0.0f, 100.0f, 0.0f}},
+        .material = _resources.ground_material,
+        .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 100.0f, 0.0f}},
     };
     scene->add(&_ground_surface);
     _selection_wireframe = {
@@ -494,8 +458,15 @@ public:
         .visible = false,
     };
     scene->add(&_selection_wireframe);
+    scene->sky_irradiance(mix(graphics::Rgb_spectrum{32.0f}, graphics::Rgb_spectrum{0.0f, 0.0f, 96.0f}, 0.1f));
+    scene->ground_albedo(_ground_surface.material.base_color_tint);
+    scene->directional_light(graphics::Directional_light{
+        .irradiance = graphics::Rgb_spectrum{481.5f},
+        .direction = normalize(math::Vec3f{1.0f, 1.3f, 0.5f}),
+    });
     get_camera()->position = {-10.0f, 3.5f, 10.0f};
     get_camera()->zoom = 2.0f * math::Vec2f{9.0f / 16.0f, 1.0f};
+    get_camera()->exposure = 0.03f;
     // srand(25);
     _column_phase = Column_phase{_box_manager.get(), &_selection};
     _ring_phase = Ring_phase{_box_manager.get()};
@@ -548,35 +519,27 @@ public:
       camera->position += movement * dt;
       _camera_yaw -= window->get_delta_cursor_position().x * 0.002f;
       _camera_pitch -= window->get_delta_cursor_position().y * 0.002f;
-      _camera_pitch = std::clamp(_camera_pitch,
-                                 -0.5f * std::numbers::pi_v<float>,
-                                 0.5f * std::numbers::pi_v<float>);
+      _camera_pitch = std::clamp(_camera_pitch, -0.5f * std::numbers::pi_v<float>, 0.5f * std::numbers::pi_v<float>);
     } else {
       window->set_cursor_mode(engine::Cursor_mode::normal);
     }
-    camera->orientation =
-        math::Quatf::axis_angle(math::Vec3f::y_axis(), _camera_yaw) *
-        math::Quatf::axis_angle(math::Vec3f::x_axis(), _camera_pitch);
+    camera->orientation = math::Quatf::axis_angle(math::Vec3f::y_axis(), _camera_yaw) *
+                          math::Quatf::axis_angle(math::Vec3f::x_axis(), _camera_pitch);
   }
 
   void post_physics() final {
     auto const &simulate_result = get_world_simulate_result();
-    _max_physics_wall_time =
-        std::max(_max_physics_wall_time, simulate_result.total_wall_time);
+    _max_physics_wall_time = std::max(_max_physics_wall_time, simulate_result.total_wall_time);
     _total_physics_wall_time += simulate_result.total_wall_time;
     _total_physics_simulated_time += physics_delta_time;
     _total_narrowphase_wall_time += simulate_result.narrowphase_wall_time;
     if (_phases[_phase_index]->is_running()) {
       _phases[_phase_index]->post_physics();
       if (!_phases[_phase_index]->is_running()) {
-        std::cout << "physics narrowphase wall time: "
-                  << _total_narrowphase_wall_time << "\n";
-        std::cout << "physics total wall time: " << _total_physics_wall_time
-                  << "\n";
-        std::cout << "physics max wall time: " << _max_physics_wall_time
-                  << "\n";
-        std::cout << "physics simulated time: " << _total_physics_simulated_time
-                  << "\n";
+        std::cout << "physics narrowphase wall time: " << _total_narrowphase_wall_time << "\n";
+        std::cout << "physics total wall time: " << _total_physics_wall_time << "\n";
+        std::cout << "physics max wall time: " << _max_physics_wall_time << "\n";
+        std::cout << "physics simulated time: " << _total_physics_simulated_time << "\n";
       }
     } else {
       _max_physics_wall_time = 0.0;
@@ -588,17 +551,14 @@ public:
     }
     if (_selection) {
       auto const rigid_body = _box_manager->get_rigid_body(*_selection);
-      _selection_wireframe.transform =
-          math::Mat3x4f::trs(get_world()->data(rigid_body)->position(),
-                             get_world()->data(rigid_body)->orientation(),
-                             0.3f);
+      _selection_wireframe.transform = math::Mat3x4f::trs(
+          get_world()->data(rigid_body)->position(), get_world()->data(rigid_body)->orientation(), 0.3f);
       _selection_wireframe.visible = true;
     } else {
       _selection_wireframe.visible = false;
     }
     if (simulate_result.total_wall_time > physics_delta_time) {
-      std::cout << "SLOWER THAN REAL TIME: "
-                << simulate_result.total_wall_time * 1000.0 << " ms\n";
+      std::cout << "SLOWER THAN REAL TIME: " << simulate_result.total_wall_time * 1000.0 << " ms\n";
     }
   }
 
