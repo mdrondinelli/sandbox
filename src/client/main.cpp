@@ -466,7 +466,7 @@ public:
     });
     get_camera()->position = {-10.0f, 3.5f, 10.0f};
     get_camera()->zoom = 2.0f * math::Vec2f{9.0f / 16.0f, 1.0f};
-    get_camera()->exposure = 0.03f;
+    get_camera()->exposure = 0.05f;
     // srand(25);
     _column_phase = Column_phase{_box_manager.get(), &_selection};
     _ring_phase = Ring_phase{_box_manager.get()};

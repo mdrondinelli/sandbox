@@ -236,13 +236,13 @@ void main() {
   vec3 ground_irradiance =
     ground_albedo.rgb * (
       sky_irradiance.rgb +
-      PI * directional_light_irradiance.rgb * max(directional_light_direction.y, 0.0)
+      directional_light_irradiance.rgb * max(directional_light_direction.y, 0.0)
     );
   vec3 ambient_irradiance = mix(ground_irradiance, sky_irradiance.rgb, n_world.y * 0.5 + 0.5);
   irradiance += ambient_irradiance;
   float n_dot_l = dot(n_world, directional_light_direction.xyz);
   irradiance +=
-    PI * directional_light_irradiance.rgb * max(n_dot_l, 0.0) *
+    directional_light_irradiance.rgb * max(n_dot_l, 0.0) *
     calculate_csm_shadow_factor(p_world + n_world * 0.005, p_view.z, n_dot_l);
   out_color = vec4(color * INV_PI * irradiance, 1.0);
 }
@@ -381,7 +381,7 @@ void Render_stream::render() {
   auto const taa_blend_factor = [&]{
     if (_frame_time) {
       auto const frame_duration = std::chrono::duration_cast<std::chrono::duration<float>>(frame_time - *_frame_time);
-      return 1.0f - pow(1.0f - 0.05f, 60.0f * frame_duration.count());
+      return 1.0f - pow(1.0f - 0.1f, 60.0f * frame_duration.count());
     } else {
       return 1.0f;
     }
