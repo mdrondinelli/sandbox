@@ -5,6 +5,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "list.h"
+
 namespace marlon {
 namespace util {
 TEST_CASE("Use align to align sizes to a power-of-two alignment.") {
@@ -13,6 +15,32 @@ TEST_CASE("Use align to align sizes to a power-of-two alignment.") {
   REQUIRE(align(4, 4) == 4);
 }
 
+TEST_CASE("make_merged") {
+  auto const size_a = Size{10};
+  auto const size_b = Size{5};
+  auto [merged_block, merged_objects] =
+      make_merged<List<int>, List<int>>(System_allocator{}, std::tuple{size_a}, std::tuple{size_b});
+  auto &[list_a, list_b] = merged_objects;
+  REQUIRE(merged_block.size() == 64);
+  REQUIRE(ptrdiff(list_b.data(), list_a.data()) == 40);
+  list_a = {};
+  list_b = {};
+  System_allocator{}.free(merged_block);
+}
+
+TEST_CASE("assign_merged") {
+  auto const size_a = Size{10};
+  auto const size_b = Size{5};
+  auto list_a = List<int>{};
+  auto list_b = List<int>{};
+  auto const merged_block =
+      assign_merged(System_allocator{}, std::tie(list_a, list_b), std::tuple{size_a}, std::tuple{size_b});
+  REQUIRE(merged_block.size() == 64);
+  REQUIRE(ptrdiff(list_b.data(), list_a.data()) == 40);
+  list_a = {};
+  list_b = {};
+  System_allocator{}.free(merged_block);
+}
 
 // TEST_CASE("Stack_allocator usage") {
 //   REQUIRE(Stack_allocator<8>::memory_requirement({2, 4, 8, 16}) == 40);

@@ -7,6 +7,7 @@
 #include <bit>
 #include <functional>
 #include <new>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -20,11 +21,9 @@ struct Const_block {
 
   Const_block() = default;
 
-  constexpr Const_block(std::byte const *begin, Size size) noexcept
-      : Const_block{begin, begin + size} {}
+  constexpr Const_block(std::byte const *begin, Size size) noexcept : Const_block{begin, begin + size} {}
 
-  constexpr Const_block(std::byte const *begin, std::byte const *end) noexcept
-      : begin{begin}, end{end} {}
+  constexpr Const_block(std::byte const *begin, std::byte const *end) noexcept : begin{begin}, end{end} {}
 
   constexpr Size size() const noexcept { return end - begin; }
 };
@@ -35,11 +34,9 @@ struct Block {
 
   Block() = default;
 
-  constexpr Block(std::byte *begin, Size size) noexcept
-      : Block{begin, begin + size} {}
+  constexpr Block(std::byte *begin, Size size) noexcept : Block{begin, begin + size} {}
 
-  constexpr Block(std::byte *begin, std::byte *end) noexcept
-      : begin{begin}, end{end} {}
+  constexpr Block(std::byte *begin, std::byte *end) noexcept : begin{begin}, end{end} {}
 
   constexpr operator Const_block() const noexcept { return {begin, end}; }
 
@@ -80,9 +77,7 @@ private:
 
 template <typename T> using Object_storage = Storage<sizeof(T), alignof(T)>;
 
-constexpr Size align(Size size, Size alignment) noexcept {
-  return (size + alignment - 1) & -alignment;
-}
+constexpr Size align(Size size, Size alignment) noexcept { return (size + alignment - 1) & -alignment; }
 
 inline Size ptrdiff(void const *p1, void const *p2) noexcept {
   return std::bit_cast<std::uintptr_t>(p1) - std::bit_cast<std::uintptr_t>(p2);
@@ -90,8 +85,7 @@ inline Size ptrdiff(void const *p1, void const *p2) noexcept {
 
 template <Size Alignment = alignof(std::max_align_t)> class Stack_allocator {
 public:
-  static constexpr Size
-  memory_requirement(std::initializer_list<Size> allocation_sizes) noexcept {
+  static constexpr Size memory_requirement(std::initializer_list<Size> allocation_sizes) noexcept {
     auto result = Size{};
     for (auto const size : allocation_sizes) {
       result += align(size, Alignment);
@@ -101,12 +95,10 @@ public:
 
   constexpr Stack_allocator() noexcept : _block{}, _top{} {}
 
-  explicit Stack_allocator(Block block) noexcept
-      : _block{block}, _top{block.begin} {}
+  explicit Stack_allocator(Block block) noexcept : _block{block}, _top{block.begin} {}
 
   constexpr Stack_allocator(Stack_allocator &&other) noexcept
-      : _block{std::exchange(other._block, Block{})},
-        _top{std::exchange(other._top, nullptr)} {}
+      : _block{std::exchange(other._block, Block{})}, _top{std::exchange(other._top, nullptr)} {}
 
   constexpr Stack_allocator &operator=(Stack_allocator &&other) noexcept {
     auto temp{std::move(other)};
@@ -136,9 +128,7 @@ public:
     }
   }
 
-  bool owns(Const_block block) const noexcept {
-    return block.begin >= _block.begin && block.begin < _block.end;
-  }
+  bool owns(Const_block block) const noexcept { return block.begin >= _block.begin && block.begin < _block.end; }
 
 private:
   constexpr void swap(Stack_allocator &other) noexcept {
@@ -150,8 +140,7 @@ private:
   std::byte *_top;
 };
 
-template <class Parent, Size MinSize, Size MaxSize = MinSize>
-class Free_list_allocator {
+template <class Parent, Size MinSize, Size MaxSize = MinSize> class Free_list_allocator {
 public:
   Free_list_allocator() = default;
 
@@ -197,14 +186,11 @@ private:
 
 template <Size MinSize, Size MaxSize = MinSize> class Pool_allocator {
 public:
-  static constexpr Size memory_requirement(Size max_allocations) {
-    return MaxSize * max_allocations;
-  }
+  static constexpr Size memory_requirement(Size max_allocations) { return MaxSize * max_allocations; }
 
   Pool_allocator() noexcept = default;
 
-  explicit Pool_allocator(Block block) noexcept
-      : _impl{Stack_allocator<1>{block}} {}
+  explicit Pool_allocator(Block block) noexcept : _impl{Stack_allocator<1>{block}} {}
 
   Const_block block() const noexcept { return _impl.parent().block(); }
 
@@ -219,10 +205,8 @@ private:
 };
 
 template <Size MinSize, Size MaxSize = MinSize, typename Allocator>
-std::pair<Block, Pool_allocator<MinSize, MaxSize>>
-make_pool_allocator(Allocator &allocator, Size max_blocks) {
-  auto const block = allocator.alloc(
-      Pool_allocator<MinSize, MaxSize>::memory_requirement(max_blocks));
+std::pair<Block, Pool_allocator<MinSize, MaxSize>> make_pool_allocator(Allocator &allocator, Size max_blocks) {
+  auto const block = allocator.alloc(Pool_allocator<MinSize, MaxSize>::memory_requirement(max_blocks));
   return {block, Pool_allocator<MinSize, MaxSize>{block}};
 }
 
@@ -240,9 +224,7 @@ public:
     return {static_cast<std::byte *>(begin), size};
   }
 
-  void free(Const_block block) noexcept {
-    std::free(const_cast<std::byte *>(block.begin));
-  }
+  void free(Const_block block) noexcept { std::free(const_cast<std::byte *>(block.begin)); }
 };
 
 class Polymorphic_allocator {
@@ -250,8 +232,7 @@ public:
   Polymorphic_allocator() = default;
 
   template <typename Allocator>
-  Polymorphic_allocator(Allocator *allocator)
-      : _allocator{allocator}, _vtable{&vtable<Allocator>} {}
+  Polymorphic_allocator(Allocator *allocator) : _allocator{allocator}, _vtable{&vtable<Allocator>} {}
 
   Block alloc(Size size) { return _vtable->alloc(_allocator, size); }
 
@@ -265,27 +246,19 @@ private:
 
   template <typename Allocator>
   static auto constexpr vtable = Vtable{
-      .alloc =
-          [](void *allocator, Size size) {
-            return static_cast<Allocator *>(allocator)->alloc(size);
-          },
-      .free =
-          [](void *allocator, Block block) {
-            return static_cast<Allocator *>(allocator)->free(block);
-          },
+      .alloc = [](void *allocator, Size size) { return static_cast<Allocator *>(allocator)->alloc(size); },
+      .free = [](void *allocator, Block block) { return static_cast<Allocator *>(allocator)->free(block); },
   };
 
   void *_allocator{};
   Vtable *_vtable{};
 };
 
-template <typename Allocator = System_allocator>
-class Unique_block : private Allocator {
+template <typename Allocator = System_allocator> class Unique_block : private Allocator {
 public:
   Unique_block() = default;
 
-  explicit Unique_block(Allocator const &allocator, Size size)
-      : Allocator{allocator}, _block{Allocator::alloc(size)} {}
+  explicit Unique_block(Allocator const &allocator, Size size) : Allocator{allocator}, _block{Allocator::alloc(size)} {}
 
   explicit Unique_block(Allocator &&allocator, Size size)
       : Allocator{std::move(allocator)}, _block{Allocator::alloc(size)} {}
@@ -293,8 +266,7 @@ public:
   explicit Unique_block(Size size) : _block{Allocator::alloc(size)} {}
 
   Unique_block(Unique_block &&other) noexcept
-      : Allocator{std::move(static_cast<Allocator&>(other))},
-        _block{std::exchange(other._block, Block{})} {}
+      : Allocator{std::move(static_cast<Allocator &>(other))}, _block{std::exchange(other._block, Block{})} {}
 
   Unique_block &operator=(Unique_block &&other) noexcept {
     auto temp{std::move(other)};
@@ -320,54 +292,24 @@ private:
   Block _block{};
 };
 
-// class Unique_block {
-// public:
-//   constexpr Unique_block() noexcept : _block{}, _allocator{} {}
+template <typename... Ts, typename Allocator, typename... ConstructorArgs>
+std::pair<Block, std::tuple<Ts...>> make_merged(Allocator &&allocator, ConstructorArgs &&...args) {
+  using Suballocator = Stack_allocator<>;
+  auto const memory_requirement = Suballocator::memory_requirement({(std::apply(Ts::memory_requirement, args))...});
+  auto const block = allocator.alloc(memory_requirement);
+  auto suballocator = Suballocator{block};
+  return {block,
+          {(std::make_from_tuple<Ts>(std::tuple_cat(
+              std::tuple{suballocator.alloc(std::apply(Ts::memory_requirement, args)).begin}, args)))...}};
+}
 
-//   Unique_block(Block block, Allocator *allocator)
-//       : _block{block}, _allocator{allocator} {}
-
-//   ~Unique_block() {
-//     if (_allocator) {
-//       _allocator->free(_block);
-//     }
-//   }
-
-//   Unique_block(Unique_block &&other) noexcept
-//       : _block{std::exchange(other._block, Block{})},
-//         _allocator{std::exchange(other._allocator, nullptr)} {}
-
-//   Unique_block &operator=(Unique_block &&other) noexcept {
-//     auto temp{std::move(other)};
-//     swap(temp);
-//     return *this;
-//   }
-
-//   Block get() const noexcept { return _block; }
-
-//   Block release() noexcept {
-//     auto const block = _block;
-//     _block = Block{};
-//     return block;
-//   }
-
-//   void *begin() const noexcept { return _block.begin; }
-
-//   void *end() const noexcept { return _block.end; }
-
-// private:
-//   void swap(Unique_block &other) noexcept {
-//     std::swap(_block, other._block);
-//     std::swap(_allocator, other._allocator);
-//   }
-
-//   Block _block;
-//   Polymorphic_allocator _allocator;
-// };
-
-// inline Unique_block<Allocator> Allocator::alloc_unique(Size size) {
-//   return {alloc(size), this};
-// }
+template <typename... Ts, typename Allocator, typename... ConstructorArgs>
+Block assign_merged(Allocator &&allocator, std::tuple<Ts &...> const &assignees, ConstructorArgs &&...args) {
+  auto block = Block{};
+  std::tie(block, assignees) =
+      make_merged<Ts...>(std::forward<Allocator>(allocator), std::forward<ConstructorArgs>(args)...);
+  return block;
+}
 } // namespace util
 } // namespace marlon
 
