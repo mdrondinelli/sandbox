@@ -29,12 +29,13 @@ TEST_CASE("make_merged") {
 }
 
 TEST_CASE("assign_merged") {
+  using std::tie;
+  using std::tuple;
   auto const size_a = Size{10};
   auto const size_b = Size{5};
   auto list_a = List<int>{};
   auto list_b = List<int>{};
-  auto const merged_block =
-      assign_merged(System_allocator{}, std::tie(list_a, list_b), std::tuple{size_a}, std::tuple{size_b});
+  auto const merged_block = assign_merged(System_allocator{}, tie(list_a, list_b), tuple{size_a}, tuple{size_b});
   REQUIRE(merged_block.size() == 64);
   REQUIRE(ptrdiff(list_b.data(), list_a.data()) == 40);
   list_a = {};
