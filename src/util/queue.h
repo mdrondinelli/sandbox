@@ -45,9 +45,7 @@ public:
       return temp;
     }
 
-    friend bool operator==(Iterator const &lhs, Iterator const &rhs) noexcept {
-      return lhs._offset == rhs._offset;
-    }
+    friend bool operator==(Iterator const &lhs, Iterator const &rhs) noexcept { return lhs._offset == rhs._offset; }
 
   private:
     friend class Const_iterator;
@@ -63,8 +61,7 @@ public:
 
   class Const_iterator {
   public:
-    Const_iterator(Iterator it) noexcept
-        : _slots{it._slots}, _index{it._index}, _offset{it._offset} {}
+    Const_iterator(Iterator it) noexcept : _slots{it._slots}, _index{it._index}, _offset{it._offset} {}
 
     T const &operator*() const noexcept { return _slots[_index]; }
 
@@ -94,8 +91,7 @@ public:
       return temp;
     }
 
-    friend bool operator==(Const_iterator const &lhs,
-                           Const_iterator const &rhs) noexcept {
+    friend bool operator==(Const_iterator const &lhs, Const_iterator const &rhs) noexcept {
       return lhs._offset == rhs._offset;
     }
 
@@ -107,16 +103,14 @@ public:
     Size _offset;
   };
 
-  template <typename Allocator>
-  static std::pair<Block, Queue> make(Allocator &allocator, Size max_size) {
+  template <typename Allocator> static std::pair<Block, Queue> make(Allocator &allocator, Size max_size) {
     auto const block = allocator.alloc(memory_requirement(max_size));
     return {block, Queue{block, max_size}};
   }
 
   static constexpr Size memory_requirement(Size max_size) noexcept {
     if (max_size != 0) {
-      return static_cast<Size>(
-          sizeof(T) * std::bit_ceil(static_cast<std::size_t>(max_size)));
+      return static_cast<Size>(sizeof(T) * std::bit_ceil(static_cast<std::size_t>(max_size)));
     } else {
       return 0;
     }
@@ -124,13 +118,10 @@ public:
 
   constexpr Queue() noexcept = default;
 
-  explicit Queue(Block block, Size max_size) noexcept
-      : Queue{block.begin, max_size} {}
+  explicit Queue(Block block, Size max_size) noexcept : Queue{block.begin, max_size} {}
 
   explicit Queue(void *block, Size max_size) noexcept
-      : _slots{static_cast<T *>(block),
-               max_size != 0 ? std::bit_ceil(static_cast<std::size_t>(max_size))
-                             : 0} {}
+      : _slots{static_cast<T *>(block), max_size != 0 ? std::bit_ceil(static_cast<std::size_t>(max_size)) : 0} {}
 
   Queue(Queue<T> &&other) noexcept
       : _slots{std::exchange(other._slots, std::span<T>{})},
@@ -147,33 +138,24 @@ public:
   ~Queue() { clear(); }
 
   Const_block block() const noexcept {
-    return {reinterpret_cast<std::byte const *>(_slots.data()),
-            static_cast<Size>(_slots.size_bytes())};
+    return {reinterpret_cast<std::byte const *>(_slots.data()), static_cast<Size>(_slots.size_bytes())};
   }
 
   T const &front() const noexcept { return _slots[_head]; }
 
   T &front() noexcept { return _slots[_head]; }
 
-  T const &back() const noexcept {
-    return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)];
-  }
+  T const &back() const noexcept { return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)]; }
 
-  T &back() noexcept {
-    return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)];
-  }
+  T &back() noexcept { return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)]; }
 
-  Const_iterator cbegin() const noexcept {
-    return Const_iterator{_slots, _head, 0};
-  }
+  Const_iterator cbegin() const noexcept { return Const_iterator{_slots, _head, 0}; }
 
   Const_iterator begin() const noexcept { return cbegin(); }
 
   Iterator begin() noexcept { return Iterator{_slots, _head, 0}; }
 
-  Const_iterator cend() const noexcept {
-    return Const_iterator{_slots, _tail, _size};
-  }
+  Const_iterator cend() const noexcept { return Const_iterator{_slots, _tail, _size}; }
 
   Const_iterator end() const noexcept { return cend(); }
 
@@ -208,14 +190,14 @@ public:
   }
 
   template <typename... Args> T &emplace_front(Args &&...args) {
-    if (_size != _slots.size()) {
+    if (_size != static_cast<Size>(_slots.size())) {
       auto const index = (_head + _slots.size() - 1) & (_slots.size() - 1);
       auto &result = *new (&_slots[index]) T(std::forward<Args>(args)...);
       ++_size;
       _head = index;
       return result;
     } else {
-      throw Capacity_error{};
+      throw Capacity_error{"Capacity_error in Queue::emplace_front"};
     }
   }
 
@@ -267,25 +249,21 @@ private:
   Size _tail{};
 };
 
-template <typename T, class Allocator = System_allocator>
-class Allocating_queue {
+template <typename T, class Allocator = System_allocator> class Allocating_queue : Allocator {
 public:
   using Iterator = typename Queue<T>::Iterator;
   using Const_iterator = typename Queue<T>::Const_iterator;
 
   Allocating_queue() { _impl.construct(); }
 
-  explicit Allocating_queue(Allocator const &allocator)
-      : _allocator{allocator} {
-    _impl.construct();
-  }
+  explicit Allocating_queue(Allocator const &allocator) : Allocator{allocator} { _impl.construct(); }
 
   ~Allocating_queue() {
     if (auto const block = _impl->block(); block.size() != 0) {
       // auto const block = make_block(
       //     _impl->data(), Queue<T>::memory_requirement(_impl->max_size()));
       _impl.destruct();
-      _allocator.free(block);
+      Allocator::free(block);
     }
   }
 
@@ -325,13 +303,13 @@ public:
 
   void reserve(Size capacity) {
     if (capacity > _impl->capacity()) {
-      auto temp = Queue<T>::make(_allocator, capacity).second;
+      auto temp = Queue<T>::make(static_cast<Allocator &>(*this), capacity).second;
       for (auto &object : *_impl) {
         temp.emplace_back(std::move(object));
       }
       if (auto const block = _impl->block(); block.size() != 0) {
         *_impl = std::move(temp);
-        _allocator.free(block);
+        Allocator::free(block);
       } else {
         *_impl = std::move(temp);
       }
@@ -371,7 +349,6 @@ private:
     }
   }
 
-  Allocator _allocator;
   Lifetime_box<Queue<T>> _impl;
 };
 } // namespace util

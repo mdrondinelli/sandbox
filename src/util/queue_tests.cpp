@@ -5,7 +5,7 @@
 namespace marlon {
 namespace util {
 TEST_CASE("marlon::util::Queue") {
-  auto q = Allocating_queue<int>{System_allocator::instance()};
+  auto q = Allocating_queue<int>{};
   REQUIRE(q.size() == 0);
   REQUIRE(q.empty());
   REQUIRE(q.begin() == q.end());
