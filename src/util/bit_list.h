@@ -15,9 +15,7 @@ namespace marlon {
 namespace util {
 class Bit_list {
 public:
-  template <typename Allocator>
-  static std::pair<Block, Bit_list> make(Allocator &allocator,
-                                         Size max_size) noexcept {
+  template <typename Allocator> static std::pair<Block, Bit_list> make(Allocator &&allocator, Size max_size) noexcept {
     auto const block = allocator.alloc(memory_requirement(max_size));
     return {block, Bit_list{block, max_size}};
   }
@@ -28,21 +26,17 @@ public:
 
   constexpr Bit_list() noexcept = default;
 
-  explicit Bit_list(Block block, Size max_size) noexcept
-      : Bit_list{block.begin, max_size} {}
+  explicit Bit_list(Block block, Size max_size) noexcept : Bit_list{block.begin, max_size} {}
 
   explicit Bit_list(void *block, Size max_size) noexcept
-      : _data{static_cast<std::uint64_t *>(block),
-              static_cast<std::size_t>((max_size + 63) / 64)} {
-  }
+      : _data{static_cast<std::uint64_t *>(block), static_cast<std::size_t>((max_size + 63) / 64)} {}
 
   Bit_list(Bit_list const &other) = delete;
 
   Bit_list &operator=(Bit_list const &other) = delete;
 
   constexpr Bit_list(Bit_list &&other) noexcept
-      : _data{std::exchange(other._data, std::span<std::uint64_t>{})},
-        _size{std::exchange(other._size, Size{})} {}
+      : _data{std::exchange(other._data, std::span<std::uint64_t>{})}, _size{std::exchange(other._size, Size{})} {}
 
   constexpr Bit_list &operator=(Bit_list &&other) noexcept {
     auto temp{std::move(other)};
