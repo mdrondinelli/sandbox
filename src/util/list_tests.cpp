@@ -5,7 +5,7 @@
 namespace marlon {
 namespace util {
 TEST_CASE("Allocating_list") {
-  auto a = Allocating_list<int>{System_allocator::instance()};
+  auto a = Allocating_list<int>{};
   for (int i = 0; i < 100000; ++i) {
     a.emplace_back(i);
   }
