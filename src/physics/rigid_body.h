@@ -48,13 +48,9 @@ public:
 
   Broadphase_bvh::Node *bvh_node() noexcept { return _bvh_node; }
 
-  std::span<Object const> neighbors() const noexcept {
-    return {_neighbors, static_cast<std::size_t>(_neighbor_count)};
-  }
+  std::span<Object const> neighbors() const noexcept { return {_neighbors, static_cast<std::size_t>(_neighbor_count)}; }
 
-  std::span<Object> neighbors() noexcept {
-    return {_neighbors, static_cast<std::size_t>(_neighbor_count)};
-  }
+  std::span<Object> neighbors() noexcept { return {_neighbors, static_cast<std::size_t>(_neighbor_count)}; }
 
   void reset_neighbors() noexcept {
     _neighbors = nullptr;
@@ -69,13 +65,9 @@ public:
     _neighbor_count = 0;
   }
 
-  void push_neighbor(Object neighbor) noexcept {
-    _neighbors[_neighbor_count++] = neighbor;
-  }
+  void push_neighbor(Object neighbor) noexcept { _neighbors[_neighbor_count++] = neighbor; }
 
-  Rigid_body_motion_callback *motion_callback() const noexcept {
-    return _motion_callback;
-  }
+  Rigid_body_motion_callback *motion_callback() const noexcept { return _motion_callback; }
 
   math::Vec3f const &position() const noexcept { return _position; }
 
@@ -87,17 +79,11 @@ public:
 
   math::Quatf const &orientation() const noexcept { return _orientation; }
 
-  void orientation(math::Quatf const &orientation) noexcept {
-    _orientation = orientation;
-  }
+  void orientation(math::Quatf const &orientation) noexcept { _orientation = orientation; }
 
-  math::Vec3f const &angular_velocity() const noexcept {
-    return _angular_velocity;
-  }
+  math::Vec3f const &angular_velocity() const noexcept { return _angular_velocity; }
 
-  void angular_velocity(math::Vec3f const &angular_velocity) noexcept {
-    _angular_velocity = angular_velocity;
-  }
+  void angular_velocity(math::Vec3f const &angular_velocity) noexcept { _angular_velocity = angular_velocity; }
 
   float motion() const noexcept { return _motion; }
 
@@ -105,9 +91,7 @@ public:
 
   float inverse_mass() const noexcept { return _inverse_mass; }
 
-  math::Mat3x3f const &inverse_inertia_tensor() const noexcept {
-    return _inverse_inertia_tensor;
-  }
+  math::Mat3x3f const &inverse_inertia_tensor() const noexcept { return _inverse_inertia_tensor; }
 
   Shape const &shape() const noexcept { return _shape; }
 
@@ -139,14 +123,11 @@ public:
     _velocity *= info.damping_factor;
     _position += info.delta_time * _velocity;
     _angular_velocity *= info.damping_factor;
-    _orientation +=
-        Quatf{0.0f, 0.5f * info.delta_time * _angular_velocity} * _orientation;
+    _orientation += Quatf{0.0f, 0.5f * info.delta_time * _angular_velocity} * _orientation;
     _orientation = normalize(_orientation);
-    _motion = min(
-        (1.0f - info.motion_smoothing_factor) * _motion +
-            info.motion_smoothing_factor *
-                (length_squared(_velocity) + length_squared(_angular_velocity)),
-        info.motion_limit);
+    _motion = min((1.0f - info.motion_smoothing_factor) * _motion +
+                      info.motion_smoothing_factor * (length_squared(_velocity) + length_squared(_angular_velocity)),
+                  info.motion_limit);
   }
 
 private:
@@ -176,8 +157,7 @@ class Rigid_body_motion_callback {
 public:
   virtual ~Rigid_body_motion_callback() = default;
 
-  virtual void on_rigid_body_motion(World const &world,
-                                    Rigid_body rigid_body) = 0;
+  virtual void on_rigid_body_motion(World const &world, Rigid_body rigid_body) = 0;
 };
 
 class Rigid_body_storage {
@@ -185,14 +165,12 @@ class Rigid_body_storage {
 
 public:
   template <typename Allocator>
-  static std::pair<util::Block, Rigid_body_storage>
-  make(Allocator &allocator, util::Size max_rigid_bodies) {
+  static std::pair<util::Block, Rigid_body_storage> make(Allocator &allocator, util::Size max_rigid_bodies) {
     auto const block = allocator.alloc(memory_requirement(max_rigid_bodies));
     return {block, Rigid_body_storage{block, max_rigid_bodies}};
   }
 
-  static constexpr util::Size
-  memory_requirement(util::Size max_rigid_bodies) noexcept {
+  static constexpr util::Size memory_requirement(util::Size max_rigid_bodies) noexcept {
     return Allocator::memory_requirement({
         decltype(_data)::memory_requirement(max_rigid_bodies),
         decltype(_available_handles)::memory_requirement(max_rigid_bodies),
@@ -202,31 +180,26 @@ public:
 
   constexpr Rigid_body_storage() = default;
 
-  explicit Rigid_body_storage(util::Block block,
-                              util::Size max_rigid_bodies) noexcept
+  explicit Rigid_body_storage(util::Block block, util::Size max_rigid_bodies) noexcept
       : Rigid_body_storage{block.begin, max_rigid_bodies} {}
 
-  explicit Rigid_body_storage(std::byte *block_begin,
-                              util::Size max_rigid_bodies) noexcept {
-    auto allocator =
-        Allocator{{block_begin, memory_requirement(max_rigid_bodies)}};
-    _data = decltype(_data)::make(allocator, max_rigid_bodies).second;
+  explicit Rigid_body_storage(std::byte *block_begin, util::Size max_rigid_bodies) noexcept {
+    util::assign_merged(Allocator{{block_begin, memory_requirement(max_rigid_bodies)}},
+                        std::tie(_data, _available_handles, _occupancy_bits),
+                        std::tuple{max_rigid_bodies},
+                        std::tuple{max_rigid_bodies},
+                        std::tuple{max_rigid_bodies});
     _data.resize(max_rigid_bodies);
-    _available_handles =
-        decltype(_available_handles)::make(allocator, max_rigid_bodies).second;
     _available_handles.resize(max_rigid_bodies);
-    for (auto i = util::Size{}; i != max_rigid_bodies; ++i) {
-      _available_handles[i] =
-          Rigid_body{static_cast<int>(max_rigid_bodies - i - 1)};
-    }
-    _occupancy_bits = util::Bit_list::make(allocator, max_rigid_bodies).second;
     _occupancy_bits.resize(max_rigid_bodies);
+    for (auto i = util::Size{}; i != max_rigid_bodies; ++i) {
+      _available_handles[i] = Rigid_body{static_cast<int>(max_rigid_bodies - i - 1)};
+    }
   }
 
   template <typename... Args> Rigid_body create(Args &&...args) {
     if (_available_handles.empty()) {
-      throw util::Capacity_error{
-          "Capacity_error in Rigid_body_storage::create"};
+      throw util::Capacity_error{"Capacity_error in Rigid_body_storage::create"};
     }
     auto const result = _available_handles.back();
     _available_handles.pop_back();
@@ -240,13 +213,9 @@ public:
     _occupancy_bits.reset(rigid_body.index());
   }
 
-  Rigid_body_data const *data(Rigid_body rigid_body) const noexcept {
-    return _data[rigid_body.index()].get();
-  }
+  Rigid_body_data const *data(Rigid_body rigid_body) const noexcept { return _data[rigid_body.index()].get(); }
 
-  Rigid_body_data *data(Rigid_body rigid_body) noexcept {
-    return _data[rigid_body.index()].get();
-  }
+  Rigid_body_data *data(Rigid_body rigid_body) noexcept { return _data[rigid_body.index()].get(); }
 
   template <typename F> void for_each(F &&f) {
     auto const n = _data.size();

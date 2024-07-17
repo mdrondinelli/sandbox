@@ -189,7 +189,7 @@ graphics::Unique_wireframe_mesh create_wireframe_cube_mesh(graphics::Graphics *g
 }
 
 constexpr float physics_delta_time = 1.0f / 128.0f;
-constexpr int physics_substeps = 10;
+constexpr int physics_substeps = 8;
 
 class Phase {
 public:
@@ -458,21 +458,21 @@ public:
         .visible = false,
     };
     scene->add(&_selection_wireframe);
-    scene->sky_irradiance(mix(graphics::Rgb_spectrum{32.0f}, graphics::Rgb_spectrum{0.0f, 0.0f, 96.0f}, 0.1f));
+    scene->sky_irradiance(mix(graphics::Rgb_spectrum{0.11f}, graphics::Rgb_spectrum{0.0f, 0.0f, 0.33f}, 0.1f));
     scene->ground_albedo(_ground_surface.material.base_color_tint);
     scene->directional_light(graphics::Directional_light{
-        .irradiance = graphics::Rgb_spectrum{481.5f},
+        .irradiance = graphics::Rgb_spectrum{1.3f},
         .direction = normalize(math::Vec3f{1.0f, 1.3f, 0.5f}),
     });
     get_camera()->position = {-10.0f, 3.5f, 10.0f};
     get_camera()->zoom = 2.0f * math::Vec2f{9.0f / 16.0f, 1.0f};
-    get_camera()->exposure = 0.05f;
+    get_camera()->exposure = 1.0f;
     // srand(25);
     _column_phase = Column_phase{_box_manager.get(), &_selection};
     _ring_phase = Ring_phase{_box_manager.get()};
     _pyramid_phase = Pyramid_phase{_box_manager.get()};
     _phases = {&_column_phase, &_ring_phase, &_ring_phase};
-    _phase_index = 2;
+    _phase_index = 0;
     _phases[_phase_index]->start();
   }
 

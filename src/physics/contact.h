@@ -7,18 +7,31 @@
 
 #include "../math/math.h"
 
+#include "constraint.h"
+
 namespace marlon {
 namespace physics {
-struct Contact {
+struct Contact : Constraint {
+  Contact() = default;
+
+  Contact(math::Vec3f const &normal,
+          std::array<math::Vec3f, 2> const &local_positions,
+          float initial_separation) noexcept
+      : normal{normal}, local_positions{local_positions}, initial_separation{initial_separation}, impulse{0.0f} {}
+
+  void solve_position(Object_pair objects, Object_storage &storage) noexcept override;
+
+  void solve_velocity(Object_pair objects, Object_storage &storage, float restitution_epsilon) noexcept override;
+
   math::Vec3f normal;
   std::array<math::Vec3f, 2> local_positions;
-  float separation;
+  float initial_separation;
+  float impulse;
 };
 
 struct Cached_contact {
   Contact contact;
   std::array<math::Quatf, 2> initial_object_orientations;
-  float impulse;
 };
 
 class Contact_manifold {
@@ -39,27 +52,21 @@ public:
     for (auto i = std::size_t{}; i != _size;) {
       auto &cached_contact = contacts()[i];
       auto const keep = [&] {
-        if (abs(dot(object_orientations[0],
-                    cached_contact.initial_object_orientations[0])) <
-            min_orientation_abs_dot) {
+        if (abs(dot(object_orientations[0], cached_contact.initial_object_orientations[0])) < min_orientation_abs_dot) {
           return false;
         }
-        if (abs(dot(object_orientations[1],
-                    cached_contact.initial_object_orientations[1])) <
-            min_orientation_abs_dot) {
+        if (abs(dot(object_orientations[1], cached_contact.initial_object_orientations[1])) < min_orientation_abs_dot) {
           return false;
         }
         auto const global_positions = std::array<Vec3f, 2>{
-            object_positions[0] +
-                object_rotations[0] * cached_contact.contact.local_positions[0],
-            object_positions[1] +
-                object_rotations[1] * cached_contact.contact.local_positions[1],
+            object_positions[0] + object_rotations[0] * cached_contact.contact.local_positions[0],
+            object_positions[1] + object_rotations[1] * cached_contact.contact.local_positions[1],
         };
         return length_squared(global_positions[0] - global_positions[1]) <
                max_position_distance * max_position_distance;
       }();
       if (keep) {
-        cached_contact.impulse = 0.0f;
+        cached_contact.contact.impulse = 0.0f;
         ++i;
       } else {
         std::shift_left(_contacts.data() + i, _contacts.data() + _size--, 1);
@@ -79,13 +86,9 @@ public:
     }
   }
 
-  std::span<Cached_contact const> contacts() const noexcept {
-    return {_contacts.data(), _size};
-  }
+  std::span<Cached_contact const> contacts() const noexcept { return {_contacts.data(), _size}; }
 
-  std::span<Cached_contact> contacts() noexcept {
-    return {_contacts.data(), _size};
-  }
+  std::span<Cached_contact> contacts() noexcept { return {_contacts.data(), _size}; }
 
   bool marked() const noexcept { return _marked; }
 
@@ -100,10 +103,8 @@ private:
     auto closest_contact = static_cast<Cached_contact *>(nullptr);
     auto closest_distance = std::numeric_limits<float>::infinity();
     for (auto it = begin; it != end; ++it) {
-      auto const distance = length_squared(it->contact.local_positions[0] -
-                                           contact.local_positions[0]) +
-                            length_squared(it->contact.local_positions[1] -
-                                           contact.local_positions[1]);
+      auto const distance = length_squared(it->contact.local_positions[0] - contact.local_positions[0]) +
+                            length_squared(it->contact.local_positions[1] - contact.local_positions[1]);
       if (distance < closest_distance) {
         closest_contact = it;
         closest_distance = distance;

@@ -32,6 +32,7 @@ add_executable(
 )
 add_library(
   physics
+  "src/physics/contact.cpp"
   "src/physics/world.cpp"
 )
 add_library(

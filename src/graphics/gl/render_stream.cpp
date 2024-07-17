@@ -77,7 +77,7 @@ layout(row_major, std140, binding = 0) uniform Surface {
 } surface;
 
 void main() {
-  vec3 color = texture(base_color_texture, vertex_data.texcoord).rgb * surface.base_color_tint.rgb;
+  vec3 color = texture(base_color_texture, vertex_data.texcoord, -1.0).rgb * surface.base_color_tint.rgb;
   vec3 normal = normalize(vertex_data.world_space_normal);
   out_color = vec4(color, 1.0);
   out_normal = oct_encode(normal);
@@ -331,7 +331,7 @@ vec3 tonemap(vec3 v) {
 }
 
 void main() {
-  out_color = vec4(tonemap(exposure * texture(in_color, texcoord).rgb), 1.0);
+  out_color = vec4(tonemap(8 * exposure * texture(in_color, texcoord).rgb), 1.0);
 }
 )";
 

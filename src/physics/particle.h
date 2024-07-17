@@ -46,13 +46,9 @@ public:
 
   Broadphase_bvh::Node *bvh_node() noexcept { return _bvh_node; }
 
-  std::span<Object const> neighbors() const noexcept {
-    return {_neighbors, static_cast<std::size_t>(_neighbor_count)};
-  }
+  std::span<Object const> neighbors() const noexcept { return {_neighbors, static_cast<std::size_t>(_neighbor_count)}; }
 
-  std::span<Object> neighbors() noexcept {
-    return {_neighbors, static_cast<std::size_t>(_neighbor_count)};
-  }
+  std::span<Object> neighbors() noexcept { return {_neighbors, static_cast<std::size_t>(_neighbor_count)}; }
 
   void reset_neighbors() noexcept {
     _neighbors = nullptr;
@@ -67,13 +63,9 @@ public:
     _neighbor_count = 0;
   }
 
-  void push_neighbor(Object neighbor) {
-    _neighbors[_neighbor_count++] = neighbor;
-  }
+  void push_neighbor(Object neighbor) { _neighbors[_neighbor_count++] = neighbor; }
 
-  Particle_motion_callback *motion_callback() const noexcept {
-    return _motion_callback;
-  }
+  Particle_motion_callback *motion_callback() const noexcept { return _motion_callback; }
 
   math::Vec3f const &position() const noexcept { return _position; }
 
@@ -117,9 +109,9 @@ public:
     _velocity += info.delta_velocity;
     _velocity *= info.damping_factor;
     _position += info.delta_time * _velocity;
-    _motion = min((1.0f - info.motion_smoothing_factor) * _motion +
-                      info.motion_smoothing_factor * length_squared(_velocity),
-                  info.motion_limit);
+    _motion =
+        min((1.0f - info.motion_smoothing_factor) * _motion + info.motion_smoothing_factor * length_squared(_velocity),
+            info.motion_limit);
   }
 
 private:
@@ -150,14 +142,12 @@ class Particle_storage {
 
 public:
   template <typename Allocator>
-  static std::pair<util::Block, Particle_storage>
-  make(Allocator &allocator, util::Size max_particles) {
+  static std::pair<util::Block, Particle_storage> make(Allocator &allocator, util::Size max_particles) {
     auto const block = allocator.alloc(memory_requirement(max_particles));
     return {block, Particle_storage{block, max_particles}};
   }
 
-  static constexpr util::Size
-  memory_requirement(util::Size max_particles) noexcept {
+  static constexpr util::Size memory_requirement(util::Size max_particles) noexcept {
     return Allocator::memory_requirement({
         decltype(_data)::memory_requirement(max_particles),
         decltype(_available_handles)::memory_requirement(max_particles),
@@ -167,24 +157,21 @@ public:
 
   constexpr Particle_storage() noexcept = default;
 
-  explicit Particle_storage(util::Block block,
-                            util::Size max_particles) noexcept
+  explicit Particle_storage(util::Block block, util::Size max_particles) noexcept
       : Particle_storage{block.begin, max_particles} {}
 
-  explicit Particle_storage(std::byte *block_begin,
-                            util::Size max_particles) noexcept {
-    auto allocator =
-        Allocator{{block_begin, memory_requirement(max_particles)}};
-    _data = decltype(_data)::make(allocator, max_particles).second;
+  explicit Particle_storage(std::byte *block_begin, util::Size max_particles) noexcept {
+    util::assign_merged(Allocator{{block_begin, memory_requirement(max_particles)}},
+                        std::tie(_data, _available_handles, _occupancy_bits),
+                        std::tuple{max_particles},
+                        std::tuple{max_particles},
+                        std::tuple{max_particles});
     _data.resize(max_particles);
-    _available_handles =
-        decltype(_available_handles)::make(allocator, max_particles).second;
     _available_handles.resize(max_particles);
+    _occupancy_bits.resize(max_particles);
     for (auto i = util::Size{}; i != max_particles; ++i) {
       _available_handles[i] = Particle{static_cast<int>(max_particles - i - 1)};
     }
-    _occupancy_bits = util::Bit_list::make(allocator, max_particles).second;
-    _occupancy_bits.resize(max_particles);
   }
 
   template <typename... Args> Particle create(Args &&...args) {
@@ -203,13 +190,9 @@ public:
     _occupancy_bits.reset(particle.index());
   }
 
-  Particle_data const *data(Particle particle) const noexcept {
-    return _data[particle.index()].get();
-  }
+  Particle_data const *data(Particle particle) const noexcept { return _data[particle.index()].get(); }
 
-  Particle_data *data(Particle particle) noexcept {
-    return _data[particle.index()].get();
-  }
+  Particle_data *data(Particle particle) noexcept { return _data[particle.index()].get(); }
 
   template <typename F> void for_each(F &&f) {
     auto const n = _data.size();

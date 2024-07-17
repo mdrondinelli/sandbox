@@ -13,12 +13,11 @@
 namespace marlon {
 namespace physics {
 struct World_create_info {
-  util::Size worker_thread_count{math::max(
-      static_cast<util::Size>(std::thread::hardware_concurrency()) / 2 - 1,
-      util::Size{0})};
-  int max_particles{10000};
-  int max_rigid_bodies{10000};
-  int max_static_bodies{100000};
+  util::Size worker_thread_count{
+      math::max(static_cast<util::Size>(std::thread::hardware_concurrency()) / 2 - 1, util::Size{0})};
+  util::Size max_particles{10000};
+  util::Size max_rigid_bodies{10000};
+  util::Size max_static_bodies{100000};
   util::Size max_aabb_tree_leaf_nodes{100000};
   util::Size max_aabb_tree_internal_nodes{100000};
   util::Size max_neighbor_pairs{20000};

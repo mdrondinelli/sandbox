@@ -5,6 +5,9 @@
 
 #include <concepts>
 #include <type_traits>
+#include <variant>
+
+#include <util/hash.h>
 
 namespace marlon {
 namespace physics {
