@@ -77,7 +77,7 @@ layout(row_major, std140, binding = 0) uniform Surface {
 } surface;
 
 void main() {
-  vec3 color = texture(base_color_texture, vertex_data.texcoord, -1.0).rgb * surface.base_color_tint.rgb;
+  vec3 color = texture(base_color_texture, vertex_data.texcoord).rgb * surface.base_color_tint.rgb;
   vec3 normal = normalize(vertex_data.world_space_normal);
   out_color = vec4(color, 1.0);
   out_normal = oct_encode(normal);
@@ -378,7 +378,7 @@ void Render_stream::render() {
     return;
   }
   auto const frame_time = Clock::now();
-  auto const taa_blend_factor = [&]{
+  auto const taa_blend_factor = [&] {
     if (_frame_time) {
       auto const frame_duration = std::chrono::duration_cast<std::chrono::duration<float>>(frame_time - *_frame_time);
       return 1.0f - pow(1.0f - 0.1f, 60.0f * frame_duration.count());
@@ -429,9 +429,7 @@ void Render_stream::acquire_surface_resource() {
   _surface_resource.acquire();
 }
 
-void Render_stream::release_surface_resource() {
-  _surface_resource.release();
-}
+void Render_stream::release_surface_resource() { _surface_resource.release(); }
 
 void Render_stream::write_surface_resource(Mat4x4f const &view_projection_matrix) {
   for (auto const surface : _scene->surfaces()) {
