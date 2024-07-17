@@ -292,22 +292,31 @@ private:
   Block _block{};
 };
 
-template <typename... Ts, typename Allocator, typename... ConstructorArgs>
-std::pair<Block, std::tuple<Ts...>> make_merged(Allocator &&allocator, ConstructorArgs &&...args) {
+template <typename Allocator, typename... Ts, typename... ConstructorArgs>
+constexpr util::Size memory_requirement(ConstructorArgs &&...args) {
+  return Allocator::memory_requirement({(std::apply(Ts::memory_requirement, args))...});
+}
+
+template <typename... Ts, typename Allocator, typename... ConstructorArgTuples>
+std::pair<Block, std::tuple<Ts...>> make_merged(Allocator &&allocator, ConstructorArgTuples &&...argTuples) {
   using Suballocator = Stack_allocator<>;
-  auto const memory_requirement = Suballocator::memory_requirement({(std::apply(Ts::memory_requirement, args))...});
+  auto const memory_requirement = Suballocator::memory_requirement({(std::apply(
+      [](auto &&...args) { return Ts::memory_requirement(std::forward<decltype(args)>(args)...); }, argTuples))...});
   auto const block = allocator.alloc(memory_requirement);
   auto suballocator = Suballocator{block};
   return {block,
           {(std::make_from_tuple<Ts>(std::tuple_cat(
-              std::tuple{suballocator.alloc(std::apply(Ts::memory_requirement, args)).begin}, args)))...}};
+              std::tuple{suballocator.alloc(std::apply(
+                  [](auto &&...args) { return Ts::memory_requirement(std::forward<decltype(args)>(args)...); },
+                  argTuples))},
+              argTuples)))...}};
 }
 
-template <typename... Ts, typename Allocator, typename... ConstructorArgs>
-Block assign_merged(Allocator &&allocator, std::tuple<Ts &...> const &assignees, ConstructorArgs &&...args) {
+template <typename... Ts, typename Allocator, typename... ConstructorArgTuples>
+Block assign_merged(Allocator &&allocator, std::tuple<Ts &...> const &assignees, ConstructorArgTuples &&...argTuples) {
   auto block = Block{};
   std::tie(block, assignees) =
-      make_merged<Ts...>(std::forward<Allocator>(allocator), std::forward<ConstructorArgs>(args)...);
+      make_merged<Ts...>(std::forward<Allocator>(allocator), std::forward<ConstructorArgTuples>(argTuples)...);
   return block;
 }
 } // namespace util
