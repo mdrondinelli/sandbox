@@ -2,6 +2,7 @@
 #define MARLON_UTIL_MEMORY_H
 
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 
 #include <bit>
@@ -305,7 +306,7 @@ std::pair<Block, std::tuple<Ts...>> make_merged(Allocator &&allocator, Construct
   auto const block = allocator.alloc(memory_requirement);
   auto suballocator = Suballocator{block};
   return {block,
-          {(std::make_from_tuple<Ts>(std::tuple_cat(
+          std::tuple{(std::make_from_tuple<Ts>(std::tuple_cat(
               std::tuple{suballocator.alloc(std::apply(
                   [](auto &&...args) { return Ts::memory_requirement(std::forward<decltype(args)>(args)...); },
                   argTuples))},
@@ -313,9 +314,9 @@ std::pair<Block, std::tuple<Ts...>> make_merged(Allocator &&allocator, Construct
 }
 
 template <typename... Ts, typename Allocator, typename... ConstructorArgTuples>
-Block assign_merged(Allocator &&allocator, std::tuple<Ts &...> const &assignees, ConstructorArgTuples &&...argTuples) {
+Block assign_merged(Allocator &&allocator, std::tuple<Ts &...> assignees, ConstructorArgTuples &&...argTuples) {
   auto block = Block{};
-  std::tie(block, assignees) =
+  std::tie(block, assignees) = 
       make_merged<Ts...>(std::forward<Allocator>(allocator), std::forward<ConstructorArgTuples>(argTuples)...);
   return block;
 }

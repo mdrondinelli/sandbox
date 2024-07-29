@@ -3,6 +3,7 @@
 
 #include <cstddef>
 
+#include <limits>
 #include <utility>
 
 #include "capacity_error.h"

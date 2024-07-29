@@ -1,5 +1,7 @@
 #include "render_stream.h"
 
+#include <cstring>
+
 #include <iostream>
 
 #include <glad/gl.h>

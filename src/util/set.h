@@ -2,6 +2,7 @@
 #define MARLON_UTIL_SET_H
 
 #include <cassert>
+#include <cmath>
 
 #include <algorithm>
 #include <array>
@@ -736,7 +737,7 @@ public:
 
   void rehash(Size count) noexcept {
     auto const max_bucket_count =
-        static_cast<Size>(std::bit_ceil(static_count<std::size_t>(
+        static_cast<Size>(std::bit_ceil(static_cast<std::size_t>(
             std::max(count,
                      static_cast<Size>(std::ceil(
                          size() / static_cast<double>(max_load_factor())))))));

@@ -13,13 +13,11 @@ class Unique_vertex_array {
 public:
   constexpr Unique_vertex_array() noexcept : _handle{0} {}
 
-  constexpr explicit Unique_vertex_array(std::uint32_t handle) noexcept
-      : _handle{handle} {}
+  constexpr explicit Unique_vertex_array(std::uint32_t handle) noexcept : _handle{handle} {}
 
   ~Unique_vertex_array();
 
-  Unique_vertex_array(Unique_vertex_array &&other) noexcept
-      : _handle{std::exchange(other._handle, 0)} {}
+  constexpr Unique_vertex_array(Unique_vertex_array &&other) noexcept : _handle{std::exchange(other._handle, 0)} {}
 
   Unique_vertex_array &operator=(Unique_vertex_array &&other) noexcept {
     auto temp{std::move(other)};
@@ -27,12 +25,10 @@ public:
     return *this;
   }
 
-  std::uint32_t get() const noexcept { return _handle; }
+  constexpr std::uint32_t get() const noexcept { return _handle; }
 
 private:
-  void swap(Unique_vertex_array &other) noexcept {
-    std::swap(_handle, other._handle);
-  }
+  void swap(Unique_vertex_array &other) noexcept { std::swap(_handle, other._handle); }
 
   std::uint32_t _handle;
 };

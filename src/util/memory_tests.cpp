@@ -21,8 +21,9 @@ TEST_CASE("make_merged") {
   auto [merged_block, merged_objects] =
       make_merged<List<int>, List<int>>(System_allocator{}, std::tuple{size_a}, std::tuple{size_b});
   auto &[list_a, list_b] = merged_objects;
-  REQUIRE(merged_block.size() == 64);
-  REQUIRE(ptrdiff(list_b.data(), list_a.data()) == 40);
+  REQUIRE(merged_block.size() == align(size_a * sizeof(int), alignof(std::max_align_t)) +
+                                     align(size_b * sizeof(int), alignof(std::max_align_t)));
+  REQUIRE(ptrdiff(list_b.data(), list_a.data()) == align(size_a * sizeof(int), alignof(std::max_align_t)));
   list_a = {};
   list_b = {};
   System_allocator{}.free(merged_block);
@@ -36,8 +37,9 @@ TEST_CASE("assign_merged") {
   auto list_a = List<int>{};
   auto list_b = List<int>{};
   auto const merged_block = assign_merged(System_allocator{}, tie(list_a, list_b), tuple{size_a}, tuple{size_b});
-  REQUIRE(merged_block.size() == 64);
-  REQUIRE(ptrdiff(list_b.data(), list_a.data()) == 40);
+  REQUIRE(merged_block.size() == align(size_a * sizeof(int), alignof(std::max_align_t)) +
+                                     align(size_b * sizeof(int), alignof(std::max_align_t)));
+  REQUIRE(ptrdiff(list_b.data(), list_a.data()) == align(size_a * sizeof(int), alignof(std::max_align_t)));
   list_a = {};
   list_b = {};
   System_allocator{}.free(merged_block);

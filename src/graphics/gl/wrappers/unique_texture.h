@@ -13,12 +13,11 @@ class Unique_texture {
 public:
   constexpr Unique_texture() noexcept : _handle{} {}
 
-  explicit Unique_texture(std::uint32_t handle) noexcept : _handle{handle} {}
+  constexpr explicit Unique_texture(std::uint32_t handle) noexcept : _handle{handle} {}
 
   ~Unique_texture();
 
-  Unique_texture(Unique_texture &&other) noexcept
-      : _handle{std::exchange(other._handle, 0)} {}
+  constexpr Unique_texture(Unique_texture &&other) noexcept : _handle{std::exchange(other._handle, 0)} {}
 
   Unique_texture &operator=(Unique_texture &&other) noexcept {
     auto temp{std::move(other)};
@@ -26,12 +25,10 @@ public:
     return *this;
   }
 
-  std::uint32_t get() const noexcept { return _handle; }
+  constexpr std::uint32_t get() const noexcept { return _handle; }
 
 private:
-  void swap(Unique_texture &other) noexcept {
-    std::swap(_handle, other._handle);
-  }
+  void swap(Unique_texture &other) noexcept { std::swap(_handle, other._handle); }
 
   std::uint32_t _handle;
 };

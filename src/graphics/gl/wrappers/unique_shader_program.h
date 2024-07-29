@@ -13,13 +13,11 @@ class Unique_shader_program {
 public:
   constexpr Unique_shader_program() noexcept : _handle{0} {}
 
-  constexpr explicit Unique_shader_program(std::uint32_t handle) noexcept
-      : _handle{handle} {}
+  constexpr explicit Unique_shader_program(std::uint32_t handle) noexcept : _handle{handle} {}
 
   ~Unique_shader_program();
 
-  Unique_shader_program(Unique_shader_program &&other) noexcept
-      : _handle{std::exchange(other._handle, 0)} {}
+  constexpr Unique_shader_program(Unique_shader_program &&other) noexcept : _handle{std::exchange(other._handle, 0)} {}
 
   Unique_shader_program &operator=(Unique_shader_program &&other) noexcept {
     auto temp{std::move(other)};
@@ -27,21 +25,18 @@ public:
     return *this;
   }
 
-  std::uint32_t get() const noexcept { return _handle; }
+  constexpr std::uint32_t get() const noexcept { return _handle; }
 
 private:
-  void swap(Unique_shader_program &other) noexcept {
-    std::swap(_handle, other._handle);
-  }
+  void swap(Unique_shader_program &other) noexcept { std::swap(_handle, other._handle); }
 
   std::uint32_t _handle;
 };
 
 Unique_shader_program make_unique_shader_program();
 
-wrappers::Unique_shader_program
-make_unique_shader_program(char const *vertex_shader_source,
-                           char const *fragment_shader_source);
+wrappers::Unique_shader_program make_unique_shader_program(char const *vertex_shader_source,
+                                                           char const *fragment_shader_source);
 } // namespace wrappers
 } // namespace gl
 } // namespace graphics

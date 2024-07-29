@@ -7,8 +7,9 @@ if (MSVC)
 else()
   add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
-find_package(glfw3 3.3.8 REQUIRED)
-find_package(Catch2 3 REQUIRED)
+find_package(glfw3 3.3.6 REQUIRED)
+# find_package(Catch2 3 REQUIRED)
+add_subdirectory(lib/Catch2-3.6.0)
 add_executable(
   math_tests
   "src/math/mat.cpp"

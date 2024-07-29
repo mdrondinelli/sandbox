@@ -26,9 +26,9 @@ public:
 
   void release() { _resources[_index].sync = wrappers::make_unique_sync(); }
 
-  T const &get() const noexcept { return _resources[_index].resource; }
+  constexpr T const &get() const noexcept { return _resources[_index].resource; }
 
-  T &get() noexcept { return _resources[_index].resource; }
+  constexpr T &get() noexcept { return _resources[_index].resource; }
 
 private:
   struct Synchronized_resource {
