@@ -1,5 +1,7 @@
 #include "surface_resource.h"
 
+#include <cstring>
+
 #include <stdexcept>
 
 namespace marlon::graphics::gl {
@@ -48,7 +50,12 @@ void Surface_resource::write(Surface const *surface, Mat4x4f const &view_project
   auto const model_view_projection_matrix = view_projection_matrix * Mat4x4f{model_matrix, {0.0f, 0.0f, 0.0f, 1.0f}};
   auto it = _surfaces.find(surface);
   if (it == _surfaces.end()) {
-    it = _surfaces.emplace(surface, Surface_data{.model_view_projection_matrix = model_view_projection_matrix}).first;
+    it = _surfaces
+             .emplace(surface,
+                      Surface_data{.uniform_buffer_offset = 0,
+                                   .model_view_projection_matrix = model_view_projection_matrix,
+                                   .marked = false})
+             .first;
   }
   auto const data = _uniform_buffers.get().data() + _uniform_buffer_offset;
   std::memcpy(data, &model_view_projection_matrix, 64);
