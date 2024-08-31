@@ -1,5 +1,6 @@
 AllowAllArgumentsOnNextLine: true
+AllowShortFunctionsOnASingleLine: Empty
 BinPackArguments: false
 BinPackParameters: false
-PackConstructorInitializers: NextLine
+PackConstructorInitializers: NextLineOnly
 ColumnLimit: 120

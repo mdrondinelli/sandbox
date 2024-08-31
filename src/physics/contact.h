@@ -43,8 +43,8 @@ public:
   void update(std::array<math::Vec3f, 2> const &object_positions,
               std::array<math::Quatf, 2> const &object_orientations) noexcept {
     using namespace math;
-    auto constexpr max_position_distance = 0.005f;
-    auto constexpr min_orientation_abs_dot = 0.999f;
+    auto constexpr max_position_distance = 0.02f;
+    auto constexpr min_orientation_abs_dot = 0.98f;
     auto const object_rotations = std::array<Mat3x3f, 2>{
         Mat3x3f::rotation(object_orientations[0]),
         Mat3x3f::rotation(object_orientations[1]),
@@ -62,8 +62,12 @@ public:
             object_positions[0] + object_rotations[0] * cached_contact.contact.local_positions[0],
             object_positions[1] + object_rotations[1] * cached_contact.contact.local_positions[1],
         };
-        return length_squared(global_positions[0] - global_positions[1]) <
-               max_position_distance * max_position_distance;
+        if (length_squared(global_positions[0] - global_positions[1]) > max_position_distance * max_position_distance) {
+          return false;
+        }
+        return dot(global_positions[0] - global_positions[1], cached_contact.contact.normal) +
+                   cached_contact.contact.initial_separation <=
+               0.001f;
       }();
       if (keep) {
         cached_contact.contact.impulse = 0.0f;
@@ -75,7 +79,7 @@ public:
   }
 
   void insert(Cached_contact const &contact) noexcept {
-    auto constexpr max_always_replace_deviation = 0.05f;
+    auto constexpr max_always_replace_deviation = 0.1f;
     auto const [closest_contact, closest_distance] = closest(contact.contact);
     if (closest_distance < max_always_replace_deviation) {
       *closest_contact = contact;

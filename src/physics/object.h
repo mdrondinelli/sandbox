@@ -17,8 +17,7 @@ enum class Object_type : std::uint8_t { particle, rigid_body, static_body };
 
 auto constexpr object_handle_type_bits = 2;
 auto constexpr object_handle_index_bits = 32 - object_handle_type_bits;
-auto constexpr object_handle_index_mask =
-    std::uint32_t{0xffffffffu} >> object_handle_type_bits;
+auto constexpr object_handle_index_mask = std::uint32_t{0xffffffffu} >> object_handle_type_bits;
 
 class Particle;
 class Rigid_body;
@@ -40,16 +39,11 @@ public:
 
   constexpr Object_handle handle() const noexcept { return _handle; }
 
-  constexpr Object_type type() const noexcept {
-    return static_cast<Object_type>(_handle >> object_handle_index_bits);
-  }
+  constexpr Object_type type() const noexcept { return static_cast<Object_type>(_handle >> object_handle_index_bits); }
 
-  constexpr int index() const noexcept {
-    return static_cast<int>(_handle & object_handle_index_mask);
-  }
+  constexpr int index() const noexcept { return static_cast<int>(_handle & object_handle_index_mask); }
 
-  constexpr std::variant<Particle, Rigid_body, Static_body>
-  specific() const noexcept;
+  constexpr std::variant<Particle, Rigid_body, Static_body> specific() const noexcept;
 
   friend constexpr bool operator==(Object lhs, Object rhs) noexcept = default;
 
@@ -62,8 +56,7 @@ public:
   Particle() = default;
 
   constexpr explicit Particle(int index) noexcept
-      : Particle{Object{static_cast<Object_handle>(Object_type::particle)
-                            << object_handle_index_bits |
+      : Particle{Object{static_cast<Object_handle>(Object_type::particle) << object_handle_index_bits |
                         static_cast<Object_handle>(index)}} {}
 
   constexpr explicit Particle(Object generic) noexcept : _generic{generic} {}
@@ -72,8 +65,7 @@ public:
 
   constexpr Object generic() const noexcept { return _generic; }
 
-  friend constexpr bool operator==(Particle lhs,
-                                   Particle rhs) noexcept = default;
+  friend constexpr bool operator==(Particle lhs, Particle rhs) noexcept = default;
 
 private:
   Object _generic;
@@ -84,8 +76,7 @@ public:
   Rigid_body() = default;
 
   constexpr explicit Rigid_body(int index) noexcept
-      : Rigid_body{Object{static_cast<Object_handle>(Object_type::rigid_body)
-                              << object_handle_index_bits |
+      : Rigid_body{Object{static_cast<Object_handle>(Object_type::rigid_body) << object_handle_index_bits |
                           static_cast<Object_handle>(index)}} {}
 
   constexpr explicit Rigid_body(Object generic) noexcept : _generic{generic} {}
@@ -94,8 +85,7 @@ public:
 
   constexpr Object generic() const noexcept { return _generic; }
 
-  friend constexpr bool operator==(Rigid_body lhs,
-                                   Rigid_body rhs) noexcept = default;
+  friend constexpr bool operator==(Rigid_body lhs, Rigid_body rhs) noexcept = default;
 
 private:
   Object _generic;
@@ -106,8 +96,7 @@ public:
   Static_body() = default;
 
   constexpr explicit Static_body(int index) noexcept
-      : Static_body{Object{static_cast<Object_handle>(Object_type::static_body)
-                               << object_handle_index_bits |
+      : Static_body{Object{static_cast<Object_handle>(Object_type::static_body) << object_handle_index_bits |
                            static_cast<Object_handle>(index)}} {}
 
   constexpr explicit Static_body(Object generic) noexcept : _generic{generic} {}
@@ -116,8 +105,7 @@ public:
 
   constexpr Object generic() const noexcept { return _generic; }
 
-  friend constexpr bool operator==(Static_body lhs,
-                                   Static_body rhs) noexcept = default;
+  friend constexpr bool operator==(Static_body lhs, Static_body rhs) noexcept = default;
 
 private:
   Object _generic;
@@ -125,29 +113,21 @@ private:
 
 class Object_pair {
 public:
-  constexpr Object_pair(Particle first, Particle second)
-      : Object_pair{first.generic(), second.generic()} {}
+  constexpr Object_pair(Particle first, Particle second) : Object_pair{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Particle first, Rigid_body second)
-      : _objects{first.generic(), second.generic()} {}
+  constexpr Object_pair(Particle first, Rigid_body second) : _objects{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Particle first, Static_body second)
-      : _objects{first.generic(), second.generic()} {}
+  constexpr Object_pair(Particle first, Static_body second) : _objects{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Rigid_body first, Particle second)
-      : _objects{second.generic(), first.generic()} {}
+  constexpr Object_pair(Rigid_body first, Particle second) : _objects{second.generic(), first.generic()} {}
 
-  constexpr Object_pair(Rigid_body first, Rigid_body second)
-      : Object_pair{first.generic(), second.generic()} {}
+  constexpr Object_pair(Rigid_body first, Rigid_body second) : Object_pair{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Rigid_body first, Static_body second)
-      : _objects{first.generic(), second.generic()} {}
+  constexpr Object_pair(Rigid_body first, Static_body second) : _objects{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Static_body first, Particle second)
-      : _objects{second.generic(), first.generic()} {}
+  constexpr Object_pair(Static_body first, Particle second) : _objects{second.generic(), first.generic()} {}
 
-  constexpr Object_pair(Static_body first, Rigid_body second)
-      : _objects{second.generic(), first.generic()} {}
+  constexpr Object_pair(Static_body first, Rigid_body second) : _objects{second.generic(), first.generic()} {}
 
   // explicit Object_pair(std::uint64_t id) noexcept
   //     : _objects{
@@ -173,8 +153,7 @@ public:
     return std::visit(
         [&](auto const object) -> std::variant<Particle, Rigid_body> {
           using T = std::decay_t<decltype(object)>;
-          if constexpr (std::is_same_v<T, Particle> ||
-                        std::is_same_v<T, Rigid_body>) {
+          if constexpr (std::is_same_v<T, Particle> || std::is_same_v<T, Rigid_body>) {
             return object;
           } else {
             math::unreachable();
@@ -184,8 +163,7 @@ public:
         _objects[0].specific());
   }
 
-  constexpr std::variant<Particle, Rigid_body, Static_body>
-  second_specific() const noexcept {
+  constexpr std::variant<Particle, Rigid_body, Static_body> second_specific() const noexcept {
     return _objects[1].specific();
   }
 
@@ -196,24 +174,18 @@ public:
                          std::pair<Rigid_body, Static_body>>
   specific() const noexcept {
     return std::visit(
-        [&](auto const first, auto const second)
-            -> std::variant<std::pair<Particle, Particle>,
-                            std::pair<Particle, Rigid_body>,
-                            std::pair<Particle, Static_body>,
-                            std::pair<Rigid_body, Rigid_body>,
-                            std::pair<Rigid_body, Static_body>> {
+        [&](auto const first, auto const second) -> std::variant<std::pair<Particle, Particle>,
+                                                                 std::pair<Particle, Rigid_body>,
+                                                                 std::pair<Particle, Static_body>,
+                                                                 std::pair<Rigid_body, Rigid_body>,
+                                                                 std::pair<Rigid_body, Static_body>> {
           using T = std::decay_t<decltype(first)>;
           using U = std::decay_t<decltype(second)>;
-          if constexpr ((std::is_same_v<T, Particle> &&
-                         std::is_same_v<U, Particle>) ||
-                        (std::is_same_v<T, Particle> &&
-                         std::is_same_v<U, Rigid_body>) ||
-                        (std::is_same_v<T, Particle> &&
-                         std::is_same_v<U, Static_body>) ||
-                        (std::is_same_v<T, Rigid_body> &&
-                         std::is_same_v<U, Rigid_body>) ||
-                        (std::is_same_v<T, Rigid_body> &&
-                         std::is_same_v<U, Static_body>)) {
+          if constexpr ((std::is_same_v<T, Particle> && std::is_same_v<U, Particle>) ||
+                        (std::is_same_v<T, Particle> && std::is_same_v<U, Rigid_body>) ||
+                        (std::is_same_v<T, Particle> && std::is_same_v<U, Static_body>) ||
+                        (std::is_same_v<T, Rigid_body> && std::is_same_v<U, Rigid_body>) ||
+                        (std::is_same_v<T, Rigid_body> && std::is_same_v<U, Static_body>)) {
             return std::pair{first, second};
           } else {
             math::unreachable();
@@ -224,8 +196,7 @@ public:
         _objects[1].specific());
   }
 
-  friend constexpr bool operator==(Object_pair lhs,
-                                   Object_pair rhs) noexcept = default;
+  friend constexpr bool operator==(Object_pair lhs, Object_pair rhs) noexcept = default;
 
   // Object first() const noexcept { return _objects[0]; }
 
@@ -241,8 +212,7 @@ public:
   // }
 
 private:
-  constexpr Object_pair(Object first, Object second) noexcept
-      : _objects{first, second} {
+  constexpr Object_pair(Object first, Object second) noexcept : _objects{first, second} {
     if (_objects[1].handle() < _objects[0].handle()) {
       std::swap(_objects[1], _objects[0]);
     }
@@ -251,8 +221,7 @@ private:
   std::array<Object, 2> _objects;
 };
 
-constexpr std::variant<Particle, Rigid_body, Static_body>
-Object::specific() const noexcept {
+constexpr std::variant<Particle, Rigid_body, Static_body> Object::specific() const noexcept {
   switch (type()) {
   case Object_type::particle:
     return Particle{*this};
@@ -260,14 +229,15 @@ Object::specific() const noexcept {
     return Rigid_body{*this};
   case Object_type::static_body:
     return Static_body{*this};
+  default:
+    math::unreachable();
   }
 }
 } // namespace physics
 namespace util {
 template <> struct Hash<physics::Object_pair> {
   constexpr std::size_t operator()(physics::Object_pair x) const noexcept {
-    return (static_cast<std::size_t>(x.first_generic().handle()) << 32) |
-           x.second_generic().handle();
+    return (static_cast<std::size_t>(x.first_generic().handle()) << 32) | x.second_generic().handle();
   }
 };
 } // namespace util

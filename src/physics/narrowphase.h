@@ -4,8 +4,9 @@
 #include <array>
 #include <optional>
 
-#include "../math/math.h"
 #include "particle.h"
+#include "physics/rigid_body.h"
+#include "physics/static_body.h"
 #include "shape.h"
 
 namespace marlon {
@@ -419,7 +420,7 @@ inline std::optional<Narrowphase_result> shape_shape_contact(Shape const &shape_
       shape_a._v);
 }
 
-std::optional<Narrowphase_result> object_object_contact(Particle_data const &first,
+inline std::optional<Narrowphase_result> object_object_contact(Particle_data const &first,
                                                         Particle_data const &second) noexcept {
   using namespace math;
   auto const displacement = first.position() - second.position();
@@ -447,7 +448,7 @@ std::optional<Narrowphase_result> object_object_contact(Particle_data const &fir
   }
 }
 
-std::optional<Narrowphase_result> object_object_contact(Particle_data const &first,
+inline std::optional<Narrowphase_result> object_object_contact(Particle_data const &first,
                                                         Rigid_body_data const &second) noexcept {
   using namespace math;
   auto const transform = Mat3x4f::rigid(second.position(), second.orientation());
@@ -455,7 +456,7 @@ std::optional<Narrowphase_result> object_object_contact(Particle_data const &fir
   return particle_shape_contact(first.radius(), first.position(), second.shape(), transform, transform_inv);
 }
 
-std::optional<Narrowphase_result> object_object_contact(Particle_data const &first,
+inline std::optional<Narrowphase_result> object_object_contact(Particle_data const &first,
                                                         Static_body_data const &second) noexcept {
   using namespace math;
   auto const transform = Mat3x4f::rigid(second.position(), second.orientation());
@@ -463,7 +464,7 @@ std::optional<Narrowphase_result> object_object_contact(Particle_data const &fir
   return particle_shape_contact(first.radius(), first.position(), second.shape(), transform, inverse_transform);
 }
 
-std::optional<Narrowphase_result> object_object_contact(Rigid_body_data const &first,
+inline std::optional<Narrowphase_result> object_object_contact(Rigid_body_data const &first,
                                                         Rigid_body_data const &second) noexcept {
   using namespace math;
   auto const transforms = std::pair{Mat3x4f::rigid(first.position(), first.orientation()),
@@ -477,7 +478,7 @@ std::optional<Narrowphase_result> object_object_contact(Rigid_body_data const &f
                              inverse_transforms.second);
 }
 
-std::optional<Narrowphase_result> object_object_contact(Rigid_body_data const &first,
+inline std::optional<Narrowphase_result> object_object_contact(Rigid_body_data const &first,
                                                         Static_body_data const &second) noexcept {
   using namespace math;
   auto const transforms = std::array<Mat3x4f, 2>{

@@ -1,23 +1,17 @@
 #include "app.h"
 
 #include <chrono>
-#include <iostream>
-#include <stdexcept>
 
 #include <glad/gl.h>
 
 #include <GLFW/glfw3.h>
 
-#include "../graphics/gl/graphics.h"
+#include <graphics/gl/graphics.h>
+
 #include "glfw_init_guard.h"
 #include "window.h"
 
-namespace marlon {
-using namespace math;
-using util::Scheduling_policy;
-using util::Thread_pool;
-
-namespace engine {
+namespace marlon::engine {
 class App::Runtime {
 public:
   explicit Runtime(physics::World_create_info const &world_create_info,
@@ -44,17 +38,29 @@ public:
 
   // Thread_pool *get_threads() noexcept { return &_threads; }
 
-  physics::World *get_world() noexcept { return &_world; }
+  physics::World *get_world() noexcept {
+    return &_world;
+  }
 
-  Window *get_window() noexcept { return &_window; }
+  Window *get_window() noexcept {
+    return &_window;
+  }
 
-  graphics::Graphics *get_graphics() noexcept { return &_graphics; }
+  graphics::Graphics *get_graphics() noexcept {
+    return &_graphics;
+  }
 
-  graphics::Render_target *get_render_target() noexcept { return _graphics.get_default_render_target(); }
+  graphics::Render_target *get_render_target() noexcept {
+    return _graphics.get_default_render_target();
+  }
 
-  graphics::Scene *get_scene() noexcept { return &_scene; }
+  graphics::Scene *get_scene() noexcept {
+    return &_scene;
+  }
 
-  graphics::Camera *get_camera() noexcept { return &_camera; }
+  graphics::Camera *get_camera() noexcept {
+    return &_camera;
+  }
 
   void render() {
     _render_stream->render();
@@ -105,33 +111,61 @@ int App::run() {
   return result;
 }
 
-physics::World const *App::get_world() const noexcept { return _runtime->get_world(); }
+physics::World const *App::get_world() const noexcept {
+  return _runtime->get_world();
+}
 
-physics::World *App::get_world() noexcept { return _runtime->get_world(); }
+physics::World *App::get_world() noexcept {
+  return _runtime->get_world();
+}
 
-physics::World_simulate_result const &App::get_world_simulate_result() const noexcept { return _world_simulate_result; }
+physics::World_simulate_result const &App::get_world_simulate_result() const noexcept {
+  return _world_simulate_result;
+}
 
-Window const *App::get_window() const noexcept { return _runtime->get_window(); }
+Window const *App::get_window() const noexcept {
+  return _runtime->get_window();
+}
 
-Window *App::get_window() noexcept { return _runtime->get_window(); }
+Window *App::get_window() noexcept {
+  return _runtime->get_window();
+}
 
-graphics::Graphics const *App::get_graphics() const noexcept { return _runtime->get_graphics(); }
+graphics::Graphics const *App::get_graphics() const noexcept {
+  return _runtime->get_graphics();
+}
 
-graphics::Graphics *App::get_graphics() noexcept { return _runtime->get_graphics(); }
+graphics::Graphics *App::get_graphics() noexcept {
+  return _runtime->get_graphics();
+}
 
-graphics::Scene const *App::get_scene() const noexcept { return _runtime->get_scene(); }
+graphics::Scene const *App::get_scene() const noexcept {
+  return _runtime->get_scene();
+}
 
-graphics::Scene *App::get_scene() noexcept { return _runtime->get_scene(); }
+graphics::Scene *App::get_scene() noexcept {
+  return _runtime->get_scene();
+}
 
-graphics::Camera const *App::get_camera() const noexcept { return _runtime->get_camera(); }
+graphics::Camera const *App::get_camera() const noexcept {
+  return _runtime->get_camera();
+}
 
-graphics::Camera *App::get_camera() noexcept { return _runtime->get_camera(); }
+graphics::Camera *App::get_camera() noexcept {
+  return _runtime->get_camera();
+}
 
-bool App::is_looping() const noexcept { return _looping; }
+bool App::is_looping() const noexcept {
+  return _looping;
+}
 
-void App::stop_looping() noexcept { _looping = false; }
+void App::stop_looping() noexcept {
+  _looping = false;
+}
 
-double App::get_loop_iteration_wall_time() const noexcept { return _loop_iteration_wall_time; }
+double App::get_loop_iteration_wall_time() const noexcept {
+  return _loop_iteration_wall_time;
+}
 
 void App::loop() {
   using clock = std::chrono::high_resolution_clock;
@@ -158,5 +192,4 @@ void App::loop() {
     _runtime->render();
   }
 }
-} // namespace engine
-} // namespace marlon
+} // namespace marlon::engine

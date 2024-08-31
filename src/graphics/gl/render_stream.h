@@ -5,7 +5,6 @@
 
 #include "../render_stream.h"
 #include "./wrappers/unique_shader_program.h"
-#include "./wrappers/unique_texture.h"
 #include "cascaded_shadow_map.h"
 #include "render_target.h"
 #include "surface_resource.h"
@@ -29,13 +28,13 @@ public:
       return &_cascaded_shadow_map_intrinsic_state;
     }
 
-    constexpr std::uint32_t surface_shader_program() const noexcept { return _surface_shader_program.get(); }
+    constexpr std::uint32_t surface_shader_program() const noexcept {
+      return _surface_shader_program.get();
+    }
 
-    // constexpr std::uint32_t wireframe_shader_program() const noexcept {
-    //   return _wireframe_shader_program.get();
-    // }
-
-    constexpr std::uint32_t lighting_shader_program() const noexcept { return _lighting_shader_program.get(); }
+    constexpr std::uint32_t lighting_shader_program() const noexcept {
+      return _lighting_shader_program.get();
+    }
 
     constexpr std::uint32_t temporal_antialiasing_shader_program() const noexcept {
       return _temporal_antialiasing_shader_program.get();
@@ -45,18 +44,16 @@ public:
       return _postprocessing_shader_program.get();
     }
 
-    constexpr std::uint32_t default_base_color_texture() const noexcept { return _default_base_color_texture.get(); }
-
-    constexpr std::uint32_t empty_vertex_array() const noexcept { return _empty_vertex_array.get(); }
+    constexpr std::uint32_t empty_vertex_array() const noexcept {
+      return _empty_vertex_array.get();
+    }
 
   private:
     Cascaded_shadow_map::Intrinsic_state _cascaded_shadow_map_intrinsic_state;
     wrappers::Unique_shader_program _surface_shader_program;
-    // wrappers::Unique_shader_program _wireframe_shader_program;
     wrappers::Unique_shader_program _lighting_shader_program;
     wrappers::Unique_shader_program _temporal_antialiasing_shader_program;
     wrappers::Unique_shader_program _postprocessing_shader_program;
-    wrappers::Unique_texture _default_base_color_texture;
     wrappers::Unique_vertex_array _empty_vertex_array;
   };
 
@@ -64,11 +61,17 @@ public:
 
   void render() final;
 
-  Render_target *target() const noexcept final { return _target; }
+  Render_target *target() const noexcept final {
+    return _target;
+  }
 
-  Scene const *scene() const noexcept final { return _scene; }
+  Scene const *scene() const noexcept final {
+    return _scene;
+  }
 
-  Camera const *camera() const noexcept final { return _camera; }
+  Camera const *camera() const noexcept final {
+    return _camera;
+  }
 
 private:
   using Clock = std::chrono::system_clock;

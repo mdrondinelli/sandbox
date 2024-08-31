@@ -1,6 +1,7 @@
 #include "glfw_init_guard.h"
 
 #include <stdexcept>
+#include <utility>
 
 #include <GLFW/glfw3.h>
 
@@ -12,8 +13,7 @@ int instance_count{0};
 
 Glfw_init_guard::Glfw_init_guard() {
   if (instance_count != 0) {
-    throw std::runtime_error{
-        "attempted to construct more than once simultaneous glfw instance"};
+    throw std::runtime_error{"attempted to construct more than once simultaneous glfw instance"};
   }
   if (glfwInit() != GLFW_TRUE) {
     const char *what{nullptr};
@@ -32,8 +32,7 @@ Glfw_init_guard::~Glfw_init_guard() {
   }
 }
 
-Glfw_init_guard::Glfw_init_guard(Glfw_init_guard &&other) noexcept
-    : _owns{std::exchange(other._owns, false)} {}
+Glfw_init_guard::Glfw_init_guard(Glfw_init_guard &&other) noexcept : _owns{std::exchange(other._owns, false)} {}
 
 Glfw_init_guard &Glfw_init_guard::operator=(Glfw_init_guard &&other) noexcept {
   auto temp{std::move(other)};
@@ -41,8 +40,6 @@ Glfw_init_guard &Glfw_init_guard::operator=(Glfw_init_guard &&other) noexcept {
   return *this;
 }
 
-void Glfw_init_guard::swap(Glfw_init_guard &other) noexcept {
-  std::swap(_owns, other._owns);
-}
+void Glfw_init_guard::swap(Glfw_init_guard &other) noexcept { std::swap(_owns, other._owns); }
 } // namespace engine
 } // namespace marlon

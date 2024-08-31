@@ -98,10 +98,10 @@ public:
 
   template <typename F> void for_each(F &&f) {
     auto const n = _occupancy_bits.size();
-    auto const m = _occupancy_bits.size() - _free_indices.size();
+    auto const m = _occupancy_bits.size() - _available_handles.size();
     auto k = util::Size{};
     for (auto i = util::Size{}; i != n && k != m; ++i) {
-      if (_occupancy_bits[i]) {
+      if (_occupancy_bits.get(i)) {
         f(Static_body{i});
         ++k;
       }

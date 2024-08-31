@@ -111,6 +111,7 @@ void Contact::solve_position(Object_pair objects, Object_storage &storage) noexc
                                      local_contact_normals[1]),
         };
         auto const impulse_scalar =
+            0.8f *
             max(-separation / (generalized_inverse_masses[0] + generalized_inverse_masses[1]), -impulse);
         impulse += impulse_scalar;
         auto const local_impulses = std::array<Vec3f, 2>{

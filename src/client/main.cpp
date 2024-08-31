@@ -1,9 +1,6 @@
-#include <fstream>
 #include <iostream>
-#include <stdexcept>
 
 #include "dynamic_prop.h"
-#include "static_prop.h"
 
 #include "../engine/app.h"
 #include "../graphics/graphics.h"
@@ -13,64 +10,33 @@ using enum engine::Key;
 using enum engine::Mouse_button;
 
 struct Resources {
-  graphics::Unique_texture brick_base_color_texture;
-  graphics::Unique_texture striped_cotton_base_color_texture;
   graphics::Surface_material brick_material;
   graphics::Surface_material striped_cotton_material;
   graphics::Surface_material ground_material;
   graphics::Unique_surface_mesh cube_mesh;
   graphics::Unique_surface_mesh low_quality_sphere_mesh;
   graphics::Unique_surface_mesh high_quality_sphere_mesh;
-  graphics::Unique_wireframe_mesh cube_wireframe_mesh;
 };
-
-graphics::Unique_texture create_texture(graphics::Graphics *graphics, const char *path);
 
 graphics::Unique_surface_mesh create_cube_mesh(graphics::Graphics *graphics);
 
 graphics::Unique_surface_mesh create_icosphere_mesh(graphics::Graphics *graphics, int subdivisions = 0);
 
-graphics::Unique_wireframe_mesh create_wireframe_cube_mesh(graphics::Graphics *graphics);
-
 Resources create_resources(graphics::Graphics *graphics) {
   Resources retval;
-  retval.brick_base_color_texture = create_texture(graphics, "C:/Users/mdron/Sandbox/res/BrickWall29_4K_BaseColor.ktx");
-  retval.striped_cotton_base_color_texture =
-      create_texture(graphics, "C:/Users/mdron/Sandbox/res/StripedCotton01_2K_BaseColor.ktx");
   retval.brick_material = graphics::Surface_material{
-      .base_color_texture = retval.brick_base_color_texture.get(),
+      //.base_color_texture = retval.brick_base_color_texture.get(),
   };
   retval.striped_cotton_material = graphics::Surface_material{
-      .base_color_texture = retval.striped_cotton_base_color_texture.get(),
+      //.base_color_texture = retval.striped_cotton_base_color_texture.get(),
   };
-  // retval.blue_material =
-  //     graphics::Surface_material{.base_color_tint = {0.00f, 0.005f, 0.02f}};
   retval.ground_material = graphics::Surface_material{
       .base_color_tint = graphics::Rgb_spectrum{0.3f},
   };
   retval.cube_mesh = create_cube_mesh(graphics);
   retval.low_quality_sphere_mesh = create_icosphere_mesh(graphics, 1);
   retval.high_quality_sphere_mesh = create_icosphere_mesh(graphics, 3);
-  retval.cube_wireframe_mesh = create_wireframe_cube_mesh(graphics);
   return retval;
-}
-
-graphics::Unique_texture create_texture(graphics::Graphics *graphics, const char *path) {
-  std::ifstream in{path, std::ios_base::binary};
-  if (in) {
-    in.seekg(0, std::ios_base::end);
-    auto const file_size = static_cast<std::size_t>(in.tellg());
-    auto data = std::vector<char>();
-    data.resize(file_size);
-    in.seekg(0, std::ios_base::beg);
-    in.read(data.data(), file_size);
-    return graphics->create_texture_unique({
-        .data = data.data(),
-        .size = data.size(),
-    });
-  } else {
-    throw std::runtime_error{"Failed to open texture file."};
-  }
 }
 
 graphics::Unique_surface_mesh create_cube_mesh(graphics::Graphics *graphics) {
@@ -171,25 +137,8 @@ graphics::Unique_surface_mesh create_icosphere_mesh(graphics::Graphics *graphics
   });
 }
 
-graphics::Unique_wireframe_mesh create_wireframe_cube_mesh(graphics::Graphics *graphics) {
-  std::vector<math::Vec3f> const vertices{
-      {1.0f, 1.0f, 1.0f},
-      {-1.0f, 1.0f, 1.0f},
-      {-1.0f, -1.0f, 1.0f},
-      {1.0f, -1.0f, 1.0f},
-      {1.0f, 1.0f, -1.0f},
-      {-1.0f, 1.0f, -1.0f},
-      {-1.0f, -1.0f, -1.0f},
-      {1.0f, -1.0f, -1.0f},
-  };
-  std::vector<std::uint16_t> const indices{
-      0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7,
-  };
-  return graphics->create_wireframe_mesh_unique({.indices = indices, .vertices = vertices});
-}
-
-constexpr float physics_delta_time = 1.0f / 128.0f;
-constexpr int physics_substeps = 8;
+constexpr float physics_delta_time = 1.0f / 120.0f;
+constexpr int physics_substeps = 10;
 
 class Phase {
 public:
@@ -213,7 +162,9 @@ public:
     }
   }
 
-  bool is_running() const noexcept { return _running; }
+  bool is_running() const noexcept {
+    return _running;
+  }
 
 private:
   bool _running{false};
@@ -273,13 +224,13 @@ public:
   }
 
 private:
-  client::Dynamic_prop_manager *_box_manager;
-  std::optional<client::Dynamic_prop_handle> *_selection;
-  util::Allocating_list<client::Dynamic_prop_handle> _boxes;
-  float _box_spawn_timer;
-  float _box_spawn_x;
-  float _box_spawn_y;
-  float _box_spawn_z;
+  client::Dynamic_prop_manager *_box_manager{};
+  std::optional<client::Dynamic_prop_handle> *_selection{};
+  util::Allocating_list<client::Dynamic_prop_handle> _boxes{};
+  float _box_spawn_timer{};
+  float _box_spawn_x{};
+  float _box_spawn_y{};
+  float _box_spawn_z{};
 };
 
 constexpr auto pyramid_layers = 11;
@@ -288,7 +239,8 @@ class Pyramid_phase : public Phase {
 public:
   Pyramid_phase() = default;
 
-  explicit Pyramid_phase(client::Dynamic_prop_manager *box_manager) : _box_manager{box_manager} {}
+  explicit Pyramid_phase(client::Dynamic_prop_manager *box_manager)
+      : _box_manager{box_manager} {}
 
   void on_start() final {
     _box_spawn_timer = 0.0f;
@@ -342,19 +294,20 @@ public:
 private:
   client::Dynamic_prop_manager *_box_manager;
   util::Allocating_list<client::Dynamic_prop_handle> _boxes;
-  float _box_spawn_timer;
-  int _box_spawn_layer;
-  int _box_spawn_row;
-  int _box_spawn_col;
-  bool _timer_started;
-  float _timer;
+  float _box_spawn_timer{};
+  int _box_spawn_layer{};
+  int _box_spawn_row{};
+  int _box_spawn_col{};
+  bool _timer_started{};
+  float _timer{};
 };
 
 class Ring_phase : public Phase {
 public:
   Ring_phase() = default;
 
-  explicit Ring_phase(client::Dynamic_prop_manager *box_manager) : _box_manager{box_manager}, _boxes{} {
+  explicit Ring_phase(client::Dynamic_prop_manager *box_manager)
+      : _box_manager{box_manager}, _boxes{} {
     _boxes.reserve(768);
   }
 
@@ -390,10 +343,10 @@ public:
   }
 
 private:
-  client::Dynamic_prop_manager *_box_manager;
-  util::Allocating_list<client::Dynamic_prop_handle> _boxes;
-  float _box_spawn_timer;
-  float _box_spawn_angle;
+  client::Dynamic_prop_manager *_box_manager{};
+  util::Allocating_list<client::Dynamic_prop_handle> _boxes{};
+  float _box_spawn_timer{};
+  float _box_spawn_angle{};
 };
 
 class Client : public engine::App {
@@ -403,11 +356,11 @@ public:
             .world_create_info =
                 {
                     .worker_thread_count = 7,
-                    .gravitational_acceleration = {0.0f, -9.8f, 0.0f},
+                    .gravitational_acceleration = {0.0f, -9.81f, 0.0f},
                 },
             .world_simulate_info = {.delta_time = physics_delta_time, .substep_count = physics_substeps},
-            .window_extents = {2560, 1440},
-            .full_screen = true,
+            .window_extents = {1280, 720},
+            .full_screen = false,
         }} {}
 
   void pre_loop() final {
@@ -452,15 +405,9 @@ public:
         .transform = math::Mat3x4f{{100.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.5f, 0.0f, -0.5f}, {0.0f, 0.0f, 100.0f, 0.0f}},
     };
     scene->add(&_ground_surface);
-    _selection_wireframe = {
-        .mesh = _resources.cube_wireframe_mesh.get(),
-        .color = {1.0f, 0.5f, 0.0f},
-        .visible = false,
-    };
-    scene->add(&_selection_wireframe);
     scene->sky_irradiance(mix(graphics::Rgb_spectrum{0.11f}, graphics::Rgb_spectrum{0.0f, 0.0f, 0.33f}, 0.1f));
     scene->ground_albedo(_ground_surface.material.base_color_tint);
-    scene->directional_light(graphics::Directional_light{
+    scene->sun(graphics::Directional_light{
         .irradiance = graphics::Rgb_spectrum{1.3f},
         .direction = normalize(math::Vec3f{1.0f, 1.3f, 0.5f}),
     });
@@ -549,14 +496,6 @@ public:
       _phase_index = (_phase_index + 1) % _phases.size();
       _phases[_phase_index]->start();
     }
-    if (_selection) {
-      auto const rigid_body = _box_manager->get_rigid_body(*_selection);
-      _selection_wireframe.transform = math::Mat3x4f::trs(
-          get_world()->data(rigid_body)->position(), get_world()->data(rigid_body)->orientation(), 0.3f);
-      _selection_wireframe.visible = true;
-    } else {
-      _selection_wireframe.visible = false;
-    }
     if (simulate_result.total_wall_time > physics_delta_time) {
       std::cout << "SLOWER THAN REAL TIME: " << simulate_result.total_wall_time * 1000.0 << " ms\n";
     }
@@ -566,7 +505,6 @@ private:
   Resources _resources;
   std::unique_ptr<client::Dynamic_prop_manager> _box_manager;
   graphics::Surface _ground_surface;
-  graphics::Wireframe _selection_wireframe;
   std::optional<client::Dynamic_prop_handle> _selection;
   float _camera_yaw{math::deg_to_rad(-45.0f)};
   float _camera_pitch{0.0f};
@@ -581,4 +519,6 @@ private:
   double _total_narrowphase_wall_time{0.0};
 };
 
-int main() { return Client{}.run(); }
+int main() {
+  return Client{}.run();
+}

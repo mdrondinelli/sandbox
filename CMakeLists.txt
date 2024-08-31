@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
-project(Sandbox CXX)
+project(Sandbox C CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if (MSVC)
@@ -7,9 +7,9 @@ if (MSVC)
 else()
   add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
-find_package(glfw3 3.3.6 REQUIRED)
-# find_package(Catch2 3 REQUIRED)
 add_subdirectory(lib/Catch2-3.6.0)
+find_package(glfw3 3.3.6 REQUIRED)
+find_package(PNG REQUIRED)
 add_executable(
   math_tests
   "src/math/mat.cpp"
@@ -37,6 +37,10 @@ add_library(
   "src/physics/world.cpp"
 )
 add_library(
+  load_png
+  "src/load_png/load_png.cpp"
+)
+add_library(
   graphics
   "src/graphics/gl/wrappers/unique_buffer.cpp"
   "src/graphics/gl/wrappers/unique_texture.cpp"
@@ -46,9 +50,7 @@ add_library(
   "src/graphics/gl/wrappers/unique_vertex_array.cpp"
   "src/graphics/gl/wrappers/unique_sync.cpp"
   "src/graphics/gl/graphics.cpp"
-  "src/graphics/gl/texture.cpp"
   "src/graphics/gl/surface_mesh.cpp"
-  "src/graphics/gl/wireframe_mesh.cpp"
   "src/graphics/gl/default_render_target.cpp"
   "src/graphics/gl/render_stream.cpp"
   "src/graphics/gl/uniform_buffer.cpp"
@@ -77,12 +79,15 @@ set_target_properties(math_tests util util_tests graphics physics engine client 
 target_include_directories(graphics PUBLIC src)
 target_include_directories(graphics PRIVATE include)
 target_include_directories(physics PRIVATE src)
+target_include_directories(engine PRIVATE src)
 target_include_directories(engine PRIVATE include)
 target_include_directories(client PRIVATE include)
 target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)
 target_link_libraries(math_tests Catch2::Catch2WithMain)
 target_link_libraries(util_tests util Catch2::Catch2WithMain)
 target_link_libraries(physics util)
-target_link_libraries(graphics util ${CMAKE_SOURCE_DIR}/lib/ktx.lib)
+target_link_directories(graphics INTERFACE ${CMAKE_SOURCE_DIR}/lib)
+target_link_libraries(graphics util ktx)
 target_link_libraries(engine physics graphics glfw)
+target_link_libraries(load_png PNG::PNG)
 target_link_libraries(client engine)

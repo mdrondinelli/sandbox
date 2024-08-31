@@ -1,14 +1,9 @@
 #include "world.h"
 
-#include <cstdint>
-
 #include <chrono>
-#include <iostream>
 #include <latch>
 
 #include "../math/scalar.h"
-#include "../util/bit_list.h"
-#include "../util/lifetime_box.h"
 #include "../util/list.h"
 #include "../util/map.h"
 #include "broadphase.h"
@@ -60,7 +55,9 @@ public:
     _groups = decltype(_groups)::make(allocator, max_group_count).second;
   }
 
-  Size object_count() const noexcept { return _objects.size(); }
+  Size object_count() const noexcept {
+    return _objects.size();
+  }
 
   std::variant<Particle, Rigid_body> object_specific(Size index) const noexcept {
     return std::visit(
@@ -76,11 +73,17 @@ public:
         object_generic(index).specific());
   }
 
-  Object object_generic(Size index) const noexcept { return _objects[index]; }
+  Object object_generic(Size index) const noexcept {
+    return _objects[index];
+  }
 
-  Size group_count() const noexcept { return _groups.size(); }
+  Size group_count() const noexcept {
+    return _groups.size();
+  }
 
-  Group const &group(util::Size group_index) const noexcept { return _groups[group_index]; }
+  Group const &group(util::Size group_index) const noexcept {
+    return _groups[group_index];
+  }
 
   void clear() noexcept {
     _objects.clear();
@@ -263,7 +266,9 @@ private:
     return {data->position(), data->orientation()};
   }
 
-  Object_derived_data derived_data(Static_body_data const *data) { return {data->position(), data->orientation()}; }
+  Object_derived_data derived_data(Static_body_data const *data) {
+    return {data->position(), data->orientation()};
+  }
 
   Intrinsic_state const *_intrinsic_state;
   std::span<std::pair<Object_pair, Contact_manifold> *const> _items;
@@ -344,7 +349,7 @@ auto constexpr velocity_damping_factor = 0.99f;
 auto constexpr motion_epsilon = 0.02f;
 auto constexpr motion_initializer = 2.0f * motion_epsilon;
 auto constexpr motion_limit = 10.0f * motion_epsilon;
-auto constexpr motion_smoothing_factor = 0.8f;
+auto constexpr motion_smoothing_factor = 0.9f;
 auto constexpr max_narrowphase_task_size = Size{32};
 } // namespace
 
@@ -424,9 +429,13 @@ public:
     util::System_allocator{}.free(_block);
   }
 
-  template <typename T> auto data(T object) const { return _objects.data(object); }
+  template <typename T> auto data(T object) const {
+    return _objects.data(object);
+  }
 
-  template <typename T> auto data(T object) { return _objects.data(object); }
+  template <typename T> auto data(T object) {
+    return _objects.data(object);
+  }
 
   Particle create_particle(Particle_create_info const &create_info) {
     auto const bvh_node = _bvh.create_leaf({}, {});
@@ -899,7 +908,7 @@ private:
         .objects = &_objects,
         .latch = nullptr,
     };
-    for (auto i = 0; i != 1; ++i) {
+    for (auto i = 0; i != 4; ++i) {
       for (auto const p : _awake_contact_manifolds) {
         auto &[objects, contact_manifold] = *p;
         for (auto &cached_contact : contact_manifold.contacts()) {
@@ -969,37 +978,58 @@ private:
   Vec3f _gravitational_acceleration;
 };
 
-World::World(World_create_info const &create_info) : _impl{std::make_unique<Impl>(create_info)} {}
+World::World(World_create_info const &create_info)
+    : _impl{std::make_unique<Impl>(create_info)} {}
 
 World::~World() {}
 
-Particle World::create_particle(Particle_create_info const &create_info) { return _impl->create_particle(create_info); }
+Particle World::create_particle(Particle_create_info const &create_info) {
+  return _impl->create_particle(create_info);
+}
 
-void World::destroy_particle(Particle particle) { _impl->destroy_particle(particle); }
+void World::destroy_particle(Particle particle) {
+  _impl->destroy_particle(particle);
+}
 
 Rigid_body World::create_rigid_body(Rigid_body_create_info const &create_info) {
   return _impl->create_rigid_body(create_info);
 }
 
-void World::destroy_rigid_body(Rigid_body handle) { _impl->destroy_rigid_body(handle); }
+void World::destroy_rigid_body(Rigid_body handle) {
+  _impl->destroy_rigid_body(handle);
+}
 
 Static_body World::create_static_body(Static_body_create_info const &create_info) {
   return _impl->create_static_body(create_info);
 }
 
-void World::destroy_static_body(Static_body static_rigid_body) { _impl->destroy_static_body(static_rigid_body); }
+void World::destroy_static_body(Static_body static_rigid_body) {
+  _impl->destroy_static_body(static_rigid_body);
+}
 
-Particle_data const *World::data(Particle object) const noexcept { return _impl->data(object); }
+Particle_data const *World::data(Particle object) const noexcept {
+  return _impl->data(object);
+}
 
-Particle_data *World::data(Particle object) noexcept { return _impl->data(object); }
+Particle_data *World::data(Particle object) noexcept {
+  return _impl->data(object);
+}
 
-Rigid_body_data const *World::data(Rigid_body object) const noexcept { return _impl->data(object); }
+Rigid_body_data const *World::data(Rigid_body object) const noexcept {
+  return _impl->data(object);
+}
 
-Rigid_body_data *World::data(Rigid_body object) noexcept { return _impl->data(object); }
+Rigid_body_data *World::data(Rigid_body object) noexcept {
+  return _impl->data(object);
+}
 
-Static_body_data const *World::data(Static_body object) const noexcept { return _impl->data(object); }
+Static_body_data const *World::data(Static_body object) const noexcept {
+  return _impl->data(object);
+}
 
-Static_body_data *World::data(Static_body object) noexcept { return _impl->data(object); }
+Static_body_data *World::data(Static_body object) noexcept {
+  return _impl->data(object);
+}
 
 World_simulate_result World::simulate(World_simulate_info const &simulate_info) {
   return _impl->simulate(*this, simulate_info);

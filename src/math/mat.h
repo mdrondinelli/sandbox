@@ -1,20 +1,24 @@
 #ifndef MARLON_MATH_MAT_H
 #define MARLON_MATH_MAT_H
 
+#include <concepts>
+
 #include "quat.h"
 #include "vec.h"
 
-namespace marlon {
-namespace math {
+namespace marlon::math {
 template <typename T, int N> class Rvec;
 
 template <typename T> class Rvec<T, 2> {
 public:
-  static constexpr auto zero() noexcept { return Rvec<T, 2>{T(0), T(0)}; }
+  static constexpr auto zero() noexcept {
+    return Rvec<T, 2>{T(0), T(0)};
+  }
 
   Rvec() = default;
 
-  constexpr Rvec(T x, T y) noexcept : _components{x, y} {}
+  constexpr Rvec(T x, T y) noexcept
+      : _components{x, y} {}
 
   template <typename F>
   constexpr explicit Rvec(F &&f) noexcept(noexcept(f(0)))
@@ -22,13 +26,18 @@ public:
 
   template <typename U>
   constexpr explicit Rvec(Rvec<U, 2> const &other) noexcept
-      : _components{static_cast<T>(other[0]), static_cast<T>(other[1])} {}
+      : _components{
+            static_cast<T>(other[0]),
+            static_cast<T>(other[1]),
+        } {}
 
   constexpr auto const &operator[](int n) const noexcept {
     return _components[n];
   }
 
-  constexpr auto &operator[](int n) noexcept { return _components[n]; }
+  constexpr auto &operator[](int n) noexcept {
+    return _components[n];
+  }
 
 private:
   T _components[2];
@@ -36,15 +45,20 @@ private:
 
 template <typename T> class Rvec<T, 3> {
 public:
-  static constexpr auto zero() noexcept { return Rvec<T, 3>{T(0), T(0), T(0)}; }
+  static constexpr auto zero() noexcept {
+    return Rvec<T, 3>{T(0), T(0), T(0)};
+  }
 
   Rvec() = default;
 
-  constexpr Rvec(T x, T y, T z) noexcept : _components{x, y, z} {}
+  constexpr Rvec(T x, T y, T z) noexcept
+      : _components{x, y, z} {}
 
-  constexpr Rvec(Rvec<T, 2> xy, T z) noexcept : _components{xy[0], xy[1], z} {}
+  constexpr Rvec(Rvec<T, 2> xy, T z) noexcept
+      : _components{xy[0], xy[1], z} {}
 
-  constexpr Rvec(T x, Rvec<T, 2> yz) noexcept : _components{x, yz[0], yz[1]} {}
+  constexpr Rvec(T x, Rvec<T, 2> yz) noexcept
+      : _components{x, yz[0], yz[1]} {}
 
   template <typename F>
   constexpr explicit Rvec(F &&f) noexcept(noexcept(f(0)))
@@ -52,15 +66,19 @@ public:
 
   template <typename U>
   constexpr explicit Rvec(Rvec<U, 3> const &other) noexcept
-      : _components{static_cast<T>(other[0]),
-                    static_cast<T>(other[1]),
-                    static_cast<T>(other[2])} {}
+      : _components{
+            static_cast<T>(other[0]),
+            static_cast<T>(other[1]),
+            static_cast<T>(other[2]),
+        } {}
 
   constexpr auto const &operator[](int n) const noexcept {
     return _components[n];
   }
 
-  constexpr auto &operator[](int n) noexcept { return _components[n]; }
+  constexpr auto &operator[](int n) noexcept {
+    return _components[n];
+  }
 
 private:
   T _components[3];
@@ -74,7 +92,8 @@ public:
 
   Rvec() = default;
 
-  constexpr Rvec(T x, T y, T z, T w) noexcept : _components{x, y, z, w} {}
+  constexpr Rvec(T x, T y, T z, T w) noexcept
+      : _components{x, y, z, w} {}
 
   constexpr Rvec(Rvec<T, 2> xy, Rvec<T, 2> zw) noexcept
       : _components{xy[0], xy[1], zw[0], zw[1]} {}
@@ -100,16 +119,20 @@ public:
 
   template <typename U>
   constexpr explicit Rvec(Rvec<U, 4> const &other) noexcept
-      : _components{static_cast<T>(other[0]),
-                    static_cast<T>(other[1]),
-                    static_cast<T>(other[2]),
-                    static_cast<T>(other[3])} {}
+      : _components{
+            static_cast<T>(other[0]),
+            static_cast<T>(other[1]),
+            static_cast<T>(other[2]),
+            static_cast<T>(other[3]),
+        } {}
 
   constexpr auto const &operator[](int n) const noexcept {
     return _components[n];
   }
 
-  constexpr auto &operator[](int n) noexcept { return _components[n]; }
+  constexpr auto &operator[](int n) noexcept {
+    return _components[n];
+  }
 
 private:
   T _components[4];
@@ -120,12 +143,18 @@ template <typename T, int N, int M> class Mat;
 template <typename T, int M> class Mat<T, 2, M> {
 public:
   static auto zero() {
-    return Mat<T, 2, M>{Rvec<T, M>::zero(), Rvec<T, M>::zero()};
+    return Mat<T, 2, M>{
+        Rvec<T, M>::zero(),
+        Rvec<T, M>::zero(),
+    };
   }
 
   static auto identity() {
     static_assert(M == 2);
-    return Mat<T, 2, 2>{{T(1), T(0)}, {T(0), T(1)}};
+    return Mat<T, 2, 2>{
+        {T(1), T(0)},
+        {T(0), T(1)},
+    };
   }
 
   Mat() = default;
@@ -133,16 +162,24 @@ public:
   constexpr Mat(Rvec<T, M> const &row0, Rvec<T, M> const &row1) noexcept
       : rows{row0, row1} {}
 
-  template <typename F>
-  constexpr explicit Mat(F &&f) noexcept(noexcept(f(0))) : rows{f(0), f(1)} {}
+  template <std::invocable<int> F>
+  constexpr explicit Mat(F &&f) noexcept(noexcept(f(0)))
+      : rows{f(0), f(1)} {}
 
   template <typename U>
   constexpr explicit Mat(Mat<U, 2, M> const &m) noexcept
-      : rows{static_cast<Rvec<T, M>>(m[0]), static_cast<Rvec<T, M>>(m[1])} {}
+      : rows{
+            static_cast<Rvec<T, M>>(m[0]),
+            static_cast<Rvec<T, M>>(m[1]),
+        } {}
 
-  constexpr auto const &operator[](int n) const noexcept { return rows[n]; }
+  constexpr auto const &operator[](int n) const noexcept {
+    return rows[n];
+  }
 
-  constexpr auto &operator[](int n) noexcept { return rows[n]; }
+  constexpr auto &operator[](int n) noexcept {
+    return rows[n];
+  }
 
 private:
   Rvec<T, M> rows[2];
@@ -152,27 +189,36 @@ template <typename T, int M> class Mat<T, 3, M> {
 public:
   static constexpr auto zero() noexcept {
     return Mat<T, 3, M>{
-        Rvec<T, M>::zero(), Rvec<T, M>::zero(), Rvec<T, M>::zero()};
+        Rvec<T, M>::zero(),
+        Rvec<T, M>::zero(),
+        Rvec<T, M>::zero(),
+    };
   }
 
   static constexpr auto identity() noexcept {
     static_assert(M == 3 || M == 4);
     if constexpr (M == 3) {
-      return Mat<T, 3, 3>{Rvec<T, 3>{T(1), T(0), T(0)},
-                          Rvec<T, 3>{T(0), T(1), T(0)},
-                          Rvec<T, 3>{T(0), T(0), T(1)}};
+      return Mat<T, 3, 3>{
+          Rvec<T, 3>{T(1), T(0), T(0)},
+          Rvec<T, 3>{T(0), T(1), T(0)},
+          Rvec<T, 3>{T(0), T(0), T(1)},
+      };
     } else {
-      return Mat<T, 3, 4>{Rvec<T, 4>{T(1), T(0), T(0), T(0)},
-                          Rvec<T, 4>{T(0), T(1), T(0), T(0)},
-                          Rvec<T, 4>{T(0), T(0), T(1), T(0)}};
+      return Mat<T, 3, 4>{
+          Rvec<T, 4>{T(1), T(0), T(0), T(0)},
+          Rvec<T, 4>{T(0), T(1), T(0), T(0)},
+          Rvec<T, 4>{T(0), T(0), T(1), T(0)},
+      };
     }
   }
 
   static constexpr auto translation(math::Vec3<T> const &t) noexcept {
     static_assert(M == 4);
-    return Mat<T, 3, 4>{{T(1), T(0), T(0), t.x},
-                        {T(0), T(1), T(0), t.y},
-                        {T(0), T(0), T(1), t.z}};
+    return Mat<T, 3, 4>{
+        {T(1), T(0), T(0), t.x},
+        {T(0), T(1), T(0), t.y},
+        {T(0), T(0), T(1), t.z},
+    };
   }
 
   static constexpr auto rotation(Quat<T> const &r) noexcept {
@@ -187,20 +233,34 @@ public:
     auto const m21 = T(2) * r.v.y * r.v.z + T(2) * r.w * r.v.x;
     auto const m22 = T(1) - T(2) * r.v.x * r.v.x - T(2) * r.v.y * r.v.y;
     if constexpr (M == 3) {
-      return Mat<T, 3, 3>{{m00, m01, m02}, {m10, m11, m12}, {m20, m21, m22}};
+      return Mat<T, 3, 3>{
+          {m00, m01, m02},
+          {m10, m11, m12},
+          {m20, m21, m22},
+      };
     } else {
       return Mat<T, 3, 4>{
-          {m00, m01, m02, T(0)}, {m10, m11, m12, T(0)}, {m20, m21, m22, T(0)}};
+          {m00, m01, m02, T(0)},
+          {m10, m11, m12, T(0)},
+          {m20, m21, m22, T(0)},
+      };
     }
   }
 
   static constexpr auto scale(T s) noexcept {
     static_assert(M == 3 || M == 4);
     if constexpr (M == 3) {
-      return Mat<T, 3, 3>{{s, T(0), T(0)}, {T(0), s, T(0)}, {T(0), T(0), s}};
+      return Mat<T, 3, 3>{
+          {s, T(0), T(0)},
+          {T(0), s, T(0)},
+          {T(0), T(0), s},
+      };
     } else {
       return Mat<T, 3, 4>{
-          {s, T(0), T(0), T(0)}, {T(0), s, T(0), T(0)}, {T(0), T(0), s, T(0)}};
+          {s, T(0), T(0), T(0)},
+          {T(0), s, T(0), T(0)},
+          {T(0), T(0), s, T(0)},
+      };
     }
   }
 
@@ -235,9 +295,7 @@ public:
 
   Mat() = default;
 
-  constexpr Mat(Rvec<T, M> const &row0,
-                Rvec<T, M> const &row1,
-                Rvec<T, M> const &row2) noexcept
+  constexpr Mat(Rvec<T, M> const &row0, Rvec<T, M> const &row1, Rvec<T, M> const &row2) noexcept
       : rows{row0, row1, row2} {}
 
   constexpr Mat(Mat<T, 2, M> const &row0, Rvec<T, M> const &row2) noexcept
@@ -246,19 +304,25 @@ public:
   constexpr Mat(Rvec<T, M> const &row0, Mat<T, 2, M> const &row1) noexcept
       : rows{row0, row1[0], row1[1]} {}
 
-  template <typename F>
+  template <std::invocable<int> F>
   constexpr explicit Mat(F &&f) noexcept(noexcept(f(0)))
       : rows{f(0), f(1), f(2)} {}
 
   template <typename U>
   constexpr explicit Mat(Mat<U, 3, M> const &m) noexcept
-      : rows{static_cast<Rvec<T, M>>(m[0]),
-             static_cast<Rvec<T, M>>(m[1]),
-             static_cast<Rvec<T, M>>(m[2])} {}
+      : rows{
+            static_cast<Rvec<T, M>>(m[0]),
+            static_cast<Rvec<T, M>>(m[1]),
+            static_cast<Rvec<T, M>>(m[2]),
+        } {}
 
-  constexpr auto const &operator[](int n) const noexcept { return rows[n]; }
+  constexpr auto const &operator[](int n) const noexcept {
+    return rows[n];
+  }
 
-  constexpr auto &operator[](int n) noexcept { return rows[n]; }
+  constexpr auto &operator[](int n) noexcept {
+    return rows[n];
+  }
 
 private:
   Rvec<T, M> rows[3];
@@ -267,18 +331,22 @@ private:
 template <typename T, int M> class Mat<T, 4, M> {
 public:
   static constexpr auto zero() {
-    return Mat<T, 4, M>{Rvec<T, M>::zero(),
-                        Rvec<T, M>::zero(),
-                        Rvec<T, M>::zero(),
-                        Rvec<T, M>::zero()};
+    return Mat<T, 4, M>{
+        Rvec<T, M>::zero(),
+        Rvec<T, M>::zero(),
+        Rvec<T, M>::zero(),
+        Rvec<T, M>::zero(),
+    };
   }
 
   static constexpr auto identity() {
     static_assert(M == 4);
-    return Mat<T, 4, 4>{{T(1), T(0), T(0), T(0)},
-                        {T(0), T(1), T(0), T(0)},
-                        {T(0), T(0), T(1), T(0)},
-                        {T(0), T(0), T(0), T(1)}};
+    return Mat<T, 4, 4>{
+        {T(1), T(0), T(0), T(0)},
+        {T(0), T(1), T(0), T(0)},
+        {T(0), T(0), T(1), T(0)},
+        {T(0), T(0), T(0), T(1)},
+    };
   }
 
   static constexpr auto translation(math::Vec3<T> const &t) noexcept {
@@ -316,25 +384,16 @@ public:
 
   Mat() = default;
 
-  constexpr Mat(Rvec<T, M> const &row0,
-                Rvec<T, M> const &row1,
-                Rvec<T, M> const &row2,
-                Rvec<T, M> const &row3) noexcept
+  constexpr Mat(Rvec<T, M> const &row0, Rvec<T, M> const &row1, Rvec<T, M> const &row2, Rvec<T, M> const &row3) noexcept
       : rows{row0, row1, row2, row3} {}
 
-  constexpr Mat(Mat<T, 2, M> const &row0,
-                Rvec<T, M> const &row2,
-                Rvec<T, M> const &row3) noexcept
+  constexpr Mat(Mat<T, 2, M> const &row0, Rvec<T, M> const &row2, Rvec<T, M> const &row3) noexcept
       : rows{row0[0], row0[1], row2, row3} {}
 
-  constexpr Mat(Rvec<T, M> const &row0,
-                Mat<T, 2, M> const &row1,
-                Rvec<T, M> const &row3) noexcept
+  constexpr Mat(Rvec<T, M> const &row0, Mat<T, 2, M> const &row1, Rvec<T, M> const &row3) noexcept
       : rows{row0, row1[0], row1[1], row3} {}
 
-  constexpr Mat(Rvec<T, M> const &row0,
-                Rvec<T, M> const &row1,
-                Mat<T, 2, M> const &row2) noexcept
+  constexpr Mat(Rvec<T, M> const &row0, Rvec<T, M> const &row1, Mat<T, 2, M> const &row2) noexcept
       : rows{row0, row1, row2[0], row2[1]} {}
 
   constexpr Mat(Mat<T, 3, M> const &row0, Rvec<T, M> const &row3) noexcept
@@ -354,9 +413,13 @@ public:
              static_cast<Rvec<T, M>>(m[2]),
              static_cast<Rvec<T, M>>(m[3])} {}
 
-  constexpr auto const &operator[](int n) const noexcept { return rows[n]; }
+  constexpr auto const &operator[](int n) const noexcept {
+    return rows[n];
+  }
 
-  constexpr auto &operator[](int n) noexcept { return rows[n]; }
+  constexpr auto &operator[](int n) noexcept {
+    return rows[n];
+  }
 
 private:
   Rvec<T, M> rows[4];
@@ -411,8 +474,7 @@ using Mat4x2d = Mat<double, 4, 2>;
 using Mat4x3d = Mat<double, 4, 3>;
 using Mat4x4d = Mat<double, 4, 4>;
 
-template <typename T, int N>
-constexpr bool operator==(Rvec<T, N> const &a, Rvec<T, N> const &b) noexcept {
+template <typename T, int N> constexpr bool operator==(Rvec<T, N> const &a, Rvec<T, N> const &b) noexcept {
   for (auto i = 0; i < N; ++i) {
     if (a[i] != b[i]) {
       return false;
@@ -421,23 +483,19 @@ constexpr bool operator==(Rvec<T, N> const &a, Rvec<T, N> const &b) noexcept {
   return true;
 }
 
-template <typename T, int N>
-constexpr Rvec<T, N> operator*(T s, Rvec<T, N> const &v) noexcept {
+template <typename T, int N> constexpr Rvec<T, N> operator*(T s, Rvec<T, N> const &v) noexcept {
   return Rvec<T, N>{[&](int i) { return s * v[i]; }};
 }
 
-template <typename T, int N>
-constexpr Rvec<T, N> operator*(Rvec<T, N> const &v, T s) noexcept {
+template <typename T, int N> constexpr Rvec<T, N> operator*(Rvec<T, N> const &v, T s) noexcept {
   return s * v;
 }
 
-template <typename T, int N>
-constexpr Rvec<T, N> &operator*=(Rvec<T, N> &v, T s) noexcept {
+template <typename T, int N> constexpr Rvec<T, N> &operator*=(Rvec<T, N> &v, T s) noexcept {
   return v = v * s;
 }
 
-template <typename T, int N>
-constexpr Rvec<T, N> operator/(Rvec<T, N> const &v, T s) noexcept {
+template <typename T, int N> constexpr Rvec<T, N> operator/(Rvec<T, N> const &v, T s) noexcept {
   if constexpr (std::is_floating_point_v<T>) {
     return v * (T(1) / s);
   } else {
@@ -445,13 +503,11 @@ constexpr Rvec<T, N> operator/(Rvec<T, N> const &v, T s) noexcept {
   }
 }
 
-template <typename T, int N>
-constexpr Rvec<T, N> &operator/=(Rvec<T, N> &v, T s) noexcept {
+template <typename T, int N> constexpr Rvec<T, N> &operator/=(Rvec<T, N> &v, T s) noexcept {
   return v = v / s;
 }
 
-template <typename T, int N>
-constexpr T operator*(Rvec<T, N> const &a, Vec<T, N> const &b) noexcept {
+template <typename T, int N> constexpr T operator*(Rvec<T, N> const &a, Vec<T, N> const &b) noexcept {
   auto retval = T(0);
   for (auto i = 0; i < N; ++i) {
     retval += a[i] * b[i];
@@ -459,24 +515,19 @@ constexpr T operator*(Rvec<T, N> const &a, Vec<T, N> const &b) noexcept {
   return retval;
 }
 
-template <typename T, int N>
-constexpr Rvec<T, N> abs(Rvec<T, N> const &v) noexcept {
+template <typename T, int N> constexpr Rvec<T, N> abs(Rvec<T, N> const &v) noexcept {
   return Rvec<T, N>{[&](int i) { return std::abs(v[i]); }};
 }
 
-template <typename T, int N>
-constexpr Rvec<T, N> transpose(Vec<T, N> const &v) noexcept {
+template <typename T, int N> constexpr Rvec<T, N> transpose(Vec<T, N> const &v) noexcept {
   return Rvec<T, N>{[&](int i) { return v[i]; }};
 }
 
-template <typename T, int N>
-constexpr Vec<T, N> transpose(Rvec<T, N> const &v) noexcept {
+template <typename T, int N> constexpr Vec<T, N> transpose(Rvec<T, N> const &v) noexcept {
   return Vec<T, N>{[&](int i) { return v[i]; }};
 }
 
-template <typename T, int N, int M>
-constexpr bool operator==(Mat<T, N, M> const &a,
-                          Mat<T, N, M> const &b) noexcept {
+template <typename T, int N, int M> constexpr bool operator==(Mat<T, N, M> const &a, Mat<T, N, M> const &b) noexcept {
   for (int i = 0; i < N; ++i) {
     if (a[i] != b[i]) {
       return false;
@@ -486,29 +537,24 @@ constexpr bool operator==(Mat<T, N, M> const &a,
 }
 
 template <typename T, int N, int M>
-constexpr Mat<T, N, M> &operator*=(Mat<T, N, M> &a,
-                                   Mat<T, M, M> const &b) noexcept {
+constexpr Mat<T, N, M> &operator*=(Mat<T, N, M> &a, Mat<T, M, M> const &b) noexcept {
   return a = a * b;
 }
 
-template <typename T, int N, int M>
-constexpr Mat<T, N, M> operator*(T s, Mat<T, N, M> const &m) noexcept {
+template <typename T, int N, int M> constexpr Mat<T, N, M> operator*(T s, Mat<T, N, M> const &m) noexcept {
   return Mat<T, N, M>{[&](int i) { return s * m[i]; }};
 }
 
-template <typename T, int N, int M>
-constexpr Mat<T, N, M> operator*(Mat<T, N, M> const &m, T s) noexcept {
+template <typename T, int N, int M> constexpr Mat<T, N, M> operator*(Mat<T, N, M> const &m, T s) noexcept {
   return Mat<T, N, M>{[&](int i) { return m[i] * s; }};
 }
 
-template <typename T, int N, int M>
-constexpr Mat<T, N, M> &operator*=(Mat<T, N, M> &a, T s) noexcept {
+template <typename T, int N, int M> constexpr Mat<T, N, M> &operator*=(Mat<T, N, M> &a, T s) noexcept {
   return a = a * s;
 }
 
 template <typename T, int N, int M>
-constexpr Rvec<T, M> operator*(Rvec<T, N> const &v,
-                               Mat<T, N, M> const &m) noexcept {
+constexpr Rvec<T, M> operator*(Rvec<T, N> const &v, Mat<T, N, M> const &m) noexcept {
   return Rvec<T, M>{[&](int j) {
     auto retval = T(0);
     for (int i = 0; i < N; ++i) {
@@ -518,15 +564,11 @@ constexpr Rvec<T, M> operator*(Rvec<T, N> const &v,
   }};
 }
 
-template <typename T, int N>
-constexpr Rvec<T, N> &operator*=(Rvec<T, N> &v,
-                                 Mat<T, N, N> const &m) noexcept {
+template <typename T, int N> constexpr Rvec<T, N> &operator*=(Rvec<T, N> &v, Mat<T, N, N> const &m) noexcept {
   return v = v * m;
 }
 
-template <typename T, int N, int M>
-constexpr Vec<T, N> operator*(Mat<T, N, M> const &m,
-                              Vec<T, M> const &v) noexcept {
+template <typename T, int N, int M> constexpr Vec<T, N> operator*(Mat<T, N, M> const &m, Vec<T, M> const &v) noexcept {
   return Vec<T, N>{[&](int i) {
     auto retval = T(0);
     for (int j = 0; j < M; ++j) {
@@ -536,8 +578,7 @@ constexpr Vec<T, N> operator*(Mat<T, N, M> const &m,
   }};
 }
 
-template <typename T, int N, int M>
-constexpr Mat<T, N, M> operator/(Mat<T, N, M> const &m, T s) noexcept {
+template <typename T, int N, int M> constexpr Mat<T, N, M> operator/(Mat<T, N, M> const &m, T s) noexcept {
   if constexpr (std::is_floating_point_v<T>) {
     return m * (1 / s);
   } else {
@@ -545,14 +586,12 @@ constexpr Mat<T, N, M> operator/(Mat<T, N, M> const &m, T s) noexcept {
   };
 }
 
-template <typename T, int N, int M>
-constexpr Mat<T, N, M> &operator/=(Mat<T, N, M> &m, T s) noexcept {
+template <typename T, int N, int M> constexpr Mat<T, N, M> &operator/=(Mat<T, N, M> &m, T s) noexcept {
   return m = m / s;
 }
 
 template <typename T, int N1, int N2, int N3>
-constexpr Mat<T, N1, N3> operator*(Mat<T, N1, N2> const &a,
-                                   Mat<T, N2, N3> const &b) noexcept {
+constexpr Mat<T, N1, N3> operator*(Mat<T, N1, N2> const &a, Mat<T, N2, N3> const &b) noexcept {
   auto retval = Mat<T, N1, N3>::zero();
   for (auto i = 0; i < N1; ++i) {
     for (auto j = 0; j < N3; ++j) {
@@ -564,18 +603,15 @@ constexpr Mat<T, N1, N3> operator*(Mat<T, N1, N2> const &a,
   return retval;
 }
 
-template <typename T, int N, int M>
-constexpr Rvec<T, M> row(Mat<T, N, M> const &m, int i) noexcept {
+template <typename T, int N, int M> constexpr Rvec<T, M> row(Mat<T, N, M> const &m, int i) noexcept {
   return m[i];
 }
 
-template <typename T, int N, int M>
-constexpr Vec<T, N> column(Mat<T, N, M> const &m, int j) noexcept {
+template <typename T, int N, int M> constexpr Vec<T, N> column(Mat<T, N, M> const &m, int j) noexcept {
   return Vec<T, N>{[&](int i) { return m[i][j]; }};
 }
 
-template <typename T, int N, int M>
-constexpr Mat<T, N, M> abs(math::Mat<T, N, M> const &m) noexcept {
+template <typename T, int N, int M> constexpr Mat<T, N, M> abs(math::Mat<T, N, M> const &m) noexcept {
   auto retval = Mat<T, N, M>::zero();
   for (auto i = 0; i < N; ++i) {
     retval[i] = abs(m[i]);
@@ -583,8 +619,7 @@ constexpr Mat<T, N, M> abs(math::Mat<T, N, M> const &m) noexcept {
   return retval;
 }
 
-template <typename T, int N, int M>
-constexpr Mat<T, M, N> transpose(math::Mat<T, N, M> const &m) noexcept {
+template <typename T, int N, int M> constexpr Mat<T, M, N> transpose(math::Mat<T, N, M> const &m) noexcept {
   auto retval = Mat<T, M, N>::zero();
   for (auto i = 0; i < M; ++i) {
     for (auto j = 0; j < N; ++j) {
@@ -594,41 +629,35 @@ constexpr Mat<T, M, N> transpose(math::Mat<T, N, M> const &m) noexcept {
   return retval;
 }
 
-template <typename T>
-constexpr T determinant(math::Mat<T, 2, 2> const &m) noexcept {
+template <typename T> constexpr T determinant(math::Mat<T, 2, 2> const &m) noexcept {
   return m[0][0] * m[1][1] - m[0][1] * m[1][0];
 }
 
-template <typename T>
-constexpr T determinant(math::Mat<T, 3, 3> const &m) noexcept {
-  return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-         m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+template <typename T> constexpr T determinant(math::Mat<T, 3, 3> const &m) noexcept {
+  return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
          m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
 }
 
-template <typename T>
-constexpr T determinant(math::Mat<T, 4, 4> const &m) noexcept {
-  return m[0][0] * (m[1][1] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) +
-                    m[1][2] * (m[2][3] * m[3][1] - m[2][1] * m[3][3]) +
-                    m[1][3] * (m[2][1] * m[3][2] - m[2][2] * m[3][1])) -
-         m[0][1] * (m[1][0] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) +
-                    m[1][2] * (m[2][3] * m[3][0] - m[2][0] * m[3][3]) +
-                    m[1][3] * (m[2][0] * m[3][2] - m[2][2] * m[3][0])) +
-         m[0][2] * (m[1][0] * (m[2][1] * m[3][3] - m[2][3] * m[3][1]) +
-                    m[1][1] * (m[2][3] * m[3][0] - m[2][0] * m[3][3]) +
-                    m[1][3] * (m[2][0] * m[3][1] - m[2][1] * m[3][0])) -
-         m[0][3] * (m[1][0] * (m[2][1] * m[3][2] - m[2][2] * m[3][1]) +
-                    m[1][1] * (m[2][2] * m[3][0] - m[2][0] * m[3][2]) +
-                    m[1][2] * (m[2][0] * m[3][1] - m[2][1] * m[3][0]));
+template <typename T> constexpr T determinant(math::Mat<T, 4, 4> const &m) noexcept {
+  return m[0][0] *
+             (m[1][1] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) + m[1][2] * (m[2][3] * m[3][1] - m[2][1] * m[3][3]) +
+              m[1][3] * (m[2][1] * m[3][2] - m[2][2] * m[3][1])) -
+         m[0][1] *
+             (m[1][0] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) + m[1][2] * (m[2][3] * m[3][0] - m[2][0] * m[3][3]) +
+              m[1][3] * (m[2][0] * m[3][2] - m[2][2] * m[3][0])) +
+         m[0][2] *
+             (m[1][0] * (m[2][1] * m[3][3] - m[2][3] * m[3][1]) + m[1][1] * (m[2][3] * m[3][0] - m[2][0] * m[3][3]) +
+              m[1][3] * (m[2][0] * m[3][1] - m[2][1] * m[3][0])) -
+         m[0][3] *
+             (m[1][0] * (m[2][1] * m[3][2] - m[2][2] * m[3][1]) + m[1][1] * (m[2][2] * m[3][0] - m[2][0] * m[3][2]) +
+              m[1][2] * (m[2][0] * m[3][1] - m[2][1] * m[3][0]));
 }
 
-template <typename T>
-constexpr Mat<T, 2, 2> cofactors(math::Mat<T, 2, 2> const &m) noexcept {
+template <typename T> constexpr Mat<T, 2, 2> cofactors(math::Mat<T, 2, 2> const &m) noexcept {
   return {{m[1][1], -m[1][0]}, {-m[0][1], m[0][0]}};
 }
 
-template <typename T>
-constexpr Mat<T, 3, 3> cofactors(math::Mat<T, 3, 3> const &m) noexcept {
+template <typename T> constexpr Mat<T, 3, 3> cofactors(math::Mat<T, 3, 3> const &m) noexcept {
   return {{determinant(Mat<T, 2, 2>{{m[1][1], m[1][2]}, {m[2][1], m[2][2]}}),
            -determinant(Mat<T, 2, 2>{{m[1][0], m[1][2]}, {m[2][0], m[2][2]}}),
            determinant(Mat<T, 2, 2>{{m[1][0], m[1][1]}, {m[2][0], m[2][1]}})},
@@ -640,22 +669,18 @@ constexpr Mat<T, 3, 3> cofactors(math::Mat<T, 3, 3> const &m) noexcept {
            determinant(Mat<T, 2, 2>{{m[0][0], m[0][1]}, {m[1][0], m[1][1]}})}};
 }
 
-template <typename T, int N>
-constexpr Mat<T, N, N> adjoint(math::Mat<T, N, N> const &m) noexcept {
+template <typename T, int N> constexpr Mat<T, N, N> adjoint(math::Mat<T, N, N> const &m) noexcept {
   return transpose(cofactors(m));
 }
 
-template <typename T, int N>
-constexpr Mat<T, N, N> inverse(math::Mat<T, N, N> const &m) noexcept {
+template <typename T, int N> constexpr Mat<T, N, N> inverse(math::Mat<T, N, N> const &m) noexcept {
   return adjoint(m) / determinant(m);
 }
 
-template <typename T>
-constexpr Mat<T, 3, 4> rigid_inverse(math::Mat<T, 3, 4> const &m) noexcept {
+template <typename T> constexpr Mat<T, 3, 4> rigid_inverse(math::Mat<T, 3, 4> const &m) noexcept {
   auto const translation = math::Vec3f{m[0][3], m[1][3], m[2][3]};
-  auto const retval_upper_left = math::Mat3x3f{{m[0][0], m[1][0], m[2][0]},
-                                               {m[0][1], m[1][1], m[2][1]},
-                                               {m[0][2], m[1][2], m[2][2]}};
+  auto const retval_upper_left =
+      math::Mat3x3f{{m[0][0], m[1][0], m[2][0]}, {m[0][1], m[1][1], m[2][1]}, {m[0][2], m[1][2], m[2][2]}};
   return {{retval_upper_left[0][0],
            retval_upper_left[0][1],
            retval_upper_left[0][2],
@@ -670,12 +695,10 @@ constexpr Mat<T, 3, 4> rigid_inverse(math::Mat<T, 3, 4> const &m) noexcept {
            -(retval_upper_left[2] * translation)}};
 }
 
-template <typename T>
-constexpr Mat<T, 4, 4> rigid_inverse(math::Mat<T, 4, 4> const &m) noexcept {
+template <typename T> constexpr Mat<T, 4, 4> rigid_inverse(math::Mat<T, 4, 4> const &m) noexcept {
   auto const translation = math::Vec3f{m[0][3], m[1][3], m[2][3]};
-  auto const retval_upper_left = math::Mat3x3f{{m[0][0], m[1][0], m[2][0]},
-                                               {m[0][1], m[1][1], m[2][1]},
-                                               {m[0][2], m[1][2], m[2][2]}};
+  auto const retval_upper_left =
+      math::Mat3x3f{{m[0][0], m[1][0], m[2][0]}, {m[0][1], m[1][1], m[2][1]}, {m[0][2], m[1][2], m[2][2]}};
   return {{retval_upper_left[0][0],
            retval_upper_left[0][1],
            retval_upper_left[0][2],
@@ -691,13 +714,10 @@ constexpr Mat<T, 4, 4> rigid_inverse(math::Mat<T, 4, 4> const &m) noexcept {
           {T(0), T(0), T(0), T(1)}};
 }
 
-template <typename T>
-constexpr Mat<T, 3, 4> affine_inverse(math::Mat<T, 3, 4> const &m) noexcept {
+template <typename T> constexpr Mat<T, 3, 4> affine_inverse(math::Mat<T, 3, 4> const &m) noexcept {
   auto const translation = math::Vec3f{m[0][3], m[1][3], m[2][3]};
   auto const retval_upper_left =
-      inverse(math::Mat3x3f{{m[0][0], m[0][1], m[0][2]},
-                            {m[1][0], m[1][1], m[1][2]},
-                            {m[2][0], m[2][1], m[2][2]}});
+      inverse(math::Mat3x3f{{m[0][0], m[0][1], m[0][2]}, {m[1][0], m[1][1], m[1][2]}, {m[2][0], m[2][1], m[2][2]}});
   return {{retval_upper_left[0][0],
            retval_upper_left[0][1],
            retval_upper_left[0][2],
@@ -712,13 +732,10 @@ constexpr Mat<T, 3, 4> affine_inverse(math::Mat<T, 3, 4> const &m) noexcept {
            -(retval_upper_left[2] * translation)}};
 }
 
-template <typename T>
-constexpr Mat<T, 4, 4> affine_inverse(math::Mat<T, 4, 4> const &m) noexcept {
+template <typename T> constexpr Mat<T, 4, 4> affine_inverse(math::Mat<T, 4, 4> const &m) noexcept {
   auto const translation = math::Vec3f{m[0][3], m[1][3], m[2][3]};
   auto const retval_upper_left =
-      inverse(math::Mat3x3f{{m[0][0], m[0][1], m[0][2]},
-                            {m[1][0], m[1][1], m[1][2]},
-                            {m[2][0], m[2][1], m[2][2]}});
+      inverse(math::Mat3x3f{{m[0][0], m[0][1], m[0][2]}, {m[1][0], m[1][1], m[1][2]}, {m[2][0], m[2][1], m[2][2]}});
   return {{retval_upper_left[0][0],
            retval_upper_left[0][1],
            retval_upper_left[0][2],
@@ -733,7 +750,6 @@ constexpr Mat<T, 4, 4> affine_inverse(math::Mat<T, 4, 4> const &m) noexcept {
            -(retval_upper_left[2] * translation)},
           {T(0), T(0), T(0), T(1)}};
 }
-} // namespace math
-} // namespace marlon
+} // namespace marlon::math
 
 #endif

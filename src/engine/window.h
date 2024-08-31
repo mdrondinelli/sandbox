@@ -3,8 +3,9 @@
 
 #include <optional>
 
-#include "../graphics/gl/window.h"
-#include "../math/vec.h"
+#include <graphics/gl/window.h>
+#include <math/vec.h>
+
 #include "glfw_window.h"
 
 namespace marlon {

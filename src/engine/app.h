@@ -4,9 +4,10 @@
 #include <string>
 #include <string_view>
 
-#include "../graphics/graphics.h"
-#include "../physics/physics.h"
-#include "../util/thread_pool.h"
+#include <graphics/graphics.h>
+#include <physics/physics.h>
+#include <util/thread_pool.h>
+
 #include "window.h"
 
 namespace marlon {
