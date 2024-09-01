@@ -5,7 +5,6 @@
 #include <thread>
 
 #include "../util/size.h"
-#include "../util/thread_pool.h"
 #include "particle.h"
 #include "rigid_body.h"
 #include "static_body.h"
