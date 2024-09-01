@@ -13,6 +13,7 @@ using namespace marlon::math;
 
 namespace marlon::graphics::gl {
 Graphics::Graphics(Graphics_create_info const &create_info) {
+  create_info.window->make_context_current();
   if (gladLoadGL(create_info.loader) == 0) {
     throw std::runtime_error{"Failed to load OpenGL functions."};
   }

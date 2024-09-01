@@ -16,7 +16,7 @@ using Api_loader = Api_function (*)(char const *);
 
 struct Graphics_create_info {
   Api_loader loader;
-  Window const *window;
+  Window *window;
 };
 
 class Graphics final : public graphics::Graphics {

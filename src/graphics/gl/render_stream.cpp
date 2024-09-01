@@ -93,6 +93,7 @@ void Render_stream::render() {
   do_postprocessing();
   _taa_resource.swap_accumulation_buffers();
   ++_frame_number;
+  _target->on_render();
 }
 
 void Render_stream::acquire_surface_resource() {

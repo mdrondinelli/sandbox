@@ -6,6 +6,10 @@ using namespace marlon::math;
 
 namespace marlon {
 namespace engine {
+void Window::set_current_context_swap_interval(int interval) {
+  glfwSwapInterval(interval);
+}
+
 Window::Window(Window_create_info const &create_info)
     : _glfw_window{[&]() {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
@@ -31,12 +35,22 @@ Window::Window(Window_create_info const &create_info)
   });
 }
 
-bool Window::should_close() const noexcept { return glfwWindowShouldClose(_glfw_window.get()); }
+void Window::make_context_current() noexcept {
+  glfwMakeContextCurrent(_glfw_window.get());
+}
+
+void Window::swap_buffers() noexcept {
+  glfwSwapBuffers(_glfw_window.get());
+}
 
 Vec2i Window::get_framebuffer_extents() const noexcept {
   auto result = Vec2i{};
   glfwGetFramebufferSize(_glfw_window.get(), &result[0], &result[1]);
   return result;
+}
+
+bool Window::should_close() const noexcept {
+  return glfwWindowShouldClose(_glfw_window.get());
 }
 
 bool Window::is_key_pressed(Key key) const noexcept {
@@ -53,7 +67,9 @@ math::Vec2d Window::get_cursor_position() const noexcept {
   return result;
 }
 
-math::Vec2d Window::get_delta_cursor_position() const noexcept { return _delta_cursor_position; }
+math::Vec2d Window::get_delta_cursor_position() const noexcept {
+  return _delta_cursor_position;
+}
 
 Cursor_mode Window::get_cursor_mode() const noexcept {
   auto const value = glfwGetInputMode(_glfw_window.get(), GLFW_CURSOR);
@@ -87,8 +103,8 @@ void Window::set_cursor_mode(Cursor_mode mode) noexcept {
   glfwSetInputMode(_glfw_window.get(), GLFW_CURSOR, value);
 }
 
-GLFWwindow *Window::get_glfw_window() noexcept { return _glfw_window.get(); }
-
-void Window::pre_input() noexcept { _delta_cursor_position = math::Vec2d::zero(); }
+void Window::pre_input() noexcept {
+  _delta_cursor_position = math::Vec2d::zero();
+}
 } // namespace engine
 } // namespace marlon

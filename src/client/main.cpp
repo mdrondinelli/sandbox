@@ -379,8 +379,6 @@ public:
                                               {0.0f, box_radius, 0.0f, 0.0f},
                                               {0.0f, 0.0f, box_radius, 0.0f}},
         .space = world,
-        .body_mass = box_mass,
-        .body_inertia_tensor = box_mass * physics::solid_inertia_tensor(box_shape),
         .body_shape = box_shape,
         .body_material =
             {
@@ -388,6 +386,8 @@ public:
                 .dynamic_friction_coefficient = 0.2f,
                 .restitution_coefficient = 0.1f,
             },
+        .body_mass = box_mass,
+        .body_inertia_tensor = box_mass * physics::solid_inertia_tensor(box_shape),
     });
     world->create_static_body({
         .shape = physics::Box{{100.0f, 0.5f, 100.0f}},

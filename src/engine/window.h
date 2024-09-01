@@ -161,15 +161,21 @@ struct Window_create_info {
 // Member functions, including constructor, must be called from the main thread
 class Window : public graphics::gl::Window {
 public:
+  static void set_current_context_swap_interval(int interval);
+
   explicit Window(Window_create_info const &create_info);
 
   Window(Window const &other) = delete;
 
   Window &operator=(Window const &other) = delete;
 
-  bool should_close() const noexcept;
+  void make_context_current() noexcept final;
+
+  void swap_buffers() noexcept final;
 
   math::Vec2i get_framebuffer_extents() const noexcept final;
+
+  bool should_close() const noexcept;
 
   bool is_key_pressed(Key key) const noexcept;
 
@@ -185,8 +191,6 @@ public:
 
 private:
   friend class App;
-
-  GLFWwindow *get_glfw_window() noexcept;
 
   void pre_input() noexcept;
 

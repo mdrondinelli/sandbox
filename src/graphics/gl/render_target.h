@@ -17,8 +17,10 @@ public:
   virtual math::Vec2i get_extents() const noexcept = 0;
 
   virtual std::uint32_t get_framebuffer() const noexcept = 0;
+
+  virtual void on_render() noexcept = 0;
 };
-}
+} // namespace gl
 } // namespace graphics
 } // namespace marlon
 

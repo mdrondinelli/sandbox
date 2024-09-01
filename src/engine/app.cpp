@@ -22,8 +22,6 @@ public:
         _world{world_create_info},
         _window{window_create_info},
         _graphics{[&]() {
-          glfwMakeContextCurrent(_window.get_glfw_window());
-          glfwSwapInterval(0);
           return graphics::gl::Graphics{{
               .loader = glfwGetProcAddress,
               .window = &_window,
@@ -34,7 +32,9 @@ public:
             .target = _graphics.get_default_render_target(),
             .scene = &_scene,
             .camera = &_camera,
-        })} {}
+        })} {
+    Window::set_current_context_swap_interval(0);
+  }
 
   // Thread_pool *get_threads() noexcept { return &_threads; }
 
@@ -64,7 +64,6 @@ public:
 
   void render() {
     _render_stream->render();
-    glfwSwapBuffers(_window.get_glfw_window());
   }
 
 private:

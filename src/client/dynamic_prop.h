@@ -4,8 +4,9 @@
 #include <cstdint>
 #include <unordered_map>
 
-#include "../graphics/graphics.h"
-#include "../physics/physics.h"
+#include "graphics/scene.h"
+#include "physics/world.h"
+
 
 namespace marlon {
 namespace client {
@@ -19,10 +20,10 @@ struct Dynamic_prop_manager_create_info {
   graphics::Surface_material surface_material{};
   math::Mat3x4f surface_pretransform{math::Mat3x4f::identity()};
   physics::World *space;
-  float body_mass{1.0f};
-  math::Mat3x3f body_inertia_tensor{math::Mat3x3f::identity()};
   physics::Shape body_shape;
   physics::Material body_material;
+  float body_mass{1.0f};
+  math::Mat3x3f body_inertia_tensor{math::Mat3x3f::identity()};
 };
 
 struct Dynamic_prop_create_info {

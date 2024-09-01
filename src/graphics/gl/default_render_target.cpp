@@ -3,8 +3,7 @@
 namespace marlon {
 namespace graphics {
 namespace gl {
-Default_render_target::Default_render_target(
-    Default_render_target_create_info const &create_info) noexcept
+Default_render_target::Default_render_target(Default_render_target_create_info const &create_info) noexcept
     : _window{create_info.window} {}
 
 math::Vec2i Default_render_target::get_extents() const noexcept {
@@ -13,6 +12,10 @@ math::Vec2i Default_render_target::get_extents() const noexcept {
 
 std::uint32_t Default_render_target::get_framebuffer() const noexcept {
   return 0;
+}
+
+void Default_render_target::on_render() noexcept {
+  _window->swap_buffers();
 }
 } // namespace gl
 } // namespace graphics
