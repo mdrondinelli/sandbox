@@ -6,10 +6,6 @@ using namespace marlon::math;
 
 namespace marlon {
 namespace engine {
-void Window::set_current_context_swap_interval(int interval) {
-  glfwSwapInterval(interval);
-}
-
 Window::Window(Window_create_info const &create_info)
     : _glfw_window{[&]() {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);

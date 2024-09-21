@@ -1,12 +1,13 @@
 #ifndef MARLON_PHYSICS_STATIC_BODY_H
 #define MARLON_PHYSICS_STATIC_BODY_H
 
-#include <bitset>
-
-#include "../math/math.h"
-#include "material.h"
-#include "object.h"
-#include "shape.h"
+#include "physics/broadphase.h"
+#include "physics/material.h"
+#include "physics/object.h"
+#include "physics/shape.h"
+#include "util/bit_list.h"
+#include "util/list.h"
+#include "util/memory.h"
 
 namespace marlon {
 namespace physics {
@@ -19,17 +20,29 @@ public:
                             Material const &material) noexcept
       : _bvh_node{bvh_node}, _position{position}, _orientation{orientation}, _shape{shape}, _material{material} {}
 
-  Broadphase_bvh::Node const *bvh_node() const noexcept { return _bvh_node; }
+  Broadphase_bvh::Node const *bvh_node() const noexcept {
+    return _bvh_node;
+  }
 
-  Broadphase_bvh::Node *bvh_node() noexcept { return _bvh_node; }
+  Broadphase_bvh::Node *bvh_node() noexcept {
+    return _bvh_node;
+  }
 
-  math::Vec3f const &position() const noexcept { return _position; }
+  math::Vec3f const &position() const noexcept {
+    return _position;
+  }
 
-  math::Quatf const &orientation() const noexcept { return _orientation; }
+  math::Quatf const &orientation() const noexcept {
+    return _orientation;
+  }
 
-  Shape const &shape() const noexcept { return _shape; }
+  Shape const &shape() const noexcept {
+    return _shape;
+  }
 
-  Material const &material() const noexcept { return _material; }
+  Material const &material() const noexcept {
+    return _material;
+  }
 
 private:
   Broadphase_bvh::Node *_bvh_node;
@@ -92,9 +105,13 @@ public:
     _occupancy_bits.reset(static_body.index());
   }
 
-  Static_body_data const *data(Static_body static_body) const noexcept { return _data[static_body.index()].get(); }
+  Static_body_data const *data(Static_body static_body) const noexcept {
+    return _data[static_body.index()].get();
+  }
 
-  Static_body_data *data(Static_body static_body) noexcept { return _data[static_body.index()].get(); }
+  Static_body_data *data(Static_body static_body) noexcept {
+    return _data[static_body.index()].get();
+  }
 
   template <typename F> void for_each(F &&f) {
     auto const n = _occupancy_bits.size();
@@ -102,7 +119,7 @@ public:
     auto k = util::Size{};
     for (auto i = util::Size{}; i != n && k != m; ++i) {
       if (_occupancy_bits.get(i)) {
-        f(Static_body{i});
+        f(Static_body{static_cast<int>(i)});
         ++k;
       }
     }

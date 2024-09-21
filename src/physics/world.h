@@ -68,21 +68,25 @@ struct World_simulate_result {
 
 class World {
 public:
+  World();
+
   explicit World(World_create_info const &create_info);
 
   ~World();
 
   Particle create_particle(Particle_create_info const &create_info);
 
-  void destroy_particle(Particle particle);
-
   Rigid_body create_rigid_body(Rigid_body_create_info const &create_info);
-
-  void destroy_rigid_body(Rigid_body rigid_body);
 
   Static_body create_static_body(Static_body_create_info const &create_info);
 
-  void destroy_static_body(Static_body handle);
+  void destroy_object(Particle particle);
+
+  void destroy_object(Rigid_body rigid_body);
+
+  void destroy_object(Static_body handle);
+
+  void destroy_object(Object handle);
 
   Particle_data const *data(Particle object) const noexcept;
 

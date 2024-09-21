@@ -44,20 +44,30 @@ public:
         _shape{shape},
         _material{material} {}
 
-  Broadphase_bvh::Node const *bvh_node() const noexcept { return _bvh_node; }
+  Broadphase_bvh::Node const *bvh_node() const noexcept {
+    return _bvh_node;
+  }
 
-  Broadphase_bvh::Node *bvh_node() noexcept { return _bvh_node; }
+  Broadphase_bvh::Node *bvh_node() noexcept {
+    return _bvh_node;
+  }
 
-  std::span<Object const> neighbors() const noexcept { return {_neighbors, static_cast<std::size_t>(_neighbor_count)}; }
+  std::span<Object const> neighbors() const noexcept {
+    return {_neighbors, static_cast<std::size_t>(_neighbor_count)};
+  }
 
-  std::span<Object> neighbors() noexcept { return {_neighbors, static_cast<std::size_t>(_neighbor_count)}; }
+  std::span<Object> neighbors() noexcept {
+    return {_neighbors, static_cast<std::size_t>(_neighbor_count)};
+  }
 
   void reset_neighbors() noexcept {
     _neighbors = nullptr;
     _neighbor_count = 0;
   }
 
-  void count_neighbor() noexcept { ++_neighbor_count; }
+  void count_neighbor() noexcept {
+    ++_neighbor_count;
+  }
 
   void reserve_neighbors(util::List<Object> &neighbors) {
     _neighbors = neighbors.data() + neighbors.size();
@@ -65,41 +75,81 @@ public:
     _neighbor_count = 0;
   }
 
-  void push_neighbor(Object neighbor) noexcept { _neighbors[_neighbor_count++] = neighbor; }
+  void push_neighbor(Object neighbor) noexcept {
+    _neighbors[_neighbor_count++] = neighbor;
+  }
 
-  Rigid_body_motion_callback *motion_callback() const noexcept { return _motion_callback; }
+  Rigid_body_motion_callback *motion_callback() const noexcept {
+    return _motion_callback;
+  }
 
-  math::Vec3f const &position() const noexcept { return _position; }
+  void motion_callback(Rigid_body_motion_callback *motion_callback) noexcept {
+    _motion_callback = motion_callback;
+  }
 
-  void position(math::Vec3f const &position) noexcept { _position = position; }
+  math::Vec3f const &position() const noexcept {
+    return _position;
+  }
 
-  math::Vec3f const &velocity() const noexcept { return _velocity; }
+  void position(math::Vec3f const &position) noexcept {
+    _position = position;
+  }
 
-  void velocity(math::Vec3f const &velocity) { _velocity = velocity; }
+  math::Vec3f const &velocity() const noexcept {
+    return _velocity;
+  }
 
-  math::Quatf const &orientation() const noexcept { return _orientation; }
+  void velocity(math::Vec3f const &velocity) {
+    _velocity = velocity;
+  }
 
-  void orientation(math::Quatf const &orientation) noexcept { _orientation = orientation; }
+  math::Quatf const &orientation() const noexcept {
+    return _orientation;
+  }
 
-  math::Vec3f const &angular_velocity() const noexcept { return _angular_velocity; }
+  void orientation(math::Quatf const &orientation) noexcept {
+    _orientation = orientation;
+  }
 
-  void angular_velocity(math::Vec3f const &angular_velocity) noexcept { _angular_velocity = angular_velocity; }
+  math::Vec3f const &angular_velocity() const noexcept {
+    return _angular_velocity;
+  }
 
-  float motion() const noexcept { return _motion; }
+  void angular_velocity(math::Vec3f const &angular_velocity) noexcept {
+    _angular_velocity = angular_velocity;
+  }
 
-  float mass() const noexcept { return 1.0f / _inverse_mass; }
+  float motion() const noexcept {
+    return _motion;
+  }
 
-  float inverse_mass() const noexcept { return _inverse_mass; }
+  float mass() const noexcept {
+    return 1.0f / _inverse_mass;
+  }
 
-  math::Mat3x3f const &inverse_inertia_tensor() const noexcept { return _inverse_inertia_tensor; }
+  float inverse_mass() const noexcept {
+    return _inverse_mass;
+  }
 
-  Shape const &shape() const noexcept { return _shape; }
+  math::Mat3x3f const &inverse_inertia_tensor() const noexcept {
+    return _inverse_inertia_tensor;
+  }
 
-  Material const &material() const noexcept { return _material; }
+  Shape const &shape() const noexcept {
+    return _shape;
+  }
 
-  bool awake() const noexcept { return !asleep(); }
+  Material const &material() const noexcept {
+    return _material;
+  }
 
-  bool asleep() const noexcept { return _flags[asleep_flag_index]; }
+  bool awake() const noexcept {
+    return !asleep();
+  }
+
+  bool asleep() const noexcept {
+    return _flags[asleep_flag_index];
+  }
 
   void wake(float motion) noexcept {
     _motion = motion;
@@ -113,9 +163,13 @@ public:
     _flags[asleep_flag_index] = true;
   }
 
-  bool marked() const noexcept { return _flags[marked_flag_index]; }
+  bool marked() const noexcept {
+    return _flags[marked_flag_index];
+  }
 
-  void marked(bool b) noexcept { _flags[marked_flag_index] = b; }
+  void marked(bool b) noexcept {
+    _flags[marked_flag_index] = b;
+  }
 
   void integrate(Object_integrate_info const &info) {
     using namespace math;
@@ -213,9 +267,13 @@ public:
     _occupancy_bits.reset(rigid_body.index());
   }
 
-  Rigid_body_data const *data(Rigid_body rigid_body) const noexcept { return _data[rigid_body.index()].get(); }
+  Rigid_body_data const *data(Rigid_body rigid_body) const noexcept {
+    return _data[rigid_body.index()].get();
+  }
 
-  Rigid_body_data *data(Rigid_body rigid_body) noexcept { return _data[rigid_body.index()].get(); }
+  Rigid_body_data *data(Rigid_body rigid_body) noexcept {
+    return _data[rigid_body.index()].get();
+  }
 
   template <typename F> void for_each(F &&f) {
     auto const n = _data.size();

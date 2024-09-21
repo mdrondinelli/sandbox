@@ -6,7 +6,6 @@
 #include <cstdlib>
 
 #include <bit>
-#include <functional>
 #include <new>
 #include <tuple>
 #include <type_traits>
@@ -22,11 +21,15 @@ struct Const_block {
 
   Const_block() = default;
 
-  constexpr Const_block(std::byte const *begin, Size size) noexcept : Const_block{begin, begin + size} {}
+  constexpr Const_block(std::byte const *begin, Size size) noexcept
+      : Const_block{begin, begin + size} {}
 
-  constexpr Const_block(std::byte const *begin, std::byte const *end) noexcept : begin{begin}, end{end} {}
+  constexpr Const_block(std::byte const *begin, std::byte const *end) noexcept
+      : begin{begin}, end{end} {}
 
-  constexpr Size size() const noexcept { return end - begin; }
+  constexpr Size size() const noexcept {
+    return end - begin;
+  }
 };
 
 struct Block {
@@ -35,13 +38,19 @@ struct Block {
 
   Block() = default;
 
-  constexpr Block(std::byte *begin, Size size) noexcept : Block{begin, begin + size} {}
+  constexpr Block(std::byte *begin, Size size) noexcept
+      : Block{begin, begin + size} {}
 
-  constexpr Block(std::byte *begin, std::byte *end) noexcept : begin{begin}, end{end} {}
+  constexpr Block(std::byte *begin, std::byte *end) noexcept
+      : begin{begin}, end{end} {}
 
-  constexpr operator Const_block() const noexcept { return {begin, end}; }
+  constexpr operator Const_block() const noexcept {
+    return {begin, end};
+  }
 
-  constexpr Size size() const noexcept { return end - begin; }
+  constexpr Size size() const noexcept {
+    return end - begin;
+  }
 };
 
 // constexpr Const_block make_block(std::byte const *begin,
@@ -64,13 +73,21 @@ struct Block {
 
 template <Size Len, Size Align> class Storage {
 public:
-  std::byte const *data() const noexcept { return _data.data(); }
+  std::byte const *data() const noexcept {
+    return _data.data();
+  }
 
-  std::byte *data() noexcept { return _data.data(); }
+  std::byte *data() noexcept {
+    return _data.data();
+  }
 
-  Const_block block() const noexcept { return {data(), data() + Len}; }
+  Const_block block() const noexcept {
+    return {data(), data() + Len};
+  }
 
-  Block block() noexcept { return {data(), data() + Len}; }
+  Block block() noexcept {
+    return {data(), data() + Len};
+  }
 
 private:
   alignas(Align) std::array<std::byte, Len> _data;
@@ -78,7 +95,9 @@ private:
 
 template <typename T> using Object_storage = Storage<sizeof(T), alignof(T)>;
 
-constexpr Size align(Size size, Size alignment) noexcept { return (size + alignment - 1) & -alignment; }
+constexpr Size align(Size size, Size alignment) noexcept {
+  return (size + alignment - 1) & -alignment;
+}
 
 inline Size ptrdiff(void const *p1, void const *p2) noexcept {
   return std::bit_cast<std::uintptr_t>(p1) - std::bit_cast<std::uintptr_t>(p2);
@@ -94,9 +113,11 @@ public:
     return result;
   }
 
-  constexpr Stack_allocator() noexcept : _block{}, _top{} {}
+  constexpr Stack_allocator() noexcept
+      : _block{}, _top{} {}
 
-  explicit Stack_allocator(Block block) noexcept : _block{block}, _top{block.begin} {}
+  explicit Stack_allocator(Block block) noexcept
+      : _block{block}, _top{block.begin} {}
 
   constexpr Stack_allocator(Stack_allocator &&other) noexcept
       : _block{std::exchange(other._block, Block{})}, _top{std::exchange(other._top, nullptr)} {}
@@ -107,7 +128,9 @@ public:
     return *this;
   }
 
-  Const_block block() const noexcept { return _block; }
+  Const_block block() const noexcept {
+    return _block;
+  }
 
   Block alloc(Size size) {
     auto const block_end = _top + size;
@@ -129,7 +152,9 @@ public:
     }
   }
 
-  bool owns(Const_block block) const noexcept { return block.begin >= _block.begin && block.begin < _block.end; }
+  bool owns(Const_block block) const noexcept {
+    return block.begin >= _block.begin && block.begin < _block.end;
+  }
 
 private:
   constexpr void swap(Stack_allocator &other) noexcept {
@@ -145,11 +170,15 @@ template <class Parent, Size MinSize, Size MaxSize = MinSize> class Free_list_al
 public:
   Free_list_allocator() = default;
 
-  explicit Free_list_allocator(Parent const &parent) : _parent{parent} {}
+  explicit Free_list_allocator(Parent const &parent)
+      : _parent{parent} {}
 
-  explicit Free_list_allocator(Parent &&parent) : _parent{std::move(parent)} {}
+  explicit Free_list_allocator(Parent &&parent)
+      : _parent{std::move(parent)} {}
 
-  Parent const &parent() const noexcept { return _parent; }
+  Parent const &parent() const noexcept {
+    return _parent;
+  }
 
   Block alloc(Size size) {
     if (size >= MinSize && size <= MaxSize) {
@@ -187,19 +216,30 @@ private:
 
 template <Size MinSize, Size MaxSize = MinSize> class Pool_allocator {
 public:
-  static constexpr Size memory_requirement(Size max_allocations) { return MaxSize * max_allocations; }
+  static constexpr Size memory_requirement(Size max_allocations) {
+    return MaxSize * max_allocations;
+  }
 
   Pool_allocator() noexcept = default;
 
-  explicit Pool_allocator(Block block) noexcept : _impl{Stack_allocator<1>{block}} {}
+  explicit Pool_allocator(Block block) noexcept
+      : _impl{Stack_allocator<1>{block}} {}
 
-  Const_block block() const noexcept { return _impl.parent().block(); }
+  Const_block block() const noexcept {
+    return _impl.parent().block();
+  }
 
-  Size max_blocks() const noexcept { return block().size() / MaxSize; }
+  Size max_blocks() const noexcept {
+    return block().size() / MaxSize;
+  }
 
-  Block alloc(Size size) { return _impl.alloc(size); }
+  Block alloc(Size size) {
+    return _impl.alloc(size);
+  }
 
-  void free(Const_block block) noexcept { _impl.free(block); }
+  void free(Const_block block) noexcept {
+    _impl.free(block);
+  }
 
 private:
   Free_list_allocator<Stack_allocator<1>, MinSize, MaxSize> _impl;
@@ -225,7 +265,9 @@ public:
     return {static_cast<std::byte *>(begin), size};
   }
 
-  void free(Const_block block) noexcept { std::free(const_cast<std::byte *>(block.begin)); }
+  void free(Const_block block) noexcept {
+    std::free(const_cast<std::byte *>(block.begin));
+  }
 };
 
 class Polymorphic_allocator {
@@ -233,11 +275,16 @@ public:
   Polymorphic_allocator() = default;
 
   template <typename Allocator>
-  Polymorphic_allocator(Allocator *allocator) : _allocator{allocator}, _vtable{&vtable<Allocator>} {}
+  Polymorphic_allocator(Allocator *allocator)
+      : _allocator{allocator}, _vtable{&vtable<Allocator>} {}
 
-  Block alloc(Size size) { return _vtable->alloc(_allocator, size); }
+  Block alloc(Size size) {
+    return _vtable->alloc(_allocator, size);
+  }
 
-  void free(Block block) noexcept { _vtable->free(_allocator, block); }
+  void free(Block block) noexcept {
+    _vtable->free(_allocator, block);
+  }
 
 private:
   struct Vtable {
@@ -259,12 +306,14 @@ template <typename Allocator = System_allocator> class Unique_block : private Al
 public:
   Unique_block() = default;
 
-  explicit Unique_block(Allocator const &allocator, Size size) : Allocator{allocator}, _block{Allocator::alloc(size)} {}
+  explicit Unique_block(Allocator const &allocator, Size size)
+      : Allocator{allocator}, _block{Allocator::alloc(size)} {}
 
   explicit Unique_block(Allocator &&allocator, Size size)
       : Allocator{std::move(allocator)}, _block{Allocator::alloc(size)} {}
 
-  explicit Unique_block(Size size) : _block{Allocator::alloc(size)} {}
+  explicit Unique_block(Size size)
+      : _block{Allocator::alloc(size)} {}
 
   Unique_block(Unique_block &&other) noexcept
       : Allocator{std::move(static_cast<Allocator &>(other))}, _block{std::exchange(other._block, Block{})} {}
@@ -281,7 +330,9 @@ public:
     }
   }
 
-  Block get() const noexcept { return _block; }
+  Block get() const noexcept {
+    return _block;
+  }
 
 private:
   void swap(Unique_block &other) noexcept {
@@ -316,7 +367,7 @@ std::pair<Block, std::tuple<Ts...>> make_merged(Allocator &&allocator, Construct
 template <typename... Ts, typename Allocator, typename... ConstructorArgTuples>
 Block assign_merged(Allocator &&allocator, std::tuple<Ts &...> assignees, ConstructorArgTuples &&...argTuples) {
   auto block = Block{};
-  std::tie(block, assignees) = 
+  std::tie(block, assignees) =
       make_merged<Ts...>(std::forward<Allocator>(allocator), std::forward<ConstructorArgTuples>(argTuples)...);
   return block;
 }

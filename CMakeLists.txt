@@ -37,6 +37,14 @@ add_library(
   "src/physics/world.cpp"
 )
 add_library(
+  game
+  "src/game/box.cpp"
+  "src/game/game.cpp"
+  "src/game/game_state.cpp"
+)
+target_include_directories(game PRIVATE src)
+target_link_libraries(game PRIVATE physics)
+add_library(
   load_png
   "src/load_png/load_png.cpp"
 )
@@ -75,7 +83,7 @@ add_executable(
   "src/client/static_prop.cpp"
   "src/client/main.cpp"
 )
-set_target_properties(math_tests util util_tests graphics physics engine client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+# set_target_properties(math_tests util util_tests graphics physics engine client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 target_include_directories(graphics PUBLIC src)
 target_include_directories(graphics PRIVATE include)
 target_include_directories(physics PRIVATE src)

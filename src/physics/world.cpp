@@ -10,6 +10,7 @@
 #include "constraint.h"
 #include "contact.h"
 #include "narrowphase.h"
+#include "util/thread_pool.h"
 
 namespace marlon {
 namespace physics {
@@ -978,6 +979,8 @@ private:
   Vec3f _gravitational_acceleration;
 };
 
+World::World() {}
+
 World::World(World_create_info const &create_info)
     : _impl{std::make_unique<Impl>(create_info)} {}
 
@@ -987,24 +990,28 @@ Particle World::create_particle(Particle_create_info const &create_info) {
   return _impl->create_particle(create_info);
 }
 
-void World::destroy_particle(Particle particle) {
-  _impl->destroy_particle(particle);
-}
-
 Rigid_body World::create_rigid_body(Rigid_body_create_info const &create_info) {
   return _impl->create_rigid_body(create_info);
-}
-
-void World::destroy_rigid_body(Rigid_body handle) {
-  _impl->destroy_rigid_body(handle);
 }
 
 Static_body World::create_static_body(Static_body_create_info const &create_info) {
   return _impl->create_static_body(create_info);
 }
 
-void World::destroy_static_body(Static_body static_rigid_body) {
+void World::destroy_object(Particle particle) {
+  _impl->destroy_particle(particle);
+}
+
+void World::destroy_object(Rigid_body handle) {
+  _impl->destroy_rigid_body(handle);
+}
+
+void World::destroy_object(Static_body static_rigid_body) {
   _impl->destroy_static_body(static_rigid_body);
+}
+
+void World::destroy_object(Object generic) {
+  std::visit([this](auto const specific) { destroy_object(specific); }, generic.specific());
 }
 
 Particle_data const *World::data(Particle object) const noexcept {

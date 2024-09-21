@@ -3,17 +3,17 @@
 
 #include <cstdint>
 
-#include <concepts>
-#include <type_traits>
+#include <array>
 #include <variant>
 
-#include <util/hash.h>
+#include "math/vec.h"
+#include "util/hash.h"
 
 namespace marlon {
 namespace physics {
 using Object_handle = std::uint32_t;
 
-enum class Object_type : std::uint8_t { particle, rigid_body, static_body };
+enum class Object_type : std::uint8_t { particle = 1, rigid_body, static_body };
 
 auto constexpr object_handle_type_bits = 2;
 auto constexpr object_handle_index_bits = 32 - object_handle_type_bits;
@@ -35,20 +35,31 @@ class Object {
 public:
   Object() = default;
 
-  explicit constexpr Object(Object_handle handle) noexcept : _handle{handle} {}
+  explicit constexpr Object(Object_handle handle) noexcept
+      : _handle{handle} {}
 
-  constexpr Object_handle handle() const noexcept { return _handle; }
+  constexpr operator bool() const noexcept {
+    return _handle != 0;
+  }
 
-  constexpr Object_type type() const noexcept { return static_cast<Object_type>(_handle >> object_handle_index_bits); }
+  constexpr Object_handle handle() const noexcept {
+    return _handle;
+  }
 
-  constexpr int index() const noexcept { return static_cast<int>(_handle & object_handle_index_mask); }
+  constexpr Object_type type() const noexcept {
+    return static_cast<Object_type>(_handle >> object_handle_index_bits);
+  }
+
+  constexpr int index() const noexcept {
+    return static_cast<int>(_handle & object_handle_index_mask);
+  }
 
   constexpr std::variant<Particle, Rigid_body, Static_body> specific() const noexcept;
 
   friend constexpr bool operator==(Object lhs, Object rhs) noexcept = default;
 
 private:
-  std::uint32_t _handle;
+  std::uint32_t _handle{};
 };
 
 class Particle {
@@ -59,11 +70,16 @@ public:
       : Particle{Object{static_cast<Object_handle>(Object_type::particle) << object_handle_index_bits |
                         static_cast<Object_handle>(index)}} {}
 
-  constexpr explicit Particle(Object generic) noexcept : _generic{generic} {}
+  constexpr explicit Particle(Object generic) noexcept
+      : _generic{generic} {}
 
-  constexpr int index() const noexcept { return _generic.index(); }
+  constexpr int index() const noexcept {
+    return _generic.index();
+  }
 
-  constexpr Object generic() const noexcept { return _generic; }
+  constexpr Object generic() const noexcept {
+    return _generic;
+  }
 
   friend constexpr bool operator==(Particle lhs, Particle rhs) noexcept = default;
 
@@ -79,11 +95,16 @@ public:
       : Rigid_body{Object{static_cast<Object_handle>(Object_type::rigid_body) << object_handle_index_bits |
                           static_cast<Object_handle>(index)}} {}
 
-  constexpr explicit Rigid_body(Object generic) noexcept : _generic{generic} {}
+  constexpr explicit Rigid_body(Object generic) noexcept
+      : _generic{generic} {}
 
-  constexpr Object_handle index() const noexcept { return _generic.index(); }
+  constexpr Object_handle index() const noexcept {
+    return _generic.index();
+  }
 
-  constexpr Object generic() const noexcept { return _generic; }
+  constexpr Object generic() const noexcept {
+    return _generic;
+  }
 
   friend constexpr bool operator==(Rigid_body lhs, Rigid_body rhs) noexcept = default;
 
@@ -99,11 +120,16 @@ public:
       : Static_body{Object{static_cast<Object_handle>(Object_type::static_body) << object_handle_index_bits |
                            static_cast<Object_handle>(index)}} {}
 
-  constexpr explicit Static_body(Object generic) noexcept : _generic{generic} {}
+  constexpr explicit Static_body(Object generic) noexcept
+      : _generic{generic} {}
 
-  constexpr Object_handle index() const noexcept { return _generic.index(); }
+  constexpr Object_handle index() const noexcept {
+    return _generic.index();
+  }
 
-  constexpr Object generic() const noexcept { return _generic; }
+  constexpr Object generic() const noexcept {
+    return _generic;
+  }
 
   friend constexpr bool operator==(Static_body lhs, Static_body rhs) noexcept = default;
 
@@ -113,41 +139,37 @@ private:
 
 class Object_pair {
 public:
-  constexpr Object_pair(Particle first, Particle second) : Object_pair{first.generic(), second.generic()} {}
+  constexpr Object_pair(Particle first, Particle second)
+      : Object_pair{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Particle first, Rigid_body second) : _objects{first.generic(), second.generic()} {}
+  constexpr Object_pair(Particle first, Rigid_body second)
+      : _objects{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Particle first, Static_body second) : _objects{first.generic(), second.generic()} {}
+  constexpr Object_pair(Particle first, Static_body second)
+      : _objects{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Rigid_body first, Particle second) : _objects{second.generic(), first.generic()} {}
+  constexpr Object_pair(Rigid_body first, Particle second)
+      : _objects{second.generic(), first.generic()} {}
 
-  constexpr Object_pair(Rigid_body first, Rigid_body second) : Object_pair{first.generic(), second.generic()} {}
+  constexpr Object_pair(Rigid_body first, Rigid_body second)
+      : Object_pair{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Rigid_body first, Static_body second) : _objects{first.generic(), second.generic()} {}
+  constexpr Object_pair(Rigid_body first, Static_body second)
+      : _objects{first.generic(), second.generic()} {}
 
-  constexpr Object_pair(Static_body first, Particle second) : _objects{second.generic(), first.generic()} {}
+  constexpr Object_pair(Static_body first, Particle second)
+      : _objects{second.generic(), first.generic()} {}
 
-  constexpr Object_pair(Static_body first, Rigid_body second) : _objects{second.generic(), first.generic()} {}
+  constexpr Object_pair(Static_body first, Rigid_body second)
+      : _objects{second.generic(), first.generic()} {}
 
-  // explicit Object_pair(std::uint64_t id) noexcept
-  //     : _objects{
-  //           Object{static_cast<std::uint32_t>(id >> 32)},
-  //           Object{static_cast<std::uint32_t>(id)},
-  //       } {}
+  constexpr Object first_generic() const noexcept {
+    return _objects[0];
+  }
 
-  // explicit Object_pair(Object first, Object second) noexcept {
-  //   if (first.handle < second.handle) {
-  //     _objects[0] = first;
-  //     _objects[1] = second;
-  //   } else {
-  //     _objects[0] = second;
-  //     _objects[1] = first;
-  //   }
-  // }
-
-  constexpr Object first_generic() const noexcept { return _objects[0]; }
-
-  constexpr Object second_generic() const noexcept { return _objects[1]; }
+  constexpr Object second_generic() const noexcept {
+    return _objects[1];
+  }
 
   constexpr std::variant<Particle, Rigid_body> first_specific() const noexcept {
     return std::visit(
@@ -198,21 +220,9 @@ public:
 
   friend constexpr bool operator==(Object_pair lhs, Object_pair rhs) noexcept = default;
 
-  // Object first() const noexcept { return _objects[0]; }
-
-  // Object second() const noexcept { return _objects[1]; }
-
-  // Object other(Object object) const noexcept {
-  //   return _objects[_objects[0] == object ? 1 : 0];
-  // }
-
-  // std::uint64_t id() const noexcept {
-  //   return static_cast<std::uint64_t>(_objects[0].handle) << 32 |
-  //          _objects[1].handle;
-  // }
-
 private:
-  constexpr Object_pair(Object first, Object second) noexcept : _objects{first, second} {
+  constexpr Object_pair(Object first, Object second) noexcept
+      : _objects{first, second} {
     if (_objects[1].handle() < _objects[0].handle()) {
       std::swap(_objects[1], _objects[0]);
     }
@@ -242,26 +252,4 @@ template <> struct Hash<physics::Object_pair> {
 };
 } // namespace util
 } // namespace marlon
-// namespace std {
-// template <> struct hash<marlon::physics::Particle> {
-//   std::size_t operator()(
-//       marlon::physics::Particle_handle particle_reference) const noexcept {
-//     return hash<std::size_t>{}(particle_reference.value());
-//   }
-// };
-
-// template <> struct hash<marlon::physics::Rigid_body_handle> {
-//   std::size_t
-//   operator()(marlon::physics::Rigid_body_handle reference) const noexcept {
-//     return hash<std::size_t>{}(reference.value());
-//   }
-// };
-
-// template <> struct hash<marlon::physics::Static_body_handle> {
-//   std::size_t
-//   operator()(marlon::physics::Static_body_handle reference) const noexcept {
-//     return hash<std::size_t>{}(reference.value());
-//   }
-// };
-// } // namespace std
 #endif

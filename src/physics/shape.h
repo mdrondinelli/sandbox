@@ -1,15 +1,11 @@
 #ifndef MARLON_PHYSICS_SHAPE_H
 #define MARLON_PHYSICS_SHAPE_H
 
-#include <algorithm>
-#include <array>
 #include <optional>
 #include <type_traits>
 #include <variant>
 
 #include <math/math.h>
-
-#include "particle.h"
 
 namespace marlon {
 namespace physics {
@@ -30,11 +26,18 @@ struct Narrowphase_result;
 
 class Shape {
 public:
-  Shape(Ball const &ball) noexcept : _v{ball} {}
+  constexpr Shape(Ball const &ball) noexcept
+      : _v{ball} {}
 
-  Shape(Capsule const &capsule) noexcept : _v{capsule} {}
+  constexpr Shape(Capsule const &capsule) noexcept
+      : _v{capsule} {}
 
-  Shape(Box const &box) noexcept : _v{box} {}
+  constexpr Shape(Box const &box) noexcept
+      : _v{box} {}
+
+  constexpr std::variant<Ball, Capsule, Box> const &get() const noexcept {
+    return _v;
+  }
 
   friend math::Aabb3f bounds(Shape const &shape, math::Mat3x4f const &transform) noexcept;
 
