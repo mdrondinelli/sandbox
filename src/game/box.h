@@ -47,7 +47,7 @@ public:
     _user_pointer = user_pointer;
   }
 
-  physics::Object get_physics_object() noexcept {
+  physics::Object get_physics_object() const noexcept {
     return _body;
   }
 
