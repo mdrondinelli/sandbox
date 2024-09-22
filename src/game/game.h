@@ -18,7 +18,8 @@ public:
   static constexpr auto max_rigid_bodies = 10000;
   static constexpr auto max_static_bodies = 100;
   static constexpr auto max_boxes = 10000;
-  static constexpr auto gravitational_acceleration = -9.81f * math::Vec3f::y_axis();
+  static constexpr auto gravitational_acceleration =
+      -9.81f * math::Vec3f::y_axis();
 
   Game() = default;
 

@@ -50,48 +50,86 @@ public:
     return *this;
   }
 
-  ~List() { clear(); }
+  ~List() {
+    clear();
+  }
 
   Const_block block() const noexcept {
     return {reinterpret_cast<std::byte const *>(_begin),
             reinterpret_cast<std::byte const *>(_buffer_end)};
   }
 
-  T const &operator[](Size index) const noexcept { return _begin[index]; }
+  T const &operator[](Size index) const noexcept {
+    return _begin[index];
+  }
 
-  T &operator[](Size index) noexcept { return _begin[index]; }
+  T &operator[](Size index) noexcept {
+    return _begin[index];
+  }
 
-  T const &front() const noexcept { return *_begin; }
+  T const &front() const noexcept {
+    return *_begin;
+  }
 
-  T &front() noexcept { return *_begin; }
+  T &front() noexcept {
+    return *_begin;
+  }
 
-  T const &back() const noexcept { return *(_stack_end - 1); }
+  T const &back() const noexcept {
+    return *(_stack_end - 1);
+  }
 
-  T &back() noexcept { return *(_stack_end - 1); }
+  T &back() noexcept {
+    return *(_stack_end - 1);
+  }
 
-  T const *data() const noexcept { return _begin; }
+  T const *data() const noexcept {
+    return _begin;
+  }
 
-  T *data() noexcept { return _begin; }
+  T *data() noexcept {
+    return _begin;
+  }
 
-  Const_iterator cbegin() const noexcept { return _begin; }
+  Const_iterator cbegin() const noexcept {
+    return _begin;
+  }
 
-  Const_iterator begin() const noexcept { return _begin; }
+  Const_iterator begin() const noexcept {
+    return _begin;
+  }
 
-  Iterator begin() noexcept { return _begin; }
+  Iterator begin() noexcept {
+    return _begin;
+  }
 
-  Const_iterator cend() const noexcept { return _stack_end; }
+  Const_iterator cend() const noexcept {
+    return _stack_end;
+  }
 
-  Const_iterator end() const noexcept { return _stack_end; }
+  Const_iterator end() const noexcept {
+    return _stack_end;
+  }
 
-  Iterator end() noexcept { return _stack_end; }
+  Iterator end() noexcept {
+    return _stack_end;
+  }
 
-  bool empty() const noexcept { return size() == 0; }
+  bool empty() const noexcept {
+    return size() == 0;
+  }
 
-  Size size() const noexcept { return _stack_end - _begin; }
+  Size size() const noexcept {
+    return _stack_end - _begin;
+  }
 
-  Size max_size() const noexcept { return _buffer_end - _begin; }
+  Size max_size() const noexcept {
+    return _buffer_end - _begin;
+  }
 
-  Size capacity() const noexcept { return max_size(); }
+  Size capacity() const noexcept {
+    return max_size();
+  }
 
   void clear() noexcept {
     auto const begin = _begin;
@@ -121,7 +159,9 @@ public:
     }
   }
 
-  void pop_back() noexcept { (--_stack_end)->~T(); }
+  void pop_back() noexcept {
+    (--_stack_end)->~T();
+  }
 
   void resize(Size count) {
     auto const stack_end = _stack_end;
@@ -164,9 +204,12 @@ public:
   using Iterator = typename List<T>::Iterator;
   using Const_iterator = typename List<T>::Const_iterator;
 
-  Allocating_list() { _impl.construct(); }
+  Allocating_list() {
+    _impl.construct();
+  }
 
-  explicit Allocating_list(Allocator const &allocator) : Allocator{allocator} {
+  explicit Allocating_list(Allocator const &allocator)
+      : Allocator{allocator} {
     _impl.construct();
   }
 
@@ -189,43 +232,81 @@ public:
     }
   }
 
-  Const_block block() const noexcept { return _impl->block(); }
+  Const_block block() const noexcept {
+    return _impl->block();
+  }
 
-  T const &operator[](Size index) const noexcept { return (*_impl)[index]; }
+  T const &operator[](Size index) const noexcept {
+    return (*_impl)[index];
+  }
 
-  T &operator[](Size index) noexcept { return (*_impl)[index]; }
+  T &operator[](Size index) noexcept {
+    return (*_impl)[index];
+  }
 
-  T const &front() const noexcept { return _impl->front(); }
+  T const &front() const noexcept {
+    return _impl->front();
+  }
 
-  T &front() noexcept { return _impl.front(); }
+  T &front() noexcept {
+    return _impl.front();
+  }
 
-  T const &back() const noexcept { return _impl->back(); }
+  T const &back() const noexcept {
+    return _impl->back();
+  }
 
-  T &back() noexcept { return _impl.back(); }
+  T &back() noexcept {
+    return _impl.back();
+  }
 
-  T const *data() const noexcept { return _impl->data(); }
+  T const *data() const noexcept {
+    return _impl->data();
+  }
 
-  T *data() noexcept { return _impl->data(); }
+  T *data() noexcept {
+    return _impl->data();
+  }
 
-  Const_iterator cbegin() const noexcept { return _impl->cbegin(); }
+  Const_iterator cbegin() const noexcept {
+    return _impl->cbegin();
+  }
 
-  Const_iterator begin() const noexcept { return _impl->begin(); }
+  Const_iterator begin() const noexcept {
+    return _impl->begin();
+  }
 
-  Iterator begin() noexcept { return _impl->begin(); }
+  Iterator begin() noexcept {
+    return _impl->begin();
+  }
 
-  Const_iterator cend() const noexcept { return _impl->cend(); }
+  Const_iterator cend() const noexcept {
+    return _impl->cend();
+  }
 
-  Const_iterator end() const noexcept { return _impl->end(); }
+  Const_iterator end() const noexcept {
+    return _impl->end();
+  }
 
-  Iterator end() noexcept { return _impl->end(); }
+  Iterator end() noexcept {
+    return _impl->end();
+  }
 
-  bool empty() const noexcept { return _impl->empty(); }
+  bool empty() const noexcept {
+    return _impl->empty();
+  }
 
-  Size size() const noexcept { return _impl->size(); }
+  Size size() const noexcept {
+    return _impl->size();
+  }
 
-  Size max_size() const noexcept { return std::numeric_limits<Size>::max(); }
+  Size max_size() const noexcept {
+    return std::numeric_limits<Size>::max();
+  }
 
-  Size capacity() const noexcept { return _impl->capacity(); }
+  Size capacity() const noexcept {
+    return _impl->capacity();
+  }
 
   void reserve(Size capacity) {
     if (capacity > _impl->capacity()) {
@@ -244,7 +325,9 @@ public:
     }
   }
 
-  void clear() { _impl->clear(); }
+  void clear() {
+    _impl->clear();
+  }
 
   void push_back(T const &object) {
     if (size() == capacity()) {
@@ -260,7 +343,9 @@ public:
     return _impl->emplace_back(std::forward<Args>(args)...);
   }
 
-  void pop_back() noexcept { _impl->pop_back(); }
+  void pop_back() noexcept {
+    _impl->pop_back();
+  }
 
   void resize(Size count) {
     if (capacity() < count) {

@@ -36,10 +36,12 @@ protected:
 
   graphics::Graphics *get_graphics() noexcept;
 
-  graphics::Render_stream *create_render_stream(graphics::Scene const *scene, graphics::Camera const *camera);
+  graphics::Render_stream *create_render_stream(graphics::Scene const *scene,
+                                                graphics::Camera const *camera);
 
-  graphics::Unique_render_stream create_render_stream_unique(graphics::Scene const *scene,
-                                                             graphics::Camera const *camera);
+  graphics::Unique_render_stream
+  create_render_stream_unique(graphics::Scene const *scene,
+                              graphics::Camera const *camera);
 
   bool is_looping() const noexcept;
 

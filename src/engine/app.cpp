@@ -105,17 +105,24 @@ graphics::Graphics *App::get_graphics() noexcept {
   return _runtime->get_graphics();
 }
 
-graphics::Render_stream *App::create_render_stream(graphics::Scene const *scene, graphics::Camera const *camera) {
+graphics::Render_stream *
+App::create_render_stream(graphics::Scene const *scene,
+                          graphics::Camera const *camera) {
   auto const graphics = _runtime->get_graphics();
   return graphics->create_render_stream(
-      {.target = graphics->get_default_render_target(), .scene = scene, .camera = camera});
+      {.target = graphics->get_default_render_target(),
+       .scene = scene,
+       .camera = camera});
 }
 
-graphics::Unique_render_stream App::create_render_stream_unique(graphics::Scene const *scene,
-                                                                graphics::Camera const *camera) {
+graphics::Unique_render_stream
+App::create_render_stream_unique(graphics::Scene const *scene,
+                                 graphics::Camera const *camera) {
   auto const graphics = _runtime->get_graphics();
   return graphics->create_render_stream_unique(
-      {.target = graphics->get_default_render_target(), .scene = scene, .camera = camera});
+      {.target = graphics->get_default_render_target(),
+       .scene = scene,
+       .camera = camera});
 }
 
 bool App::is_looping() const noexcept {
@@ -138,7 +145,9 @@ void App::do_loop() {
   _looping = true;
   while (_looping) {
     auto const current_time = clock::now();
-    _loop_iteration_wall_time = std::chrono::duration_cast<duration>(current_time - previous_time).count();
+    _loop_iteration_wall_time =
+        std::chrono::duration_cast<duration>(current_time - previous_time)
+            .count();
     previous_time = current_time;
     do_input();
   }

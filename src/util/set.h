@@ -33,15 +33,25 @@ class Set {
     std::size_t hash;
     alignas(alignof(T)) std::array<std::byte, sizeof(T)> storage;
 
-    Node *prev() const noexcept { return _prev; }
+    Node *prev() const noexcept {
+      return _prev;
+    }
 
-    void prev(Node *prev) noexcept { _prev = prev; }
+    void prev(Node *prev) noexcept {
+      _prev = prev;
+    }
 
-    Node *next() const noexcept { return _next; }
+    Node *next() const noexcept {
+      return _next;
+    }
 
-    void next(Node *next) noexcept { _next = next; }
+    void next(Node *next) noexcept {
+      _next = next;
+    }
 
-    T &value() noexcept { return *std::launder(reinterpret_cast<T *>(&storage)); }
+    T &value() noexcept {
+      return *std::launder(reinterpret_cast<T *>(&storage));
+    }
   };
 
   static auto constexpr alignment = std::max(alignof(Bucket), alignof(Node));
@@ -52,9 +62,13 @@ public:
     friend class Const_iterator;
 
   public:
-    T &operator*() const noexcept { return _node->value(); }
+    T &operator*() const noexcept {
+      return _node->value();
+    }
 
-    T *operator->() const noexcept { return &_node->value(); }
+    T *operator->() const noexcept {
+      return &_node->value();
+    }
 
     Iterator &operator++() noexcept {
       if (_node) {
@@ -87,7 +101,8 @@ public:
     }
 
   private:
-    explicit Iterator(Node *node) noexcept : _node{node} {}
+    explicit Iterator(Node *node) noexcept
+        : _node{node} {}
 
     Node *_node;
   };
@@ -96,11 +111,16 @@ public:
     friend class Set;
 
   public:
-    Const_iterator(Iterator it) noexcept : _node{it._node} {}
+    Const_iterator(Iterator it) noexcept
+        : _node{it._node} {}
 
-    T const &operator*() const noexcept { return _node->value(); }
+    T const &operator*() const noexcept {
+      return _node->value();
+    }
 
-    T const *operator->() const noexcept { return &_node->value(); }
+    T const *operator->() const noexcept {
+      return &_node->value();
+    }
 
     Const_iterator &operator++() noexcept {
       if (_node) {
@@ -133,7 +153,8 @@ public:
     }
 
   private:
-    explicit Const_iterator(Node *node) noexcept : _node{node} {}
+    explicit Const_iterator(Node *node) noexcept
+        : _node{node} {}
 
     Node *_node;
   };
@@ -219,19 +240,33 @@ public:
 
   // void *data() noexcept { return _buckets.data(); }
 
-  Iterator begin() noexcept { return Iterator{_head}; }
+  Iterator begin() noexcept {
+    return Iterator{_head};
+  }
 
-  Const_iterator begin() const noexcept { return Const_iterator{_head}; }
+  Const_iterator begin() const noexcept {
+    return Const_iterator{_head};
+  }
 
-  Const_iterator cbegin() const noexcept { return Const_iterator{_head}; }
+  Const_iterator cbegin() const noexcept {
+    return Const_iterator{_head};
+  }
 
-  Iterator end() noexcept { return Iterator{nullptr}; }
+  Iterator end() noexcept {
+    return Iterator{nullptr};
+  }
 
-  Const_iterator end() const noexcept { return Const_iterator{nullptr}; }
+  Const_iterator end() const noexcept {
+    return Const_iterator{nullptr};
+  }
 
-  Const_iterator cend() const noexcept { return Const_iterator{nullptr}; }
+  Const_iterator cend() const noexcept {
+    return Const_iterator{nullptr};
+  }
 
-  Size size() const noexcept { return _size; }
+  Size size() const noexcept {
+    return _size;
+  }
 
   Size max_size() const noexcept {
     return std::max(_nodes.max_blocks(), Size{1}) - 1;
@@ -477,7 +512,9 @@ public:
     }
   }
 
-  Iterator erase(Iterator pos) noexcept { return erase(Const_iterator{pos}); }
+  Iterator erase(Iterator pos) noexcept {
+    return erase(Const_iterator{pos});
+  }
 
   Iterator erase(Const_iterator pos) noexcept {
     pos._node->value().~T();
@@ -558,17 +595,25 @@ public:
     }
   }
 
-  Size bucket_count() const noexcept { return _buckets.size(); }
+  Size bucket_count() const noexcept {
+    return _buckets.size();
+  }
 
-  Size max_bucket_count() const noexcept { return _buckets.capacity(); }
+  Size max_bucket_count() const noexcept {
+    return _buckets.capacity();
+  }
 
   float load_factor() const noexcept {
     return static_cast<float>(_size) / static_cast<float>(_buckets.size());
   }
 
-  float max_load_factor() const noexcept { return _max_load_factor; }
+  float max_load_factor() const noexcept {
+    return _max_load_factor;
+  }
 
-  void max_load_factor(float ml) noexcept { _max_load_factor = ml; }
+  void max_load_factor(float ml) noexcept {
+    _max_load_factor = ml;
+  }
 
   void rehash(Size count) noexcept {
     auto const n = std::min(
@@ -649,9 +694,12 @@ public:
   using Iterator = typename Set<T, Hash, Equal>::Iterator;
   using Const_iterator = typename Set<T, Hash, Equal>::Const_iterator;
 
-  Allocating_set() { _impl.construct(); }
+  Allocating_set() {
+    _impl.construct();
+  }
 
-  explicit Allocating_set(Allocator const &allocator) : Allocator{allocator} {
+  explicit Allocating_set(Allocator const &allocator)
+      : Allocator{allocator} {
     _impl.construct();
   }
 
@@ -674,25 +722,41 @@ public:
 
   // void *data() noexcept { return _impl->data(); }
 
-  Iterator begin() noexcept { return _impl->begin(); }
+  Iterator begin() noexcept {
+    return _impl->begin();
+  }
 
-  Const_iterator begin() const noexcept { return _impl->begin(); }
+  Const_iterator begin() const noexcept {
+    return _impl->begin();
+  }
 
-  Const_iterator cbegin() const noexcept { return _impl->cbegin(); }
+  Const_iterator cbegin() const noexcept {
+    return _impl->cbegin();
+  }
 
-  Iterator end() noexcept { return _impl->end(); }
+  Iterator end() noexcept {
+    return _impl->end();
+  }
 
-  Const_iterator end() const noexcept { return _impl->end(); }
+  Const_iterator end() const noexcept {
+    return _impl->end();
+  }
 
-  Const_iterator cend() const noexcept { return _impl->cend(); }
+  Const_iterator cend() const noexcept {
+    return _impl->cend();
+  }
 
-  Size size() const noexcept { return _impl->size(); }
+  Size size() const noexcept {
+    return _impl->size();
+  }
 
   Size max_size() const noexcept {
     return std::numeric_limits<std::ptrdiff_t>::max();
   }
 
-  void clear() noexcept { _impl->clear(); }
+  void clear() noexcept {
+    _impl->clear();
+  }
 
   template <typename K> std::pair<Iterator, bool> insert(K &&x) {
 
@@ -706,9 +770,13 @@ public:
     return _impl->emplace(std::forward<Args>(args)...);
   }
 
-  Iterator erase(Iterator pos) noexcept { return _impl->erase(pos); }
+  Iterator erase(Iterator pos) noexcept {
+    return _impl->erase(pos);
+  }
 
-  Iterator erase(Const_iterator pos) noexcept { return _impl->erase(pos); }
+  Iterator erase(Const_iterator pos) noexcept {
+    return _impl->erase(pos);
+  }
 
   template <typename K> Size erase(K const &x) noexcept {
     return _impl->erase(x);
@@ -722,16 +790,22 @@ public:
     return _impl->find(x);
   }
 
-  Size bucket_count() const noexcept { return _impl->bucket_count(); }
+  Size bucket_count() const noexcept {
+    return _impl->bucket_count();
+  }
 
   Size max_bucket_count() const noexcept {
     return std::numeric_limits<std::ptrdiff_t>::max() ^
            (std::numeric_limits<std::ptrdiff_t>::max() >> 1);
   }
 
-  float load_factor() const noexcept { return _impl->load_factor(); }
+  float load_factor() const noexcept {
+    return _impl->load_factor();
+  }
 
-  float max_load_factor() const noexcept { return _impl->max_load_factor(); }
+  float max_load_factor() const noexcept {
+    return _impl->max_load_factor();
+  }
 
   void max_load_factor(float ml) noexcept {}
 

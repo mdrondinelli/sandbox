@@ -26,7 +26,9 @@ public:
     return std::launder(reinterpret_cast<T const *>(&_storage));
   }
 
-  T *get() noexcept { return std::launder(reinterpret_cast<T *>(&_storage)); }
+  T *get() noexcept {
+    return std::launder(reinterpret_cast<T *>(&_storage));
+  }
 
   T const &operator*() const noexcept {
     return *get();

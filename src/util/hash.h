@@ -35,7 +35,9 @@ template <> struct Hash<std::uint64_t> {
 };
 
 template <> struct Hash<std::nullptr_t> {
-  constexpr std::size_t operator()(std::nullptr_t) const noexcept { return 0; }
+  constexpr std::size_t operator()(std::nullptr_t) const noexcept {
+    return 0;
+  }
 };
 
 template <typename T> struct Hash<T *> {

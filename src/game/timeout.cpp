@@ -6,30 +6,37 @@
 #include "util/memory.h"
 
 namespace marlon::game {
-Timeout_manager::Timeout_manager(Timeout_manager_create_info const &create_info) {
-  _memory = util::assign_merged(
-      util::System_allocator{},
-      std::tie(
-          _timeouts, _allocated_timeouts, _expiring_timeouts, _intervals, _allocated_intervals, _expiring_intervals),
-      std::tuple{create_info.max_timeouts},
-      std::tuple{create_info.max_timeouts},
-      std::tuple{create_info.max_timeouts},
-      std::tuple{create_info.max_intervals},
-      std::tuple{create_info.max_intervals},
-      std::tuple{create_info.max_intervals});
+Timeout_manager::Timeout_manager(
+    Timeout_manager_create_info const &create_info) {
+  _memory = util::assign_merged(util::System_allocator{},
+                                std::tie(_timeouts,
+                                         _allocated_timeouts,
+                                         _expiring_timeouts,
+                                         _intervals,
+                                         _allocated_intervals,
+                                         _expiring_intervals),
+                                std::tuple{create_info.max_timeouts},
+                                std::tuple{create_info.max_timeouts},
+                                std::tuple{create_info.max_timeouts},
+                                std::tuple{create_info.max_intervals},
+                                std::tuple{create_info.max_intervals},
+                                std::tuple{create_info.max_intervals});
 }
 
 Timeout_manager::~Timeout_manager() {
   util::System_allocator{}.free(_memory);
 }
 
-Timeout *Timeout_manager::set_timeout(Timeout_callback *callback, double delay) {
-  auto const result = _timeouts.emplace(Timeout{.callback = callback, .delay = delay});
+Timeout *Timeout_manager::set_timeout(Timeout_callback *callback,
+                                      double delay) {
+  auto const result =
+      _timeouts.emplace(Timeout{.callback = callback, .delay = delay});
   _allocated_timeouts.emplace(result);
   return result;
 }
 
-Interval *Timeout_manager::set_interval(Timeout_callback *callback, double delay) {
+Interval *Timeout_manager::set_interval(Timeout_callback *callback,
+                                        double delay) {
   auto const result = _intervals.emplace(Interval{
       .callback = callback,
       .delay = delay,
@@ -50,17 +57,21 @@ void Timeout_manager::clear(Interval *interval) {
 }
 
 void Timeout_manager::on_time_passing(double dt) {
-  for (auto it = _allocated_timeouts.begin(); it != _allocated_timeouts.end(); ++it) {
+  for (auto it = _allocated_timeouts.begin(); it != _allocated_timeouts.end();
+       ++it) {
     if (((*it)->delay -= dt) < 0) {
       _expiring_timeouts.emplace_back(it);
     }
   }
-  for (auto it = _allocated_intervals.begin(); it != _allocated_intervals.end(); ++it) {
+  for (auto it = _allocated_intervals.begin(); it != _allocated_intervals.end();
+       ++it) {
     if (((*it)->delay -= dt) < 0) {
       _expiring_intervals.emplace_back(it);
     }
   }
-  auto const comparator = [](auto const &lhs, auto const &rhs) { return lhs->delay < rhs->delay; };
+  auto const comparator = [](auto const &lhs, auto const &rhs) {
+    return lhs->delay < rhs->delay;
+  };
   std::ranges::sort(_expiring_timeouts, comparator);
   std::ranges::sort(_expiring_intervals, comparator);
   auto expiring_timeout_it = _expiring_timeouts.begin();
@@ -68,7 +79,10 @@ void Timeout_manager::on_time_passing(double dt) {
   for (;;) {
     using Choice = std::variant<Timeout **, Interval **>;
     auto choice = std::optional<Choice>{};
-    auto const choice_delay = [&]() { return std::visit([](auto const choice) { return (*choice)->delay; }, *choice); };
+    auto const choice_delay = [&]() {
+      return std::visit([](auto const choice) { return (*choice)->delay; },
+                        *choice);
+    };
     if (expiring_timeout_it != _expiring_timeouts.end()) {
       choice = expiring_timeout_it;
     }

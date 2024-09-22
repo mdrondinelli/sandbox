@@ -52,7 +52,8 @@ public:
   constexpr Unique_png_struct() = default;
 
   explicit Unique_png_struct(char const *libpng_version_string)
-      : _png_ptr{png_create_read_struct(libpng_version_string, nullptr, nullptr, nullptr)} {
+      : _png_ptr{png_create_read_struct(
+            libpng_version_string, nullptr, nullptr, nullptr)} {
     if (!_png_ptr) {
       throw std::bad_alloc{};
     }

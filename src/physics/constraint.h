@@ -13,10 +13,12 @@ class Constraint {
 public:
   virtual ~Constraint() {}
 
-  virtual void solve_position(Object_pair objects, Object_storage &object_storage) noexcept = 0;
+  virtual void solve_position(Object_pair objects,
+                              Object_storage &object_storage) noexcept = 0;
 
-  virtual void
-  solve_velocity(Object_pair objects, Object_storage &object_storage, float restitution_epsilon) noexcept = 0;
+  virtual void solve_velocity(Object_pair objects,
+                              Object_storage &object_storage,
+                              float restitution_epsilon) noexcept = 0;
 };
 } // namespace marlon::physics
 

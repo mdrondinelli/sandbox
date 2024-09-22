@@ -13,7 +13,9 @@ public:
   explicit Capacity_error(std::string_view what_arg)
       : _what{std::make_shared<std::string>(what_arg)} {}
 
-  char const *what() const noexcept { return _what->c_str(); }
+  char const *what() const noexcept {
+    return _what->c_str();
+  }
 
 private:
   std::shared_ptr<std::string> _what;

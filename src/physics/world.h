@@ -12,8 +12,9 @@
 namespace marlon {
 namespace physics {
 struct World_create_info {
-  util::Size worker_thread_count{
-      math::max(static_cast<util::Size>(std::thread::hardware_concurrency()) / 2 - 1, util::Size{0})};
+  util::Size worker_thread_count{math::max(
+      static_cast<util::Size>(std::thread::hardware_concurrency()) / 2 - 1,
+      util::Size{0})};
   util::Size max_particles{10000};
   util::Size max_rigid_bodies{10000};
   util::Size max_static_bodies{100000};

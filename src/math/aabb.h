@@ -10,7 +10,8 @@ template <typename T, int N> struct Aabb {
 
   Aabb() noexcept = default;
 
-  constexpr Aabb(Vec<T, N> const &p) noexcept : Aabb{p, p} {}
+  constexpr Aabb(Vec<T, N> const &p) noexcept
+      : Aabb{p, p} {}
 
   constexpr Aabb(Vec<T, N> const &min, Vec<T, N> const &max) noexcept
       : min{min}, max{max} {}

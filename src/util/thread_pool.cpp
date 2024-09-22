@@ -11,8 +11,7 @@ Thread_pool::Thread_pool(Size thread_count, Scheduling_policy scheduling_policy)
   if (thread_count > 0) {
     auto allocator = System_allocator{};
     auto block = Block{};
-    std::tie(block, _threads) =
-        List<Thread>::make(allocator, thread_count);
+    std::tie(block, _threads) = List<Thread>::make(allocator, thread_count);
     try {
       for (int i = 0; i != thread_count; ++i) {
         _threads.emplace_back(
@@ -33,7 +32,9 @@ Thread_pool::~Thread_pool() {
   }
 }
 
-bool Thread_pool::empty() const noexcept { return size() <= 0; }
+bool Thread_pool::empty() const noexcept {
+  return size() <= 0;
+}
 
 Size Thread_pool::size() const noexcept {
   return _threads.size();

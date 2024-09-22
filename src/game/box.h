@@ -36,8 +36,14 @@ class Box : physics::Rigid_body_motion_callback {
 public:
   Box() = default;
 
-  explicit Box(void *user_pointer, physics::World *world, physics::Object body, Box_motion_callback *motion_callback)
-      : _user_pointer{user_pointer}, _world{world}, _body{body}, _motion_callback{motion_callback} {}
+  explicit Box(void *user_pointer,
+               physics::World *world,
+               physics::Object body,
+               Box_motion_callback *motion_callback)
+      : _user_pointer{user_pointer},
+        _world{world},
+        _body{body},
+        _motion_callback{motion_callback} {}
 
   void *get_user_pointer() const noexcept {
     return _user_pointer;
@@ -62,7 +68,8 @@ public:
   void set_motion_callback(Box_motion_callback *callback) noexcept;
 
 private:
-  void set_rigid_body_motion_callback(physics::Rigid_body_motion_callback *callback) noexcept;
+  void set_rigid_body_motion_callback(
+      physics::Rigid_body_motion_callback *callback) noexcept;
 
   void on_rigid_body_motion(physics::World const &, physics::Rigid_body) final;
 
@@ -112,7 +119,8 @@ public:
 
   void set_box_creation_callback(Box_creation_callback *callback) noexcept;
 
-  void set_box_destruction_callback(Box_destruction_callback *callback) noexcept;
+  void
+  set_box_destruction_callback(Box_destruction_callback *callback) noexcept;
 
 private:
   util::Block _memory{};

@@ -6,7 +6,8 @@ namespace marlon {
 namespace util {
 TEST_CASE("marlon::util::Bit_list") {
   auto constexpr requested_max_size = Size{100};
-  auto [block, bit_list] = Bit_list::make(System_allocator{}, requested_max_size);
+  auto [block, bit_list] =
+      Bit_list::make(System_allocator{}, requested_max_size);
   REQUIRE(bit_list.max_size() >= requested_max_size);
   REQUIRE(bit_list.capacity() >= requested_max_size);
   for (auto i{std::size_t{}}; i != requested_max_size; ++i) {

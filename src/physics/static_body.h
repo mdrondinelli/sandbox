@@ -18,7 +18,11 @@ public:
                             math::Quatf const &orientation,
                             Shape const &shape,
                             Material const &material) noexcept
-      : _bvh_node{bvh_node}, _position{position}, _orientation{orientation}, _shape{shape}, _material{material} {}
+      : _bvh_node{bvh_node},
+        _position{position},
+        _orientation{orientation},
+        _shape{shape},
+        _material{material} {}
 
   Broadphase_bvh::Node const *bvh_node() const noexcept {
     return _bvh_node;
@@ -57,12 +61,14 @@ class Static_body_storage {
 
 public:
   template <typename Allocator>
-  static std::pair<util::Block, Static_body_storage> make(Allocator &allocator, util::Size max_static_bodies) {
+  static std::pair<util::Block, Static_body_storage>
+  make(Allocator &allocator, util::Size max_static_bodies) {
     auto const block = allocator.alloc(memory_requirement(max_static_bodies));
     return {block, Static_body_storage{block, max_static_bodies}};
   }
 
-  static constexpr util::Size memory_requirement(util::Size max_static_bodies) noexcept {
+  static constexpr util::Size
+  memory_requirement(util::Size max_static_bodies) noexcept {
     return Allocator::memory_requirement({
         decltype(_data)::memory_requirement(max_static_bodies),
         decltype(_available_handles)::memory_requirement(max_static_bodies),
@@ -72,19 +78,23 @@ public:
 
   constexpr Static_body_storage() = default;
 
-  explicit Static_body_storage(util::Block block, util::Size max_static_bodies) noexcept
+  explicit Static_body_storage(util::Block block,
+                               util::Size max_static_bodies) noexcept
       : Static_body_storage{block.begin, max_static_bodies} {}
 
-  explicit Static_body_storage(std::byte *block_begin, util::Size max_static_bodies) noexcept {
-    util::assign_merged(Allocator{{block_begin, memory_requirement(max_static_bodies)}},
-                        std::tie(_data, _available_handles, _occupancy_bits),
-                        std::tuple{max_static_bodies},
-                        std::tuple{max_static_bodies},
-                        std::tuple{max_static_bodies});
+  explicit Static_body_storage(std::byte *block_begin,
+                               util::Size max_static_bodies) noexcept {
+    util::assign_merged(
+        Allocator{{block_begin, memory_requirement(max_static_bodies)}},
+        std::tie(_data, _available_handles, _occupancy_bits),
+        std::tuple{max_static_bodies},
+        std::tuple{max_static_bodies},
+        std::tuple{max_static_bodies});
     _data.resize(max_static_bodies);
     _available_handles.resize(max_static_bodies);
     for (auto i = util::Size{}; i != max_static_bodies; ++i) {
-      _available_handles[i] = Static_body{static_cast<int>(max_static_bodies - i - 1)};
+      _available_handles[i] =
+          Static_body{static_cast<int>(max_static_bodies - i - 1)};
     }
     _occupancy_bits.resize(max_static_bodies);
   }

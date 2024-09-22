@@ -17,9 +17,13 @@ template <typename T> class Queue {
 public:
   class Iterator {
   public:
-    T &operator*() const noexcept { return _slots[_index]; }
+    T &operator*() const noexcept {
+      return _slots[_index];
+    }
 
-    T *operator->() const noexcept { return &_slots[_index]; }
+    T *operator->() const noexcept {
+      return &_slots[_index];
+    }
 
     Iterator &operator++() noexcept {
       _index = (_index + 1) & (_slots.size() - 1);
@@ -45,7 +49,9 @@ public:
       return temp;
     }
 
-    friend bool operator==(Iterator const &lhs, Iterator const &rhs) noexcept { return lhs._offset == rhs._offset; }
+    friend bool operator==(Iterator const &lhs, Iterator const &rhs) noexcept {
+      return lhs._offset == rhs._offset;
+    }
 
   private:
     friend class Const_iterator;
@@ -61,11 +67,16 @@ public:
 
   class Const_iterator {
   public:
-    Const_iterator(Iterator it) noexcept : _slots{it._slots}, _index{it._index}, _offset{it._offset} {}
+    Const_iterator(Iterator it) noexcept
+        : _slots{it._slots}, _index{it._index}, _offset{it._offset} {}
 
-    T const &operator*() const noexcept { return _slots[_index]; }
+    T const &operator*() const noexcept {
+      return _slots[_index];
+    }
 
-    T const *operator->() const noexcept { return &_slots[_index]; }
+    T const *operator->() const noexcept {
+      return &_slots[_index];
+    }
 
     Const_iterator &operator++() noexcept {
       _index = (_index + 1) & (_slots.size() - 1);
@@ -91,7 +102,8 @@ public:
       return temp;
     }
 
-    friend bool operator==(Const_iterator const &lhs, Const_iterator const &rhs) noexcept {
+    friend bool operator==(Const_iterator const &lhs,
+                           Const_iterator const &rhs) noexcept {
       return lhs._offset == rhs._offset;
     }
 
@@ -103,14 +115,16 @@ public:
     Size _offset;
   };
 
-  template <typename Allocator> static std::pair<Block, Queue> make(Allocator &allocator, Size max_size) {
+  template <typename Allocator>
+  static std::pair<Block, Queue> make(Allocator &allocator, Size max_size) {
     auto const block = allocator.alloc(memory_requirement(max_size));
     return {block, Queue{block, max_size}};
   }
 
   static constexpr Size memory_requirement(Size max_size) noexcept {
     if (max_size != 0) {
-      return static_cast<Size>(sizeof(T) * std::bit_ceil(static_cast<std::size_t>(max_size)));
+      return static_cast<Size>(
+          sizeof(T) * std::bit_ceil(static_cast<std::size_t>(max_size)));
     } else {
       return 0;
     }
@@ -118,10 +132,13 @@ public:
 
   constexpr Queue() noexcept = default;
 
-  explicit Queue(Block block, Size max_size) noexcept : Queue{block.begin, max_size} {}
+  explicit Queue(Block block, Size max_size) noexcept
+      : Queue{block.begin, max_size} {}
 
   explicit Queue(void *block, Size max_size) noexcept
-      : _slots{static_cast<T *>(block), max_size != 0 ? std::bit_ceil(static_cast<std::size_t>(max_size)) : 0} {}
+      : _slots{static_cast<T *>(block),
+               max_size != 0 ? std::bit_ceil(static_cast<std::size_t>(max_size))
+                             : 0} {}
 
   Queue(Queue<T> &&other) noexcept
       : _slots{std::exchange(other._slots, std::span<T>{})},
@@ -135,39 +152,70 @@ public:
     return *this;
   }
 
-  ~Queue() { clear(); }
-
-  Const_block block() const noexcept {
-    return {reinterpret_cast<std::byte const *>(_slots.data()), static_cast<Size>(_slots.size_bytes())};
+  ~Queue() {
+    clear();
   }
 
-  T const &front() const noexcept { return _slots[_head]; }
+  Const_block block() const noexcept {
+    return {reinterpret_cast<std::byte const *>(_slots.data()),
+            static_cast<Size>(_slots.size_bytes())};
+  }
 
-  T &front() noexcept { return _slots[_head]; }
+  T const &front() const noexcept {
+    return _slots[_head];
+  }
 
-  T const &back() const noexcept { return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)]; }
+  T &front() noexcept {
+    return _slots[_head];
+  }
 
-  T &back() noexcept { return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)]; }
+  T const &back() const noexcept {
+    return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)];
+  }
 
-  Const_iterator cbegin() const noexcept { return Const_iterator{_slots, _head, 0}; }
+  T &back() noexcept {
+    return _slots[(_tail + _slots.size() - 1) & (_slots.size() - 1)];
+  }
 
-  Const_iterator begin() const noexcept { return cbegin(); }
+  Const_iterator cbegin() const noexcept {
+    return Const_iterator{_slots, _head, 0};
+  }
 
-  Iterator begin() noexcept { return Iterator{_slots, _head, 0}; }
+  Const_iterator begin() const noexcept {
+    return cbegin();
+  }
 
-  Const_iterator cend() const noexcept { return Const_iterator{_slots, _tail, _size}; }
+  Iterator begin() noexcept {
+    return Iterator{_slots, _head, 0};
+  }
 
-  Const_iterator end() const noexcept { return cend(); }
+  Const_iterator cend() const noexcept {
+    return Const_iterator{_slots, _tail, _size};
+  }
 
-  Iterator end() noexcept { return Iterator{_slots, _tail, _size}; }
+  Const_iterator end() const noexcept {
+    return cend();
+  }
 
-  bool empty() const noexcept { return size() == 0; }
+  Iterator end() noexcept {
+    return Iterator{_slots, _tail, _size};
+  }
 
-  Size size() const noexcept { return _size; }
+  bool empty() const noexcept {
+    return size() == 0;
+  }
 
-  Size max_size() const noexcept { return _slots.size(); }
+  Size size() const noexcept {
+    return _size;
+  }
 
-  Size capacity() const noexcept { return max_size(); }
+  Size max_size() const noexcept {
+    return _slots.size();
+  }
+
+  Size capacity() const noexcept {
+    return max_size();
+  }
 
   void clear() noexcept {
     for (Size i = 0; i != _size; ++i) {
@@ -249,14 +297,20 @@ private:
   Size _tail{};
 };
 
-template <typename T, class Allocator = System_allocator> class Allocating_queue : Allocator {
+template <typename T, class Allocator = System_allocator>
+class Allocating_queue : Allocator {
 public:
   using Iterator = typename Queue<T>::Iterator;
   using Const_iterator = typename Queue<T>::Const_iterator;
 
-  Allocating_queue() { _impl.construct(); }
+  Allocating_queue() {
+    _impl.construct();
+  }
 
-  explicit Allocating_queue(Allocator const &allocator) : Allocator{allocator} { _impl.construct(); }
+  explicit Allocating_queue(Allocator const &allocator)
+      : Allocator{allocator} {
+    _impl.construct();
+  }
 
   ~Allocating_queue() {
     if (auto const block = _impl->block(); block.size() != 0) {
@@ -267,43 +321,78 @@ public:
     }
   }
 
-  Const_block block() const noexcept { return _impl->block(); }
+  Const_block block() const noexcept {
+    return _impl->block();
+  }
 
-  T const &front() const noexcept { return _impl->front(); }
+  T const &front() const noexcept {
+    return _impl->front();
+  }
 
-  T &front() noexcept { return _impl->front(); }
+  T &front() noexcept {
+    return _impl->front();
+  }
 
-  T const &back() const noexcept { return _impl->back(); }
+  T const &back() const noexcept {
+    return _impl->back();
+  }
 
-  T &back() noexcept { return _impl->back(); }
+  T &back() noexcept {
+    return _impl->back();
+  }
 
-  void const *data() const noexcept { return _impl->data(); }
+  void const *data() const noexcept {
+    return _impl->data();
+  }
 
-  void *data() noexcept { return _impl->data(); }
+  void *data() noexcept {
+    return _impl->data();
+  }
 
-  Const_iterator cbegin() const noexcept { return _impl->cbegin(); }
+  Const_iterator cbegin() const noexcept {
+    return _impl->cbegin();
+  }
 
-  Const_iterator begin() const noexcept { return _impl->begin(); }
+  Const_iterator begin() const noexcept {
+    return _impl->begin();
+  }
 
-  Iterator begin() noexcept { return _impl->begin(); }
+  Iterator begin() noexcept {
+    return _impl->begin();
+  }
 
-  Const_iterator cend() const noexcept { return _impl->cend(); }
+  Const_iterator cend() const noexcept {
+    return _impl->cend();
+  }
 
-  Const_iterator end() const noexcept { return _impl->end(); }
+  Const_iterator end() const noexcept {
+    return _impl->end();
+  }
 
-  Iterator end() noexcept { return _impl->end(); }
+  Iterator end() noexcept {
+    return _impl->end();
+  }
 
-  bool empty() const noexcept { return _impl->empty(); }
+  bool empty() const noexcept {
+    return _impl->empty();
+  }
 
-  Size size() const noexcept { return _impl->size(); }
+  Size size() const noexcept {
+    return _impl->size();
+  }
 
-  Size max_size() const noexcept { return std::numeric_limits<Size>::max(); }
+  Size max_size() const noexcept {
+    return std::numeric_limits<Size>::max();
+  }
 
-  Size capacity() const noexcept { return _impl->capacity(); }
+  Size capacity() const noexcept {
+    return _impl->capacity();
+  }
 
   void reserve(Size capacity) {
     if (capacity > _impl->capacity()) {
-      auto temp = Queue<T>::make(static_cast<Allocator &>(*this), capacity).second;
+      auto temp =
+          Queue<T>::make(static_cast<Allocator &>(*this), capacity).second;
       for (auto &object : *_impl) {
         temp.emplace_back(std::move(object));
       }
@@ -316,7 +405,9 @@ public:
     }
   }
 
-  void clear() noexcept { _impl->clear(); }
+  void clear() noexcept {
+    _impl->clear();
+  }
 
   void push_front(T const &object) {
     prepare_for_new_element();
@@ -328,7 +419,9 @@ public:
     return _impl->emplace_front(std::forward<Args>(args)...);
   }
 
-  void pop_front() noexcept { _impl->pop_front(); }
+  void pop_front() noexcept {
+    _impl->pop_front();
+  }
 
   void push_back(T const &object) {
     prepare_for_new_element();
@@ -340,7 +433,9 @@ public:
     return _impl->emplace_back(std::forward<Args>(args)...);
   }
 
-  void pop_back() noexcept { _impl->pop_back(); }
+  void pop_back() noexcept {
+    _impl->pop_back();
+  }
 
 private:
   void prepare_for_new_element() {

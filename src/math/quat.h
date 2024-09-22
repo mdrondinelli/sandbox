@@ -14,9 +14,13 @@ template <typename T> struct Quat {
   T w;
   Vec<T, 3> v;
 
-  static auto zero() { return Quat<T>{T(0), Vec<T, 3>::zero()}; }
+  static auto zero() {
+    return Quat<T>{T(0), Vec<T, 3>::zero()};
+  }
 
-  static auto identity() { return Quat<T>{T(1), Vec<T, 3>::zero()}; }
+  static auto identity() {
+    return Quat<T>{T(1), Vec<T, 3>::zero()};
+  }
 
   static auto axis_angle(Vec<T, 3> const &axis, T angle) {
     const auto half_angle = angle / T(2);
@@ -25,7 +29,8 @@ template <typename T> struct Quat {
 
   Quat() noexcept = default;
 
-  constexpr Quat(T w, Vec<T, 3> const &v) noexcept : w{w}, v{v} {}
+  constexpr Quat(T w, Vec<T, 3> const &v) noexcept
+      : w{w}, v{v} {}
 };
 
 using Quatf = Quat<float>;

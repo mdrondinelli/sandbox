@@ -105,7 +105,8 @@ inline Size ptrdiff(void const *p1, void const *p2) noexcept {
 
 template <Size Alignment = alignof(std::max_align_t)> class Stack_allocator {
 public:
-  static constexpr Size memory_requirement(std::initializer_list<Size> allocation_sizes) noexcept {
+  static constexpr Size
+  memory_requirement(std::initializer_list<Size> allocation_sizes) noexcept {
     auto result = Size{};
     for (auto const size : allocation_sizes) {
       result += align(size, Alignment);
@@ -120,7 +121,8 @@ public:
       : _block{block}, _top{block.begin} {}
 
   constexpr Stack_allocator(Stack_allocator &&other) noexcept
-      : _block{std::exchange(other._block, Block{})}, _top{std::exchange(other._top, nullptr)} {}
+      : _block{std::exchange(other._block, Block{})},
+        _top{std::exchange(other._top, nullptr)} {}
 
   constexpr Stack_allocator &operator=(Stack_allocator &&other) noexcept {
     auto temp{std::move(other)};
@@ -166,7 +168,8 @@ private:
   std::byte *_top;
 };
 
-template <class Parent, Size MinSize, Size MaxSize = MinSize> class Free_list_allocator {
+template <class Parent, Size MinSize, Size MaxSize = MinSize>
+class Free_list_allocator {
 public:
   Free_list_allocator() = default;
 
@@ -246,8 +249,10 @@ private:
 };
 
 template <Size MinSize, Size MaxSize = MinSize, typename Allocator>
-std::pair<Block, Pool_allocator<MinSize, MaxSize>> make_pool_allocator(Allocator &allocator, Size max_blocks) {
-  auto const block = allocator.alloc(Pool_allocator<MinSize, MaxSize>::memory_requirement(max_blocks));
+std::pair<Block, Pool_allocator<MinSize, MaxSize>>
+make_pool_allocator(Allocator &allocator, Size max_blocks) {
+  auto const block = allocator.alloc(
+      Pool_allocator<MinSize, MaxSize>::memory_requirement(max_blocks));
   return {block, Pool_allocator<MinSize, MaxSize>{block}};
 }
 
@@ -294,15 +299,22 @@ private:
 
   template <typename Allocator>
   static auto constexpr vtable = Vtable{
-      .alloc = [](void *allocator, Size size) { return static_cast<Allocator *>(allocator)->alloc(size); },
-      .free = [](void *allocator, Block block) { return static_cast<Allocator *>(allocator)->free(block); },
+      .alloc =
+          [](void *allocator, Size size) {
+            return static_cast<Allocator *>(allocator)->alloc(size);
+          },
+      .free =
+          [](void *allocator, Block block) {
+            return static_cast<Allocator *>(allocator)->free(block);
+          },
   };
 
   void *_allocator{};
   Vtable *_vtable{};
 };
 
-template <typename Allocator = System_allocator> class Unique_block : private Allocator {
+template <typename Allocator = System_allocator>
+class Unique_block : private Allocator {
 public:
   Unique_block() = default;
 
@@ -316,7 +328,8 @@ public:
       : _block{Allocator::alloc(size)} {}
 
   Unique_block(Unique_block &&other) noexcept
-      : Allocator{std::move(static_cast<Allocator &>(other))}, _block{std::exchange(other._block, Block{})} {}
+      : Allocator{std::move(static_cast<Allocator &>(other))},
+        _block{std::exchange(other._block, Block{})} {}
 
   Unique_block &operator=(Unique_block &&other) noexcept {
     auto temp{std::move(other)};
@@ -346,29 +359,40 @@ private:
 
 template <typename Allocator, typename... Ts, typename... ConstructorArgs>
 constexpr util::Size memory_requirement(ConstructorArgs &&...args) {
-  return Allocator::memory_requirement({(std::apply(Ts::memory_requirement, args))...});
+  return Allocator::memory_requirement(
+      {(std::apply(Ts::memory_requirement, args))...});
 }
 
 template <typename... Ts, typename Allocator, typename... ConstructorArgTuples>
-std::pair<Block, std::tuple<Ts...>> make_merged(Allocator &&allocator, ConstructorArgTuples &&...argTuples) {
+std::pair<Block, std::tuple<Ts...>>
+make_merged(Allocator &&allocator, ConstructorArgTuples &&...argTuples) {
   using Suballocator = Stack_allocator<>;
   auto const memory_requirement = Suballocator::memory_requirement({(std::apply(
-      [](auto &&...args) { return Ts::memory_requirement(std::forward<decltype(args)>(args)...); }, argTuples))...});
+      [](auto &&...args) {
+        return Ts::memory_requirement(std::forward<decltype(args)>(args)...);
+      },
+      argTuples))...});
   auto const block = allocator.alloc(memory_requirement);
   auto suballocator = Suballocator{block};
   return {block,
-          std::tuple{(std::make_from_tuple<Ts>(std::tuple_cat(
-              std::tuple{suballocator.alloc(std::apply(
-                  [](auto &&...args) { return Ts::memory_requirement(std::forward<decltype(args)>(args)...); },
-                  argTuples))},
-              argTuples)))...}};
+          std::tuple{(std::make_from_tuple<Ts>(
+              std::tuple_cat(std::tuple{suballocator.alloc(std::apply(
+                                 [](auto &&...args) {
+                                   return Ts::memory_requirement(
+                                       std::forward<decltype(args)>(args)...);
+                                 },
+                                 argTuples))},
+                             argTuples)))...}};
 }
 
 template <typename... Ts, typename Allocator, typename... ConstructorArgTuples>
-Block assign_merged(Allocator &&allocator, std::tuple<Ts &...> assignees, ConstructorArgTuples &&...argTuples) {
+Block assign_merged(Allocator &&allocator,
+                    std::tuple<Ts &...> assignees,
+                    ConstructorArgTuples &&...argTuples) {
   auto block = Block{};
   std::tie(block, assignees) =
-      make_merged<Ts...>(std::forward<Allocator>(allocator), std::forward<ConstructorArgTuples>(argTuples)...);
+      make_merged<Ts...>(std::forward<Allocator>(allocator),
+                         std::forward<ConstructorArgTuples>(argTuples)...);
   return block;
 }
 } // namespace util

@@ -48,8 +48,10 @@ private:
 };
 
 using Unique_surface_mesh = std::unique_ptr<Surface_mesh, Surface_mesh_deleter>;
-using Unique_render_target = std::unique_ptr<Render_target, Render_target_deleter>;
-using Unique_render_stream = std::unique_ptr<Render_stream, Render_stream_deleter>;
+using Unique_render_target =
+    std::unique_ptr<Render_target, Render_target_deleter>;
+using Unique_render_stream =
+    std::unique_ptr<Render_stream, Render_stream_deleter>;
 
 struct Graphics_implementation_info {
   int cascaded_shadow_map_max_cascade_count;
@@ -59,40 +61,48 @@ class Graphics {
 public:
   virtual ~Graphics() = default;
 
-  virtual Graphics_implementation_info const &implementation_info() const noexcept = 0;
+  virtual Graphics_implementation_info const &
+  implementation_info() const noexcept = 0;
 
-  Unique_render_stream create_render_stream_unique(Render_stream_create_info const &create_info) {
+  Unique_render_stream
+  create_render_stream_unique(Render_stream_create_info const &create_info) {
     return Unique_render_stream{create_render_stream(create_info), this};
   }
 
-  virtual Render_stream *create_render_stream(Render_stream_create_info const &create_info) = 0;
+  virtual Render_stream *
+  create_render_stream(Render_stream_create_info const &create_info) = 0;
 
   virtual void destroy_render_stream(Render_stream *render_stream) = 0;
 
   virtual void destroy_render_target(Render_target *target) noexcept = 0;
 
-  Unique_surface_mesh create_surface_mesh_unique(Surface_mesh_create_info const &create_info) {
+  Unique_surface_mesh
+  create_surface_mesh_unique(Surface_mesh_create_info const &create_info) {
     return Unique_surface_mesh{create_surface_mesh(create_info), this};
   }
 
-  virtual Surface_mesh *create_surface_mesh(Surface_mesh_create_info const &create_info) = 0;
+  virtual Surface_mesh *
+  create_surface_mesh(Surface_mesh_create_info const &create_info) = 0;
 
   virtual void destroy_surface_mesh(Surface_mesh *surface_mesh) noexcept = 0;
 };
 
-inline void Surface_mesh_deleter::operator()(Surface_mesh *surface_mesh) const noexcept {
+inline void
+Surface_mesh_deleter::operator()(Surface_mesh *surface_mesh) const noexcept {
   if (_owner) {
     _owner->destroy_surface_mesh(surface_mesh);
   }
 }
 
-inline void Render_target_deleter::operator()(Render_target *render_target) const noexcept {
+inline void
+Render_target_deleter::operator()(Render_target *render_target) const noexcept {
   if (_owner) {
     _owner->destroy_render_target(render_target);
   }
 }
 
-inline void Render_stream_deleter::operator()(Render_stream *render_stream) const noexcept {
+inline void
+Render_stream_deleter::operator()(Render_stream *render_stream) const noexcept {
   if (_owner) {
     _owner->destroy_render_stream(render_stream);
   }

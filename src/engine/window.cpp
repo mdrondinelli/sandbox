@@ -13,22 +13,26 @@ Window::Window(Window_create_info const &create_info)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        return make_unique_glfw_window(create_info.extents.x,
-                                       create_info.extents.y,
-                                       create_info.title,
-                                       create_info.full_screen ? glfwGetPrimaryMonitor() : nullptr);
+        return make_unique_glfw_window(
+            create_info.extents.x,
+            create_info.extents.y,
+            create_info.title,
+            create_info.full_screen ? glfwGetPrimaryMonitor() : nullptr);
       }()} {
   if (glfwRawMouseMotionSupported()) {
     glfwSetInputMode(_glfw_window.get(), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
   }
   glfwSetWindowUserPointer(_glfw_window.get(), this);
-  glfwSetCursorPosCallback(_glfw_window.get(), [](GLFWwindow *window, double x, double y) {
-    auto const self = static_cast<Window *>(glfwGetWindowUserPointer(window));
-    if (self->_cursor_position) {
-      self->_delta_cursor_position += math::Vec2d{x - self->_cursor_position->x, y - self->_cursor_position->y};
-    }
-    self->_cursor_position = math::Vec2d{x, y};
-  });
+  glfwSetCursorPosCallback(
+      _glfw_window.get(), [](GLFWwindow *window, double x, double y) {
+        auto const self =
+            static_cast<Window *>(glfwGetWindowUserPointer(window));
+        if (self->_cursor_position) {
+          self->_delta_cursor_position += math::Vec2d{
+              x - self->_cursor_position->x, y - self->_cursor_position->y};
+        }
+        self->_cursor_position = math::Vec2d{x, y};
+      });
 }
 
 void Window::make_context_current() noexcept {
@@ -54,7 +58,8 @@ bool Window::is_key_pressed(Key key) const noexcept {
 }
 
 bool Window::is_mouse_button_pressed(Mouse_button mouse_button) const noexcept {
-  return glfwGetMouseButton(_glfw_window.get(), static_cast<int>(mouse_button)) == GLFW_PRESS;
+  return glfwGetMouseButton(_glfw_window.get(),
+                            static_cast<int>(mouse_button)) == GLFW_PRESS;
 }
 
 math::Vec2d Window::get_cursor_position() const noexcept {

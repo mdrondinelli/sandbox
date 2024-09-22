@@ -177,11 +177,14 @@ public:
     _velocity *= info.damping_factor;
     _position += info.delta_time * _velocity;
     _angular_velocity *= info.damping_factor;
-    _orientation += Quatf{0.0f, 0.5f * info.delta_time * _angular_velocity} * _orientation;
+    _orientation +=
+        Quatf{0.0f, 0.5f * info.delta_time * _angular_velocity} * _orientation;
     _orientation = normalize(_orientation);
-    _motion = min((1.0f - info.motion_smoothing_factor) * _motion +
-                      info.motion_smoothing_factor * (length_squared(_velocity) + length_squared(_angular_velocity)),
-                  info.motion_limit);
+    _motion = min(
+        (1.0f - info.motion_smoothing_factor) * _motion +
+            info.motion_smoothing_factor *
+                (length_squared(_velocity) + length_squared(_angular_velocity)),
+        info.motion_limit);
   }
 
 private:
@@ -211,7 +214,8 @@ class Rigid_body_motion_callback {
 public:
   virtual ~Rigid_body_motion_callback() = default;
 
-  virtual void on_rigid_body_motion(World const &world, Rigid_body rigid_body) = 0;
+  virtual void on_rigid_body_motion(World const &world,
+                                    Rigid_body rigid_body) = 0;
 };
 
 class Rigid_body_storage {
@@ -219,12 +223,14 @@ class Rigid_body_storage {
 
 public:
   template <typename Allocator>
-  static std::pair<util::Block, Rigid_body_storage> make(Allocator &allocator, util::Size max_rigid_bodies) {
+  static std::pair<util::Block, Rigid_body_storage>
+  make(Allocator &allocator, util::Size max_rigid_bodies) {
     auto const block = allocator.alloc(memory_requirement(max_rigid_bodies));
     return {block, Rigid_body_storage{block, max_rigid_bodies}};
   }
 
-  static constexpr util::Size memory_requirement(util::Size max_rigid_bodies) noexcept {
+  static constexpr util::Size
+  memory_requirement(util::Size max_rigid_bodies) noexcept {
     return Allocator::memory_requirement({
         decltype(_data)::memory_requirement(max_rigid_bodies),
         decltype(_available_handles)::memory_requirement(max_rigid_bodies),
@@ -234,26 +240,31 @@ public:
 
   constexpr Rigid_body_storage() = default;
 
-  explicit Rigid_body_storage(util::Block block, util::Size max_rigid_bodies) noexcept
+  explicit Rigid_body_storage(util::Block block,
+                              util::Size max_rigid_bodies) noexcept
       : Rigid_body_storage{block.begin, max_rigid_bodies} {}
 
-  explicit Rigid_body_storage(std::byte *block_begin, util::Size max_rigid_bodies) noexcept {
-    util::assign_merged(Allocator{{block_begin, memory_requirement(max_rigid_bodies)}},
-                        std::tie(_data, _available_handles, _occupancy_bits),
-                        std::tuple{max_rigid_bodies},
-                        std::tuple{max_rigid_bodies},
-                        std::tuple{max_rigid_bodies});
+  explicit Rigid_body_storage(std::byte *block_begin,
+                              util::Size max_rigid_bodies) noexcept {
+    util::assign_merged(
+        Allocator{{block_begin, memory_requirement(max_rigid_bodies)}},
+        std::tie(_data, _available_handles, _occupancy_bits),
+        std::tuple{max_rigid_bodies},
+        std::tuple{max_rigid_bodies},
+        std::tuple{max_rigid_bodies});
     _data.resize(max_rigid_bodies);
     _available_handles.resize(max_rigid_bodies);
     _occupancy_bits.resize(max_rigid_bodies);
     for (auto i = util::Size{}; i != max_rigid_bodies; ++i) {
-      _available_handles[i] = Rigid_body{static_cast<int>(max_rigid_bodies - i - 1)};
+      _available_handles[i] =
+          Rigid_body{static_cast<int>(max_rigid_bodies - i - 1)};
     }
   }
 
   template <typename... Args> Rigid_body create(Args &&...args) {
     if (_available_handles.empty()) {
-      throw util::Capacity_error{"Capacity_error in Rigid_body_storage::create"};
+      throw util::Capacity_error{
+          "Capacity_error in Rigid_body_storage::create"};
     }
     auto const result = _available_handles.back();
     _available_handles.pop_back();

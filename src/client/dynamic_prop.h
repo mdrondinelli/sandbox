@@ -7,7 +7,6 @@
 #include "graphics/scene.h"
 #include "physics/world.h"
 
-
 namespace marlon {
 namespace client {
 struct Dynamic_prop_handle {

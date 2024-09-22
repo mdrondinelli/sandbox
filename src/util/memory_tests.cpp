@@ -18,12 +18,14 @@ TEST_CASE("Use align to align sizes to a power-of-two alignment.") {
 TEST_CASE("make_merged") {
   auto const size_a = Size{10};
   auto const size_b = Size{5};
-  auto [merged_block, merged_objects] =
-      make_merged<List<int>, List<int>>(System_allocator{}, std::tuple{size_a}, std::tuple{size_b});
+  auto [merged_block, merged_objects] = make_merged<List<int>, List<int>>(
+      System_allocator{}, std::tuple{size_a}, std::tuple{size_b});
   auto &[list_a, list_b] = merged_objects;
-  REQUIRE(merged_block.size() == align(size_a * sizeof(int), alignof(std::max_align_t)) +
-                                     align(size_b * sizeof(int), alignof(std::max_align_t)));
-  REQUIRE(ptrdiff(list_b.data(), list_a.data()) == align(size_a * sizeof(int), alignof(std::max_align_t)));
+  REQUIRE(merged_block.size() ==
+          align(size_a * sizeof(int), alignof(std::max_align_t)) +
+              align(size_b * sizeof(int), alignof(std::max_align_t)));
+  REQUIRE(ptrdiff(list_b.data(), list_a.data()) ==
+          align(size_a * sizeof(int), alignof(std::max_align_t)));
   list_a = {};
   list_b = {};
   System_allocator{}.free(merged_block);
@@ -36,10 +38,13 @@ TEST_CASE("assign_merged") {
   auto const size_b = Size{5};
   auto list_a = List<int>{};
   auto list_b = List<int>{};
-  auto const merged_block = assign_merged(System_allocator{}, tie(list_a, list_b), tuple{size_a}, tuple{size_b});
-  REQUIRE(merged_block.size() == align(size_a * sizeof(int), alignof(std::max_align_t)) +
-                                     align(size_b * sizeof(int), alignof(std::max_align_t)));
-  REQUIRE(ptrdiff(list_b.data(), list_a.data()) == align(size_a * sizeof(int), alignof(std::max_align_t)));
+  auto const merged_block = assign_merged(
+      System_allocator{}, tie(list_a, list_b), tuple{size_a}, tuple{size_b});
+  REQUIRE(merged_block.size() ==
+          align(size_a * sizeof(int), alignof(std::max_align_t)) +
+              align(size_b * sizeof(int), alignof(std::max_align_t)));
+  REQUIRE(ptrdiff(list_b.data(), list_a.data()) ==
+          align(size_a * sizeof(int), alignof(std::max_align_t)));
   list_a = {};
   list_b = {};
   System_allocator{}.free(merged_block);
@@ -49,7 +54,8 @@ TEST_CASE("assign_merged") {
 //   REQUIRE(Stack_allocator<8>::memory_requirement({2, 4, 8, 16}) == 40);
 //   REQUIRE(Stack_allocator<16>::memory_requirement({2, 4, 8, 16}) == 64);
 //   auto const allocator_block =
-//       make_unique_block(Stack_allocator<8>::memory_requirement({2, 4, 8, 16}));
+//       make_unique_block(Stack_allocator<8>::memory_requirement({2, 4, 8,
+//       16}));
 //   auto allocator = Stack_allocator<8>{allocator_block.get()};
 //   REQUIRE_NOTHROW([&]() {
 //     auto const a1 = make_unique_block(2, &allocator);

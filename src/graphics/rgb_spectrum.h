@@ -9,7 +9,8 @@ public:
   float g;
   float b;
 
-  constexpr Rgb_spectrum(float rgb) noexcept : r{rgb}, g{rgb}, b{rgb} {}
+  constexpr Rgb_spectrum(float rgb) noexcept
+      : r{rgb}, g{rgb}, b{rgb} {}
 
   constexpr Rgb_spectrum(float r, float g, float b) noexcept
       : r{r}, g{g}, b{b} {}
