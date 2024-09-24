@@ -60,13 +60,13 @@ void Timeout_manager::on_time_passing(double dt) {
   for (auto it = _allocated_timeouts.begin(); it != _allocated_timeouts.end();
        ++it) {
     if (((*it)->delay -= dt) < 0) {
-      _expiring_timeouts.emplace_back(it);
+      _expiring_timeouts.emplace_back(*it);
     }
   }
   for (auto it = _allocated_intervals.begin(); it != _allocated_intervals.end();
        ++it) {
     if (((*it)->delay -= dt) < 0) {
-      _expiring_intervals.emplace_back(it);
+      _expiring_intervals.emplace_back(*it);
     }
   }
   auto const comparator = [](auto const &lhs, auto const &rhs) {

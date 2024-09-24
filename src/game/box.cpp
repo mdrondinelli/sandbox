@@ -95,7 +95,8 @@ Box *Box_manager::create_box(Rigid_box_create_info const &create_info) {
   });
   auto box = static_cast<Box *>(nullptr);
   try {
-    box = _boxes.emplace(create_info.user_pointer, _world, body, nullptr);
+    box = _boxes.emplace(
+        create_info.user_pointer, _world, body.generic(), nullptr);
   } catch (...) {
     _world->destroy_object(body);
     throw;
@@ -116,7 +117,8 @@ Box *Box_manager::create_box(Static_box_create_info const &create_info) {
   });
   auto box = static_cast<Box *>(nullptr);
   try {
-    box = _boxes.emplace(create_info.user_pointer, _world, body, nullptr);
+    box = _boxes.emplace(
+        create_info.user_pointer, _world, body.generic(), nullptr);
   } catch (...) {
     _world->destroy_object(body);
     throw;

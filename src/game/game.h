@@ -27,13 +27,21 @@ public:
 
   void tick();
 
-  Timeout_manager const &get_timeouts() const noexcept;
+  Timeout_manager const &get_timeouts() const noexcept {
+    return _timeouts;
+  }
 
-  Timeout_manager &get_timeouts() noexcept;
+  Timeout_manager &get_timeouts() noexcept {
+    return _timeouts;
+  }
 
-  Box_manager const &get_boxes() const noexcept;
+  Box_manager const &get_boxes() const noexcept {
+    return _boxes;
+  }
 
-  Box_manager &get_boxes() noexcept;
+  Box_manager &get_boxes() noexcept {
+    return _boxes;
+  }
 
 private:
   physics::World _world;

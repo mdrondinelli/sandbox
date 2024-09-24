@@ -18,7 +18,7 @@ Game::Game(Game_create_info const &)
       }, _timeouts{{
           .max_timeouts = 1000,
           .max_intervals = 1000,
-      }} {}
+      }}, _game_state{this} {}
 
 void Game::tick() {
   _world.simulate({World_simulate_info{tick_duration, physics_substep_count}});
