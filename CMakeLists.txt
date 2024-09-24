@@ -11,17 +11,24 @@ endif()
 add_subdirectory(lib/Catch2-3.6.0)
 find_package(glfw3 3.3.6 REQUIRED)
 find_package(PNG REQUIRED)
+
+# math_tests
 add_executable(
   math_tests
   "src/math/mat.cpp"
   "src/math/quat.cpp"
   "src/math/vec.cpp"
 )
+target_link_libraries(math_tests Catch2::Catch2WithMain)
+
+# util
 add_library(
   util
   "src/util/memory.cpp"
   "src/util/thread_pool.cpp"
 )
+
+# util_tests
 add_executable(
   util_tests
   "src/util/hash_tests.cpp"
@@ -32,23 +39,44 @@ add_executable(
   "src/util/set_tests.cpp"
   "src/util/map_tests.cpp"
 )
+target_link_libraries(util_tests util Catch2::Catch2WithMain)
+
+# physics
 add_library(
   physics
   "src/physics/contact.cpp"
   "src/physics/world.cpp"
 )
+target_include_directories(physics PRIVATE src)
+target_link_libraries(physics util)
+
+# game
 add_library(
   game
   "src/game/box.cpp"
   "src/game/game.cpp"
   "src/game/game_state.cpp"
+  "src/game/timeout.cpp"
 )
 target_include_directories(game PRIVATE src)
 target_link_libraries(game PRIVATE physics)
+
+# game_tests
+add_executable(
+  game_tests
+  "src/game/timeout_tests.cpp"
+)
+target_include_directories(game_tests PRIVATE src)
+target_link_libraries(game_tests PRIVATE game Catch2::Catch2WithMain)
+
+# load_png
 add_library(
   load_png
   "src/load_png/load_png.cpp"
 )
+target_link_libraries(load_png PNG::PNG)
+
+# graphics
 add_library(
   graphics
   "src/graphics/gl/wrappers/unique_buffer.cpp"
@@ -71,6 +99,12 @@ add_library(
   "src/graphics/glad/gl.cpp"
   "src/graphics/scene.cpp"
 )
+target_include_directories(graphics PUBLIC src)
+target_include_directories(graphics PRIVATE include)
+target_link_directories(graphics INTERFACE ${CMAKE_SOURCE_DIR}/lib)
+target_link_libraries(graphics util)
+
+# engine
 add_library(
   engine
   "src/engine/app.cpp"
@@ -78,25 +112,19 @@ add_library(
   "src/engine/glfw_window.cpp"
   "src/engine/window.cpp"
 )
+target_include_directories(engine PRIVATE src)
+target_include_directories(engine PRIVATE include)
+target_link_libraries(engine physics graphics glfw)
+
+# client
 add_executable(
   client
   "src/client/dynamic_prop.cpp"
   "src/client/static_prop.cpp"
   "src/client/main.cpp"
 )
-# set_target_properties(math_tests util util_tests graphics physics engine client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-target_include_directories(graphics PUBLIC src)
-target_include_directories(graphics PRIVATE include)
-target_include_directories(physics PRIVATE src)
-target_include_directories(engine PRIVATE src)
-target_include_directories(engine PRIVATE include)
 target_include_directories(client PRIVATE include)
 target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)
-target_link_libraries(math_tests Catch2::Catch2WithMain)
-target_link_libraries(util_tests util Catch2::Catch2WithMain)
-target_link_libraries(physics util)
-target_link_directories(graphics INTERFACE ${CMAKE_SOURCE_DIR}/lib)
-target_link_libraries(graphics util)
-target_link_libraries(engine physics graphics glfw)
-target_link_libraries(load_png PNG::PNG)
 target_link_libraries(client engine)
+
+# set_target_properties(math_tests util util_tests graphics physics engine client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
