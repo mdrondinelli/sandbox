@@ -17,7 +17,7 @@ Game::Game(Game_create_info const &)
           },
       }, _timeouts{{
           .max_timeouts = 1000,
-            
+          .max_intervals = 1000,
       }} {}
 
 void Game::tick() {
