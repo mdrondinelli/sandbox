@@ -5,7 +5,7 @@ using namespace physics;
 using namespace math;
 Game::Game(Game_create_info const &)
     : _world{
-          World_create_info{
+          {
               .max_particles = 0,
               .max_rigid_bodies = max_rigid_bodies,
               .max_static_bodies = max_static_bodies,
@@ -15,7 +15,10 @@ Game::Game(Game_create_info const &)
               .max_neighbor_groups = max_boxes,
               .gravitational_acceleration = gravitational_acceleration,
           },
-      }, _timeouts{} {}
+      }, _timeouts{{
+          .max_timeouts = 1000,
+            
+      }} {}
 
 void Game::tick() {
   _world.simulate({World_simulate_info{tick_duration, physics_substep_count}});
