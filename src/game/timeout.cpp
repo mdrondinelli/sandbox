@@ -24,6 +24,12 @@ Timeout_manager::Timeout_manager(
 }
 
 Timeout_manager::~Timeout_manager() {
+  _timeouts = {};
+  _intervals = {};
+  _allocated_timeouts = {};
+  _allocated_intervals = {};
+  _expiring_timeouts = {};
+  _expiring_intervals = {};
   util::System_allocator{}.free(_memory);
 }
 
@@ -117,6 +123,8 @@ void Timeout_manager::on_time_passing(double dt) {
                     break;
                   }
                 }
+              } else {
+                ++expiring_interval_it;
               }
             }
           },
@@ -124,6 +132,9 @@ void Timeout_manager::on_time_passing(double dt) {
     } else {
       break;
     }
+  }
+  for (auto const timeout : _expiring_timeouts) {
+    clear(timeout);
   }
   _expiring_timeouts.clear();
   _expiring_intervals.clear();
