@@ -1,13 +1,12 @@
 #include "timeout.h"
 
 #include <array>
-#include <iostream>
 #include <string>
 
 #include <catch2/catch_test_macros.hpp>
 
 namespace marlon::game {
-TEST_CASE("Timemouts work") {
+TEST_CASE("Timeout_manager works") {
   struct Callback : Timeout_callback {
     std::string *s;
     char c;
