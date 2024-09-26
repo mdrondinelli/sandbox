@@ -15,13 +15,13 @@ struct World_create_info {
   util::Size worker_thread_count{math::max(
       static_cast<util::Size>(std::thread::hardware_concurrency()) / 2 - 1,
       util::Size{0})};
-  util::Size max_particles{10000};
-  util::Size max_rigid_bodies{10000};
-  util::Size max_static_bodies{100000};
-  util::Size max_aabb_tree_leaf_nodes{100000};
-  util::Size max_aabb_tree_internal_nodes{100000};
-  util::Size max_neighbor_pairs{20000};
-  util::Size max_neighbor_groups{10000};
+  util::Size max_particles{1000};
+  util::Size max_rigid_bodies{1000};
+  util::Size max_static_bodies{10000};
+  util::Size max_aabb_tree_leaf_nodes{10000};
+  util::Size max_aabb_tree_internal_nodes{10000};
+  util::Size max_neighbor_pairs{2000};
+  util::Size max_neighbor_groups{1000};
   math::Vec3f gravitational_acceleration{math::Vec3f::zero()};
 };
 

@@ -64,6 +64,7 @@ target_link_libraries(game PRIVATE physics)
 # game_tests
 add_executable(
   game_tests
+  "src/game/box_tests.cpp"
   "src/game/timeout_tests.cpp"
 )
 target_include_directories(game_tests PRIVATE src)

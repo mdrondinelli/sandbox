@@ -123,10 +123,16 @@ Box *Box_manager::create_box(Static_box_create_info const &create_info) {
     _world->destroy_object(body);
     throw;
   }
+  if (_box_creation_callback) {
+    _box_creation_callback->on_box_created(box);
+  }
   return box;
 }
 
 void Box_manager::destroy_box(Box *box) noexcept {
+  if (_box_destruction_callback) {
+    _box_destruction_callback->on_box_destroyed(box);
+  }
   _world->destroy_object(box->get_physics_object());
 }
 
