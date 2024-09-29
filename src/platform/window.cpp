@@ -4,8 +4,7 @@
 
 using namespace marlon::math;
 
-namespace marlon {
-namespace engine {
+namespace marlon::platform {
 Window::Window(Window_create_info const &create_info)
     : _glfw_window{[&]() {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
@@ -107,5 +106,4 @@ void Window::set_cursor_mode(Cursor_mode mode) noexcept {
 void Window::pre_input() noexcept {
   _delta_cursor_position = math::Vec2d::zero();
 }
-} // namespace engine
-} // namespace marlon
+} // namespace marlon::platform

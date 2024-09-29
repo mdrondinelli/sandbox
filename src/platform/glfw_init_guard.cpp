@@ -5,13 +5,12 @@
 
 #include <GLFW/glfw3.h>
 
-namespace marlon {
-namespace engine {
+namespace marlon::platform {
 namespace {
 int instance_count{0};
 }
 
-Glfw_init_guard::Glfw_init_guard() {
+Glfw_init_guard::Glfw_init_guard(Glfw_init_guard_create_info const &) {
   if (instance_count != 0) {
     throw std::runtime_error{
         "attempted to construct more than once simultaneous glfw instance"};
@@ -45,5 +44,4 @@ Glfw_init_guard &Glfw_init_guard::operator=(Glfw_init_guard &&other) noexcept {
 void Glfw_init_guard::swap(Glfw_init_guard &other) noexcept {
   std::swap(_owns, other._owns);
 }
-} // namespace engine
-} // namespace marlon
+} // namespace marlon::platform

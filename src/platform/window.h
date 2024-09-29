@@ -1,5 +1,5 @@
-#ifndef MARLON_ENGINE_WINDOW_H
-#define MARLON_ENGINE_WINDOW_H
+#ifndef MARLON_PLATFORM_WINDOW_H
+#define MARLON_PLATFORM_WINDOW_H
 
 #include <optional>
 
@@ -8,8 +8,7 @@
 
 #include "glfw_window.h"
 
-namespace marlon {
-namespace engine {
+namespace marlon::platform {
 enum class Key {
   k_unknown = -1,
   k_space = 32,
@@ -196,7 +195,6 @@ private:
   std::optional<math::Vec2d> _cursor_position;
   math::Vec2d _delta_cursor_position{math::Vec2d::zero()};
 };
-} // namespace engine
-} // namespace marlon
+} // namespace marlon::platform
 
 #endif

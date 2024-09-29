@@ -1,17 +1,17 @@
-#ifndef MARLON_ENGINE_APP_H
-#define MARLON_ENGINE_APP_H
+#ifndef MARLON_PLATOFRM_APP_H
+#define MARLON_PLATOFRM_APP_H
 
 #include <string>
 #include <string_view>
 
-#include "graphics/camera.h"
-#include "graphics/graphics.h"
-#include "graphics/render_stream.h"
-#include "graphics/scene.h"
+#include <graphics/camera.h>
+#include <graphics/graphics.h>
+#include <graphics/render_stream.h>
+#include <graphics/scene.h>
+
 #include "window.h"
 
-namespace marlon {
-namespace engine {
+namespace marlon::platform {
 struct App_create_info {
   std::string_view window_title{"app"};
   math::Vec2i window_extents{1280, 720};
@@ -24,8 +24,7 @@ public:
 
   virtual ~App();
 
-  /** only call once per App lifetime */
-  int run();
+  void run();
 
 protected:
   Window const *get_window() const noexcept;
@@ -49,15 +48,9 @@ protected:
 
   double get_loop_iteration_wall_time() const noexcept;
 
-  virtual void pre_loop();
-
   virtual void pre_input() {}
 
   virtual void post_input() {}
-
-  virtual void pre_render() {}
-
-  virtual void post_render() {}
 
 private:
   class Runtime;
@@ -73,7 +66,6 @@ private:
   bool _looping{false};
   double _loop_iteration_wall_time{0.0};
 };
-} // namespace engine
-} // namespace marlon
+} // namespace marlon::platform
 
 #endif

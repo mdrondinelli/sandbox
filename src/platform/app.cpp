@@ -11,23 +11,16 @@
 #include "glfw_init_guard.h"
 #include "window.h"
 
-namespace marlon::engine {
+namespace marlon::platform {
 class App::Runtime {
 public:
   explicit Runtime(Window_create_info const &window_create_info)
-      : _window{window_create_info},
-        _graphics{[&]() {
-          return graphics::gl::Graphics{{
-              .loader = glfwGetProcAddress,
-              .window = &_window,
-          }};
-        }()},
-        _scene{{}},
-        _render_stream{_graphics.create_render_stream({
-            .target = _graphics.get_default_render_target(),
-            .scene = &_scene,
-            .camera = &_camera,
-        })} {
+      : _glfw_init_guard{{}},
+        _window{window_create_info},
+        _graphics{{
+            .loader = glfwGetProcAddress,
+            .window = &_window,
+        }} {
     glfwSwapInterval(0);
   }
 
@@ -39,25 +32,10 @@ public:
     return &_graphics;
   }
 
-  graphics::Scene *get_scene() noexcept {
-    return &_scene;
-  }
-
-  graphics::Camera *get_camera() noexcept {
-    return &_camera;
-  }
-
-  void render() {
-    _render_stream->render();
-  }
-
 private:
   Glfw_init_guard _glfw_init_guard;
   Window _window;
   graphics::gl::Graphics _graphics;
-  graphics::Scene _scene;
-  graphics::Camera _camera;
-  graphics::Unique_render_stream _render_stream;
 };
 
 App::App(App_create_info const &create_info)
@@ -67,26 +45,14 @@ App::App(App_create_info const &create_info)
 
 App::~App() {}
 
-int App::run() {
+void App::run() {
   assert(_runtime == nullptr);
-  auto result = 0;
-  // try {
   _runtime = std::make_unique<Runtime>(Window_create_info{
       .title = _window_title.c_str(),
       .extents = _window_extents,
       .full_screen = _full_screen,
   });
-  pre_loop();
   do_loop();
-  // } catch (std::exception &e) {
-  //   std::cerr << "Caught exception: " << e.what() << "\n";
-  //   result = 1;
-  // } catch (...) {
-  //   std::cerr << "Caught unknown exception\n";
-  //   result = 2;
-  // }
-  _runtime = nullptr;
-  return result;
 }
 
 Window const *App::get_window() const noexcept {
@@ -159,4 +125,4 @@ void App::do_input() {
   glfwPollEvents();
   post_input();
 }
-} // namespace marlon::engine
+} // namespace marlon::platform

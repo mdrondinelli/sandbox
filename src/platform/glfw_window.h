@@ -1,13 +1,12 @@
-#ifndef MARLON_ENGINE_GLFW_WINDOW_H
-#define MARLON_ENGINE_GLFW_WINDOW_H
+#ifndef MARLON_PLATFORM_GLFW_WINDOW_H
+#define MARLON_PLATFORM_GLFW_WINDOW_H
 
 #include <memory>
 
 struct GLFWmonitor;
 struct GLFWwindow;
 
-namespace marlon {
-namespace engine {
+namespace marlon::platform {
 struct Glfw_window_deleter {
   void operator()(GLFWwindow *ptr) const;
 };
@@ -19,7 +18,6 @@ Unique_glfw_window_ptr make_unique_glfw_window(int width,
                                                const char *title,
                                                GLFWmonitor *monitor = nullptr,
                                                GLFWwindow *share = nullptr);
-} // namespace engine
-} // namespace marlon
+} // namespace marlon::platform
 
 #endif

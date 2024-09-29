@@ -12,6 +12,9 @@ add_subdirectory(lib/Catch2-3.6.0)
 find_package(glfw3 3.3.6 REQUIRED)
 find_package(PNG REQUIRED)
 
+# math
+# (header only)
+
 # math_tests
 add_executable(
   math_tests
@@ -105,27 +108,25 @@ target_include_directories(graphics PRIVATE include)
 target_link_directories(graphics INTERFACE ${CMAKE_SOURCE_DIR}/lib)
 target_link_libraries(graphics util)
 
-# engine
+# platform
 add_library(
-  engine
-  "src/engine/app.cpp"
-  "src/engine/glfw_init_guard.cpp"
-  "src/engine/glfw_window.cpp"
-  "src/engine/window.cpp"
+  platform
+  "src/platform/app.cpp"
+  "src/platform/glfw_init_guard.cpp"
+  "src/platform/glfw_window.cpp"
+  "src/platform/window.cpp"
 )
-target_include_directories(engine PRIVATE src)
-target_include_directories(engine PRIVATE include)
-target_link_libraries(engine physics graphics glfw)
+target_include_directories(platform PRIVATE src)
+target_include_directories(platform PRIVATE include)
+target_link_libraries(platform physics graphics glfw)
 
-# client
+# app
 add_executable(
-  client
-  "src/client/dynamic_prop.cpp"
-  "src/client/static_prop.cpp"
-  "src/client/main.cpp"
+  app
+  "src/app/main.cpp"
 )
-target_include_directories(client PRIVATE include)
-target_compile_definitions(client PRIVATE CATCH_CONFIG_DISABLE)
-target_link_libraries(client engine)
+target_include_directories(app PRIVATE include)
+target_compile_definitions(app PRIVATE CATCH_CONFIG_DISABLE)
+target_link_libraries(app platform game)
 
-# set_target_properties(math_tests util util_tests graphics physics engine client PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+# set_target_properties(math_tests util util_tests graphics physics platform app PROPERTIES MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")

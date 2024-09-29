@@ -4,8 +4,7 @@
 
 #include <GLFW/glfw3.h>
 
-namespace marlon {
-namespace engine {
+namespace marlon::platform {
 void Glfw_window_deleter::operator()(GLFWwindow *ptr) const {
   glfwDestroyWindow(ptr);
 }
@@ -23,5 +22,4 @@ Unique_glfw_window_ptr make_unique_glfw_window(int width,
   }
   return Unique_glfw_window_ptr{window};
 }
-} // namespace engine
-} // namespace marlon
+} // namespace marlon::platform
