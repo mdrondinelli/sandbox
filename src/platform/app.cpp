@@ -40,18 +40,15 @@ private:
 
 App::App(App_create_info const &create_info)
     : _window_title{create_info.window_title},
-      _window_extents{create_info.window_extents},
-      _full_screen{create_info.full_screen} {}
+      _runtime{std::make_unique<Runtime>(Window_create_info{
+          .title = _window_title.c_str(),
+          .extents = create_info.window_extents,
+          .full_screen = create_info.full_screen,
+      })} {}
 
 App::~App() {}
 
 void App::run() {
-  assert(_runtime == nullptr);
-  _runtime = std::make_unique<Runtime>(Window_create_info{
-      .title = _window_title.c_str(),
-      .extents = _window_extents,
-      .full_screen = _full_screen,
-  });
   do_loop();
 }
 

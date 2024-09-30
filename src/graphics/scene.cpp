@@ -1,5 +1,7 @@
 #include "scene.h"
 
+#include <utility>
+
 namespace marlon {
 namespace graphics {
 using namespace math;
@@ -23,6 +25,27 @@ Scene::Scene(Scene_create_info const &create_info) noexcept
 Scene::~Scene() {
   _surfaces = {};
   System_allocator{}.free(_memory);
+}
+
+Scene::Scene(Scene &&other) noexcept
+    : _memory{std::exchange(other._memory, Block{})},
+      _surfaces{std::move(other._surfaces)},
+      _sun{std::move(other._sun)},
+      _sky_irradiance{std::move(other._sky_irradiance)},
+      _ground_albedo{std::move(other._ground_albedo)} {}
+
+Scene &Scene::operator=(Scene &&other) noexcept {
+  auto temp{std::move(other)};
+  swap(temp);
+  return *this;
+}
+
+void Scene::swap(Scene &other) noexcept {
+  std::swap(_memory, other._memory);
+  std::swap(_surfaces, other._surfaces);
+  std::swap(_sun, other._sun);
+  std::swap(_sky_irradiance, other._sky_irradiance);
+  std::swap(_ground_albedo, other._ground_albedo);
 }
 } // namespace graphics
 } // namespace marlon

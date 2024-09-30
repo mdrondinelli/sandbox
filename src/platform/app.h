@@ -60,8 +60,6 @@ private:
   void do_input();
 
   std::string _window_title;
-  math::Vec2i _window_extents;
-  bool _full_screen;
   std::unique_ptr<Runtime> _runtime;
   bool _looping{false};
   double _loop_iteration_wall_time{0.0};

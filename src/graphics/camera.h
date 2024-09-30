@@ -1,7 +1,8 @@
 #ifndef MARLON_GRAPHICS_CAMERA_H
 #define MARLON_GRAPHICS_CAMERA_H
 
-#include "../math/math.h"
+#include <math/quat.h>
+#include <math/vec.h>
 
 namespace marlon {
 namespace graphics {

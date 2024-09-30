@@ -16,8 +16,8 @@
 namespace marlon {
 namespace util {
 struct Const_block {
-  std::byte const *begin;
-  std::byte const *end;
+  std::byte const *begin{};
+  std::byte const *end{};
 
   Const_block() = default;
 
@@ -27,14 +27,18 @@ struct Const_block {
   constexpr Const_block(std::byte const *begin, std::byte const *end) noexcept
       : begin{begin}, end{end} {}
 
+  constexpr operator bool() const noexcept {
+    return begin != nullptr;
+  }
+
   constexpr Size size() const noexcept {
     return end - begin;
   }
 };
 
 struct Block {
-  std::byte *begin;
-  std::byte *end;
+  std::byte *begin{};
+  std::byte *end{};
 
   Block() = default;
 
@@ -46,6 +50,10 @@ struct Block {
 
   constexpr operator Const_block() const noexcept {
     return {begin, end};
+  }
+
+  constexpr operator bool() const noexcept {
+    return begin != nullptr;
   }
 
   constexpr Size size() const noexcept {

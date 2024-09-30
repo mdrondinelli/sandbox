@@ -16,9 +16,15 @@ struct Scene_create_info {
 
 class Scene {
 public:
+  Scene() = default;
+
   explicit Scene(Scene_create_info const &create_info) noexcept;
 
   ~Scene();
+
+  Scene(Scene &&other) noexcept;
+
+  Scene &operator=(Scene &&other) noexcept;
 
   util::Set<Surface const *> const &surfaces() const noexcept {
     return _surfaces;
@@ -61,6 +67,8 @@ public:
   }
 
 private:
+  void swap(Scene &other) noexcept;
+
   util::Block _memory;
   util::Set<Surface const *> _surfaces;
   std::optional<Directional_light> _sun;
